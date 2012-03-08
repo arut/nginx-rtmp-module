@@ -1,10 +1,11 @@
 ngx_addon_name="ngx_rtmp_module"
 
-NGX_ADDON_SRC="$NGX_ADDON_SRC \
+CORE_MODULES="$CORE_MODULES ngx_rtmp_module"
+
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
                $ngx_addon_dir/ngx_rtmp.c \
                $ngx_addon_dir/ngx_rtmp_handler.c \
                $ngx_addon_dir/ngx_rtmp_core_module.c \
                $ngx_addon_dir/ngx_rtmp_amf0.c \
                $ngx_addon_dir/ngx_rtmp_netconn.c \
-               $ngx_addon_dir/ngx_rtmp_netstream.c \
-	       "
+               $ngx_addon_dir/ngx_rtmp_netstream.c"
