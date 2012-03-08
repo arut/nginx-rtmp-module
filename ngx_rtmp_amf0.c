@@ -8,12 +8,13 @@
 static ngx_int_t
 ngx_rtmp_amf0_get(ngx_chain_t **l, void *p, size_t n)
 {
-    ngx_buf_t              *b;
+    ngx_buf_t       *b;
+    size_t          size;
 
     if (!n)
-        return;
+        return NGX_OK;
 
-    for(; *l; l = &l->next) {
+    for(; *l; l = &(*l)->next) {
 
         b = (*l)->buf;
 
@@ -24,8 +25,10 @@ ngx_rtmp_amf0_get(ngx_chain_t **l, void *p, size_t n)
             return NGX_OK;
         }
 
+        size = b->last - b->pos;
+
         if (p)
-            p = ngx_cpymem(p, b->pos, b->last - b->pos);
+            p = ngx_cpymem(p, b->pos, size);
 
         n -= size;
     }
@@ -37,7 +40,8 @@ ngx_rtmp_amf0_get(ngx_chain_t **l, void *p, size_t n)
 static ngx_int_t
 ngx_rtmp_amf0_put(ngx_chain_t **l, ngx_chain_t **free, void *p, size_t n)
 {
-    ngx_buf_t              *b;
+    ngx_buf_t       *b;
+    size_t          size;
 
     while(n) {
         b = (*l) ? (*l)->buf : NULL;
@@ -59,20 +63,24 @@ ngx_rtmp_amf0_put(ngx_chain_t **l, ngx_chain_t **free, void *p, size_t n)
             b->pos = b->last = b->start;
         }
 
-        if (b->end - b->last <= n) {
+        size = b->end - b->last;
+
+        if (size <= n) {
             b->last = ngx_cpymem(b->last, p, n);
             return NGX_OK;
         }
 
-        b->last = ngx_cpymem(b->last, p, b->end - b->last);
-        p += (b->end - b->last);
-        n -= (b->end - b->last);
+        b->last = ngx_cpymem(b->last, p, size);
+        p = (u_char*)p + size;
+        n -= size;
     }
+
+    return NGX_OK;
 }
 
 
 static ngx_int_t 
-ngx_rtmp_amf0_read_object(ngx_chain_t **l, ngx_rtmp_amf0_objelt_t *elts, 
+ngx_rtmp_amf0_read_object(ngx_chain_t **l, ngx_rtmp_amf0_elt_t *elts, 
         size_t nelts)
 {
     uint8_t                 type;
@@ -81,8 +89,8 @@ ngx_rtmp_amf0_read_object(ngx_chain_t **l, ngx_rtmp_amf0_objelt_t *elts,
     ngx_int_t               rc;
 
     maxlen = 0;
-    for(i = 0; i < n; ++i) {
-        namelen = strlen(v[n].name);
+    for(n = 0; n < nelts; ++n) {
+        namelen = strlen(elts[n].name);
         if (namelen > maxlen)
             maxlen = namelen;
     }
@@ -117,11 +125,11 @@ ngx_rtmp_amf0_read_object(ngx_chain_t **l, ngx_rtmp_amf0_objelt_t *elts,
          * then we could be able to use binary search */
         for(n = 0; n < nelts && strcmp(name, elts[n].name); ++n);
 
-        if (ngx_rtmp_amf0_read(s, n < nelts ? &elts[n] : NULL, 1) != NGX_OK)
+        if (ngx_rtmp_amf0_read(l, n < nelts ? &elts[n] : NULL, 1) != NGX_OK)
             return NGX_ERROR;
     }
 
-    if (ngx_rtmp_amf0_get(l, type, 1) != NGX_OK
+    if (ngx_rtmp_amf0_get(l, &type, 1) != NGX_OK
         || type != NGX_RTMP_AMF0_END)
     {
         return NGX_ERROR;
@@ -130,14 +138,14 @@ ngx_rtmp_amf0_read_object(ngx_chain_t **l, ngx_rtmp_amf0_objelt_t *elts,
     return NGX_OK;
 }
 
-#define NGX_RTMP_AMF0_TILL_END_FLAG (size_t(1) << (sizeof(size_t) * 8 - 1))
+#define NGX_RTMP_AMF0_TILL_END_FLAG ((size_t)1 << (sizeof(size_t) * 8 - 1))
 
 ngx_int_t 
 ngx_rtmp_amf0_read(ngx_chain_t **l, ngx_rtmp_amf0_elt_t *elts, size_t nelts)
 {
     void                   *data;
     uint8_t                 type;
-    size_t                  n, clen;
+    size_t                  n;
     uint16_t                len;
     ngx_int_t               rc;
     int                     till_end;
@@ -176,16 +184,16 @@ ngx_rtmp_amf0_read(ngx_chain_t **l, ngx_rtmp_amf0_elt_t *elts, size_t nelts)
                 if (data == NULL) {
                     rc = ngx_rtmp_amf0_get(l, data, len);
 
-                } else if (elts->len <= len)
+                } else if (elts->len <= len) {
                     rc = ngx_rtmp_amf0_get(l, data, elts->len - 1);
                     if (rc != NGX_OK)
                         return NGX_ERROR;
-                    data[elts->len - 1] = 0;
+                    ((char*)data)[elts->len - 1] = 0;
                     rc = ngx_rtmp_amf0_get(l, NULL, len - elts->len + 1);
 
                 } else {
                     rc = ngx_rtmp_amf0_get(l, data, len);
-                    data[len] = 0;
+                    ((char*)data)[len] = 0;
                 }
 
                 if (rc != NGX_OK)
@@ -264,7 +272,6 @@ ngx_rtmp_amf0_write(ngx_chain_t **l, ngx_chain_t **free,
         ngx_rtmp_amf0_elt_t *elts, size_t nelts)
 {
     size_t                  n;
-    ngx_int_t               rc;
     uint8_t                 type;
     void                   *data;
     uint16_t                len;

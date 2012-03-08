@@ -17,6 +17,8 @@
 
 #define NGX_RTMP_DEFAULT_CHUNK_SIZE 128
 
+#define NGX_LOG_DEBUG_RTMP NGX_LOG_DEBUG_CORE
+
 
 typedef struct {
     void                  **main_conf;
@@ -119,7 +121,7 @@ typedef struct {
 #define NGX_RTMP_SUBSCRIBER  0x02
 
 
-typedef struct {
+struct ngx_rtmp_session_s {
     uint32_t                signature;         /* "RTMP" */
 
     ngx_connection_t       *connection;
@@ -127,6 +129,8 @@ typedef struct {
     void                  **ctx;
     void                  **main_conf;
     void                  **srv_conf;
+
+    ngx_str_t              *addr_text;
 
     ngx_uint_t              chunk_size;
     ngx_chain_t            *free;
@@ -148,10 +152,13 @@ typedef struct {
     ngx_rtmp_packet_hdr_t   out_hdr;
 
     /* broadcast */
-    ngx_str_t              *name;
-    ngx_rtmp_session_t     *next;
+    ngx_str_t               name;
+    struct ngx_rtmp_session_s
+                            *next;
     ngx_uint_t              flags;
-} ngx_rtmp_session_t;
+};
+
+typedef struct ngx_rtmp_session_s ngx_rtmp_session_t;
 
 
 #define NGX_RTMP_SESSION_HASH_SIZE 16384
@@ -235,13 +242,11 @@ typedef struct {
 void ngx_rtmp_init_connection(ngx_connection_t *c);    
 void ngx_rtmp_close_session(ngx_rtmp_session_t *s);
 u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
-void ngx_rtmp_send(ngx_event_t *wev);
-void ngx_rtmp_recv(ngx_event_t *wev);
 
 void ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, uint32_t chunk_size);
 void ngx_rtmp_set_bytes_read(ngx_rtmp_session_t *s, uint32_t bytes_read);
 void ngx_rtmp_set_client_buffer_time(ngx_rtmp_session_t *s, int16_t msec);
-void ngx_rtmp_clear_buffer(ngx_rtmp_sesion_t *s);
+void ngx_rtmp_clear_buffer(ngx_rtmp_session_t *s);
 void ngx_rtmp_set_ping_time(ngx_rtmp_session_t *s, int16_t msec);
 void ngx_rtmp_set_server_bw(ngx_rtmp_session_t *s, uint32_t bw, 
     uint8_t limit_type);
@@ -260,6 +265,7 @@ void ngx_rtmp_send_packet(ngx_rtmp_session_t *s,
 
 /* NetConnection methods */
 ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, ngx_chain_t **l);
+ngx_int_t ngx_rtmp_call(ngx_rtmp_session_t *s, ngx_chain_t **l);
 ngx_int_t ngx_rtmp_close(ngx_rtmp_session_t *s, ngx_chain_t **l);
 ngx_int_t ngx_rtmp_createstream(ngx_rtmp_session_t *s, ngx_chain_t **l);
 

@@ -18,8 +18,6 @@ static char *ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-static char *ngx_rtmp_core_protocol(ngx_conf_t *cf, ngx_command_t *cmd,
-    void *conf);
 static char *ngx_rtmp_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -156,12 +154,9 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     cscf->timeout = NGX_CONF_UNSET_MSEC;
     cscf->resolver_timeout = NGX_CONF_UNSET_MSEC;
     cscf->so_keepalive = NGX_CONF_UNSET;
-    cssf->buffers = NGX_CONF_UNSET;
+    cscf->buffers = NGX_CONF_UNSET;
 
     cscf->resolver = NGX_CONF_UNSET_PTR;
-
-    cscf->file_name = cf->conf_file->file.name.data;
-    cscf->line = cf->conf_file->line;
 
     return cscf;
 }
@@ -265,8 +260,6 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_rtmp_core_srv_conf_t  *cscf = conf;
-
     size_t                      len, off;
     in_port_t                   port;
     ngx_str_t                  *value;
@@ -361,17 +354,6 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         module = ngx_modules[m]->ctx;
-
-        if (module->protocol == NULL) {
-            continue;
-        }
-
-        for (i = 0; module->protocol->port[i]; i++) {
-            if (module->protocol->port[i] == u.port) {
-                cscf->protocol = module->protocol;
-                break;
-            }
-        }
     }
 
     for (i = 2; i < cf->args->nelts; i++) {
