@@ -1,0 +1,7 @@
++1) string allocations inside ngx_chain_t
++2) AMF0 creation
+3) add AMF0 command parsing & replies to RTMP handler
+4) improve handshake
+5) add session_buckets option to core srv conf
+
+Do we need loc confs (=fms apps) ?
