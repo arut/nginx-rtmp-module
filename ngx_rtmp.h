@@ -108,10 +108,10 @@ typedef struct {
 
 
 typedef struct {
-    uint8_t                 channel;
     uint8_t                 type;
+    uint8_t                 channel;
     uint8_t                 hsize;
-    uint8_t                 size;
+    uint32_t                size;
     uint32_t                timer;
     uint32_t                stream;
 } ngx_rtmp_packet_hdr_t;

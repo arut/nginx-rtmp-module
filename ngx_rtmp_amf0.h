@@ -25,6 +25,13 @@ typedef struct {
     size_t                  len;
 } ngx_rtmp_amf0_elt_t;
 
+
+typedef struct {
+    ngx_chain_t           **link, **free;
+    ngx_log_t              *log;
+} ngx_rtmp_amf0_ctx_t;
+
+
 /*
 
 struct {
@@ -70,11 +77,11 @@ ngx_rtmp_amf0_write(l, free, elts, sizeof(elts));
 */
 
 /* reading AMF0 */
-ngx_int_t ngx_rtmp_amf0_read(ngx_chain_t **l, 
+ngx_int_t ngx_rtmp_amf0_read(ngx_rtmp_amf0_ctx_t *ctx,
         ngx_rtmp_amf0_elt_t *elts, size_t nelts);
 
 /* writing AMF0 */
-ngx_int_t ngx_rtmp_amf0_write(ngx_chain_t **l, ngx_chain_t **free,
+ngx_int_t ngx_rtmp_amf0_write(ngx_rtmp_amf0_ctx_t *ctx,
         ngx_rtmp_amf0_elt_t *elts, size_t nelts);
 
 
