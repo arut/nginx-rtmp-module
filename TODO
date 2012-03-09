@@ -1,7 +1,32 @@
-+1) string allocations inside ngx_chain_t
-+2) AMF0 creation
-3) add AMF0 command parsing & replies to RTMP handler
-4) improve handshake
-5) add session_buckets option to core srv conf
+- RTMP replies
 
-Do we need loc confs (=fms apps) ?
+- standard-compliance
+    - improve handshake
+    - names
+
+- Input buffers:
+  allocate a continuous block &
+  allocate input buffers
+  in it. Upon chunk size change 
+  re-split the same buffer for
+  new chunk size. Use temp
+  buffer as temporary
+  storage of overflow data.
+  Max chunk size if 65K which is
+  really a lot.
+
+- Output buffers:
+  implement shared (per-loc/srv) buffers 
+  for output of a) header(max 18b) b) chunk (fixed-sized)
+  We never change output chunk size.
+  Chunk buffers should be ref-counted.
+
+- implement loc confs (=fms apps)
+    loc options:
+    - session buckets
+    - broadcast/file
+    - input buffer size per connection
+    - output chunk size
+    - output chunk buffer size
+    - output header buffer size
+    - HTTP callbacks on invoke calls

@@ -102,18 +102,18 @@ typedef struct {
 
 
 typedef struct {
-    ngx_array_t             servers;     /* ngx_rtmp_core_srv_conf_t */
-    ngx_array_t             listen;      /* ngx_rtmp_listen_t */
+    ngx_array_t             servers;    /* ngx_rtmp_core_srv_conf_t */
+    ngx_array_t             listen;     /* ngx_rtmp_listen_t */
 } ngx_rtmp_core_main_conf_t;
 
 
 typedef struct {
-    uint8_t                 type;
-    uint8_t                 channel;
-    uint8_t                 hsize;
-    uint32_t                size;
-    uint32_t                timer;
-    uint32_t                stream;
+    uint8_t                 fmt;        /* header format */
+    uint32_t                csid;       /* chunk stream id */
+    uint32_t                timestamp;
+    uint32_t                mlen;       /* message length */
+    uint8_t                 type;       /* message type id */
+    uint32_t                msid;       /* message stream id */
 } ngx_rtmp_packet_hdr_t;
 
 
@@ -156,6 +156,7 @@ struct ngx_rtmp_session_s {
     struct ngx_rtmp_session_s
                             *next;
     ngx_uint_t              flags;
+    uint32_t                csid;
 };
 
 typedef struct ngx_rtmp_session_s ngx_rtmp_session_t;
@@ -191,28 +192,40 @@ typedef struct {
 } ngx_rtmp_module_t;
 
 
-/* RTMP packet types*/
-#define NGX_RTMP_PACKET_CHUNK_SIZE  0x01
-#define NGX_RTMP_PACKET_BYTES_READ  0x03
-#define NGX_RTMP_PACKET_PING        0x04
-#define NGX_RTMP_PACKET_SERVER_BW   0x05
-#define NGX_RTMP_PACKET_CLIENT_BW   0x06
-#define NGX_RTMP_PACKET_AUDIO       0x08
-#define NGX_RTMP_PACKET_VIDEO       0x09
-#define NGX_RTMP_PACKET_FLEX        0x0f
-#define NGX_RTMP_PACKET_FLEX_SO     0x10
-#define NGX_RTMP_PACKET_FLEX_MSG    0x11
-#define NGX_RTMP_PACKET_NOTIFY      0x12
-#define NGX_RTMP_PACKET_SO          0x13
-#define NGX_RTMP_PACKET_INVOKE      0x14
+/* Chunk header:
+ *   max 3  basic header
+ * + max 11 message header
+ * + max 4  extended header (timestamp) */
+#define NGX_RTMP_MAX_CHUNK_HEADER   18
 
-/* RMTP ping types */
-#define NGX_RMTP_PING_CLEAR_STEAM   0
-#define NGX_RMTP_PING_CLEAR_BUFFER  1
-#define NGX_RMTP_PING_CLIENT_TIME   3
-#define NGX_RMTP_PING_RESET_STREAM  4
-#define NGX_RMTP_PING_PING          6
-#define NGX_RMTP_PING_PONG          7
+
+/* RTMP packet types*/
+#define NGX_RTMP_PACKET_CHUNK_SIZE  1
+#define NGX_RTMP_PACKET_ABORT       2
+#define NGX_RTMP_PACKET_ACK         3
+#define NGX_RTMP_PACKET_CTL         4
+#define NGX_RTMP_PACKET_ACK_SIZE    5
+#define NGX_RTMP_PACKET_BANDWIDTH   6
+#define NGX_RTMP_PACKET_EDGE        7
+#define NGX_RTMP_PACKET_AUDIO       8
+#define NGX_RTMP_PACKET_VIDEO       9
+#define NGX_RTMP_PACKET_AMF3_META   15
+#define NGX_RTMP_PACKET_AMF3_SHARED 16
+#define NGX_RTMP_PACKET_AMF3_CMD    17
+#define NGX_RTMP_PACKET_AMF0_META   18
+#define NGX_RTMP_PACKET_AMF0_SHARED 19
+#define NGX_RTMP_PACKET_AMF0_CMD    20
+#define NGX_RTMP_PACKET_AGGREGATE   22
+
+
+/* RMTP control message types */
+#define NGX_RTMP_CTL_STREAM_BEGIN   0
+#define NGX_RTMP_CTL_STREAM_EOF     1
+#define NGX_RTMP_CTL_STREAM_DRY     2
+#define NGX_RTMP_CTL_SET_BUFLEN     3
+#define NGX_RTMP_CTL_RECORDED       4
+#define NGX_RTMP_CTL_PING_REQUEST   6
+#define NGX_RTMP_CTL_PING_RESPONSE  7
 
 
 #define NGX_RTMP_MODULE         0x504D5452     /* "RTMP" */
@@ -264,22 +277,22 @@ void ngx_rtmp_send_packet(ngx_rtmp_session_t *s,
 
 
 /* NetConnection methods */
-ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_call(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_close(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_createstream(ngx_rtmp_session_t *s, ngx_chain_t **l);
+ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_call(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_close(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_createstream(ngx_rtmp_session_t *s, ngx_chain_t *l);
 
 
 /* NetStream methods */
-ngx_int_t ngx_rtmp_play(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_play2(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_deletestream(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_closestream(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_receiveaudio(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_receivevideo(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_publish(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_seek(ngx_rtmp_session_t *s, ngx_chain_t **l);
-ngx_int_t ngx_rtmp_pause(ngx_rtmp_session_t *s, ngx_chain_t **l);
+ngx_int_t ngx_rtmp_play(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_play2(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_deletestream(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_closestream(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_receiveaudio(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_receivevideo(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_publish(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_seek(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_pause(ngx_rtmp_session_t *s, ngx_chain_t *l);
 
 
 extern ngx_uint_t    ngx_rtmp_max_module;

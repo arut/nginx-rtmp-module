@@ -23,20 +23,18 @@ static void ngx_rtmp_send(ngx_event_t *rev);
 
 static void ngx_rtmp_close_connection(ngx_connection_t *c);
 
-static size_t   hdrsizes[] = { 12, 8, 4, 1 };
-
 #ifdef NGX_DEBUG
 static char*
 ngx_rtmp_packet_type(uint8_t type) {
     static char* types[] = {
         "?",
         "chunk_size",
-        "?",
-        "bytes_read",
-        "ping",
-        "server_bw",
-        "client_bw",
-        "?",
+        "abort",
+        "ack",
+        "ctl",
+        "ack_size",
+        "bandwidth",
+        "edge",
         "audio",
         "video",
         "?",
@@ -44,12 +42,14 @@ ngx_rtmp_packet_type(uint8_t type) {
         "?",
         "?",
         "?",
-        "flex",
-        "flex_so",
-        "flex_msg",
-        "notify",
-        "so",
-        "invoke"
+        "amf3_meta",
+        "amf3_shared",
+        "amd3_cmd",
+        "amf0_meta",
+        "amf0_shared",
+        "amf0_cmd",
+        "?",
+        "aggregate"
     };
 
     return type < sizeof(types) / sizeof(types[0])
@@ -212,8 +212,7 @@ ngx_rtmp_init_session(ngx_connection_t *c)
 
     s->chunk_size = NGX_RTMP_DEFAULT_CHUNK_SIZE;
 
-    /* TODO: we should move preallcation to a func to call on user request */
-    bufs.size = s->chunk_size + 14 /* + max header size */;
+    bufs.size = s->chunk_size + NGX_RTMP_MAX_CHUNK_HEADER;
     bufs.num = cscf->buffers;
 
     s->free = ngx_create_chain_of_bufs(c->pool, &bufs);
@@ -363,13 +362,15 @@ restart:
 void
 ngx_rtmp_recv(ngx_event_t *rev)
 {
-    ngx_int_t                  n;
-    ngx_connection_t          *c;
-    ngx_rtmp_session_t        *s;
-    ngx_rtmp_core_srv_conf_t  *cscf;
-    ngx_buf_t                 *b, *bb;
-    u_char                     h, *p, *pp;
-    ngx_chain_t               *lin;
+    ngx_int_t                   n;
+    ngx_connection_t           *c;
+    ngx_rtmp_session_t         *s;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+    ngx_buf_t                  *b, *bb;
+    u_char                     *p, *pp;
+    ngx_chain_t                *lin;
+    ngx_rtmp_packet_hdr_t      *h;
+    uint32_t                    timestamp;
 
     c = rev->data;
     s = c->data;
@@ -413,86 +414,106 @@ ngx_rtmp_recv(ngx_event_t *rev)
             return;
         }
 
-        /* first byte of a packet? */
-        if (b->last == b->start) {
-            h = *b->last;
-            s->in_hdr.hsize   = hdrsizes[(h >> 6) & 0x03];
-            s->in_hdr.channel = h & 0x3f;
+        b->last += n;
+        h = &s->in_hdr;
 
-            ngx_log_debug3(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                    "RTMP start %d hd=%d ch=%d",
-                    (int)h,
-                    (int)s->in_hdr.hsize,
-                    (int)s->in_hdr.channel);
+        /* parse headers */
+        if (b->pos == b->start) {
+            p = b->pos;
+            timestamp = h->timestamp;
+
+            /* chunk basic header */
+            h->fmt  = (*p >> 6) & 0x03;
+            h->csid = *p++ & 0x3f;
+
+            if (h->csid == 0) {
+                if (b->last - p < 1)
+                    continue;
+                h->csid = 64;
+                h->csid += *(uint8_t*)p++;
+
+            } else if (h->csid == 1) {
+                if (b->last - p < 2)
+                    continue;
+                h->csid = 64;
+                h->csid += *(uint8_t*)p++;
+                h->csid += (uint32_t)256 * (*(uint8_t*)p++);
+            }
+
+            ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                    "RTMP bheader fmt=%d csid=%D",
+                    (int)h->fmt, h->csid);
+
+            if (h->fmt <= 2 ) {
+                if (b->last - p < 3)
+                    continue;
+                /* timestamp: 
+                 *  big-endian 3b -> little-endian 4b */
+                pp = (u_char*)&timestamp;
+                pp[2] = *p++;
+                pp[1] = *p++;
+                pp[0] = *p++;
+                pp[3] = 0;
+
+                if (h->fmt <= 1) {
+                    if (b->last - p < 4)
+                        continue;
+                    /* size:
+                     *  big-endian 3b -> little-endian 4b 
+                     * type:
+                     *  1b -> 1b*/
+                    pp = (u_char*)&h->mlen;
+                    pp[2] = *p++;
+                    pp[1] = *p++;
+                    pp[0] = *p++;
+                    pp[3] = 0;
+                    h->type = *(uint8_t*)p++;
+
+                    if (h->fmt == 0) {
+                        if (b->last - p < 4)
+                            continue;
+                        /* stream:
+                         *  little-endian 4b -> little-endian 4b */
+                        pp = (u_char*)&h->msid;
+                        pp[0] = *p++;
+                        pp[1] = *p++;
+                        pp[2] = *p++;
+                        pp[3] = *p++;
+                    }
+                }
+
+                /* extended header */
+                if (timestamp == 0x00ffffff) {
+                    if (b->last - p < 4)
+                        continue;
+                    pp = (u_char*)&h->timestamp;
+                    pp[3] = *p++;
+                    pp[2] = *p++;
+                    pp[1] = *p++;
+                    pp[0] = *p++;
+                } else if (h->fmt) {
+                    h->timestamp += timestamp;
+                } else {
+                    h->timestamp = timestamp;
+                }
+            }
+
+            ngx_log_debug5(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                    "RTMP mheader %s (%d) "
+                    "timestamp=%D mlen=%D msid=%D",
+                    ngx_rtmp_packet_type(h->type), (int)h->type,
+                    h->timestamp, h->mlen, h->msid);
+
+            /* header done */
+            b->pos = p;
         }
 
-        b->last += n;
-        if (b->last - b->pos < s->in_hdr.hsize)
+        /* parse payload */
+        if (b->last - b->pos < (ngx_int_t)ngx_min(h->mlen, s->chunk_size)) 
             continue;
-        p = b->start + 1;
-
-        /* basic header */
-        do {
-            if (s->in_hdr.hsize < 4)
-                break;
-
-            /* FIXME: is this fix really needed?
-            if (s->in_hdr.channel == 1) {
-                p += 2;
-            }*/
-
-            /* timer: 
-             *  big-endian 3b -> little-endian 4b */
-            pp = (u_char*)&s->in_hdr.timer;
-            pp[0] = p[2];
-            pp[1] = p[1];
-            pp[2] = p[0];
-            pp[3] = 0;
-            if (s->in_hdr.hsize < 8)
-                break;
-
-            /* size:
-             *  big-endian 3b -> little-endian 4b 
-             * type:
-             *  1b -> 1b*/
-            p += 3;
-            pp = (u_char*)&s->in_hdr.size;
-            pp[0] = p[2];
-            pp[1] = p[1];
-            pp[2] = p[0];
-            pp[3] = 0;
-            p += 3;
-            pp = &s->in_hdr.type;
-            *pp = *p;
-            if (s->in_hdr.hsize < 12)
-                break;
-
-            /* stream:
-             *  little-endian 4b -> little-endian 4b */
-            ++p;
-            ngx_memcpy(&s->in_hdr.stream, p, 4);
-            p += 4;
-
-        } while(0);
-
-        ngx_log_debug7(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                "RTMP header %s (%d) ch=%d hd=%d "
-                "sz=%D tm=%D st=%D",
-                ngx_rtmp_packet_type(s->in_hdr.type),
-                (int)s->in_hdr.type,
-                (int)s->in_hdr.channel,
-                (int)s->in_hdr.hsize,
-                s->in_hdr.size,
-                s->in_hdr.timer,
-                s->in_hdr.stream);
-
-        if (b->last < p + ngx_min(s->in_hdr.size, s->chunk_size)) 
-            continue;
-
-        b->pos = p;
 
         /* if fragmented then wait for more fragments */
-        if (s->in_hdr.size > s->chunk_size) {
+        if (h->mlen > s->chunk_size) {
             if (s->free == NULL) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 
                         NGX_ERROR, "no free buffers");
@@ -503,14 +524,14 @@ ngx_rtmp_recv(ngx_event_t *rev)
             s->free = s->free->next;
             lin = lin->next;
             lin->next = NULL;
-            s->in_hdr.size -= s->chunk_size;
+            h->mlen -= s->chunk_size;
             bb = lin->buf;
             bb->pos = bb->last = bb->start;
             continue;
         }
 
         /* handle packet! */
-        if (ngx_rtmp_receive_packet(s, &s->in_hdr, s->in) != NGX_OK) {
+        if (ngx_rtmp_receive_packet(s, h, s->in) != NGX_OK) {
             ngx_rtmp_close_session(s);
             return;
         }
@@ -518,10 +539,10 @@ ngx_rtmp_recv(ngx_event_t *rev)
         bb->pos = bb->last = bb->start;
 
         /* copy remained data to first buffer */
-        if (s->in_hdr.size < b->last - b->pos) {
+        if (h->mlen < b->last - b->pos) {
             bb->last = ngx_movemem(bb->start, 
-                    b->pos + s->in_hdr.size, 
-                    b->last - b->pos - s->in_hdr.size);
+                    b->pos + h->mlen, 
+                    b->last - b->pos - h->mlen);
         }
 
         /* free all but one input buffer */
@@ -537,7 +558,6 @@ ngx_rtmp_recv(ngx_event_t *rev)
 void
 ngx_rtmp_send(ngx_event_t *wev)
 {
-    ngx_int_t                  n;
     ngx_connection_t          *c;
     ngx_rtmp_session_t        *s;
     ngx_rtmp_core_srv_conf_t  *cscf;
@@ -548,7 +568,8 @@ ngx_rtmp_send(ngx_event_t *wev)
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (wev->timedout) {
-        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, "client timed out");
+        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, 
+                "client timed out");
         c->timedout = 1;
         ngx_rtmp_close_session(s);
         return;
@@ -559,7 +580,6 @@ ngx_rtmp_send(ngx_event_t *wev)
     }
 
     while(s->out) {
-
         l = c->send_chain(c, s->out, 0);
 
         if (l == NGX_CHAIN_ERROR) {
@@ -567,21 +587,21 @@ ngx_rtmp_send(ngx_event_t *wev)
             return;
         }
 
-        n = 0;
-
-        if (l != s->out) {
-            for(ll = s->out; ll->next && ll->next != l; ll = ll->next);
-            ll->next = s->free;
-            s->out = l;
-        }
-
-        if (l != NULL) {
+        if (l == NULL) {
             cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
             ngx_add_timer(c->write, cscf->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                 ngx_rtmp_close_session(s);
             }
             return;
+        }
+
+        if (l != s->out) {
+            for(ll = s->out; 
+                    ll->next && ll->next != l; 
+                    ll = ll->next);
+            ll->next = s->free;
+            s->out = l;
         }
     }
 
@@ -658,100 +678,172 @@ ngx_rtmp_leave(ngx_rtmp_session_t *s)
 
 void 
 ngx_rtmp_send_packet(ngx_rtmp_session_t *s, ngx_rtmp_packet_hdr_t *h, 
-        ngx_chain_t *l)
+        ngx_chain_t *ll)
 {
     ngx_rtmp_packet_hdr_t  *lh;
-    size_t                  hsel, hsize, size;
-    ngx_chain_t            *ll, **pl;
+    ngx_int_t               hsize, size, nbufs;
+    ngx_chain_t            *l, **pl;
     ngx_buf_t              *b, *bb;
     u_char                 *p, *pp;
+    uint8_t                 fmt;
+    uint32_t                timestamp, ext_timestamp, mlen;
+    ngx_connection_t       *c;
 
-    if (l == NULL)
+    if (ll == NULL) {
         return;
+    }
 
-    b = l->buf;
-    p = b->pos;
-
+    /* detect packet size */
+    mlen = 0;
+    l = ll;
+    nbufs = 0; 
     while(l) {
+        mlen += (l->buf->last - l->buf->pos);
+        ++nbufs;
+        l = l->next;
+    }
 
+    c = s->connection;
+    bb = ll->buf;
+    pp = bb->pos;
+    lh = &s->out_hdr;
+
+    ngx_log_debug7(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            "RTMP send %s (%d) csid=%D timestamp=%D "
+            "mlen=%D msid=%D nbufs=%d",
+            ngx_rtmp_packet_type(h->type), (int)h->type, 
+            h->csid, h->timestamp, mlen, h->msid, nbufs);
+
+    while(ll) {
         if (s->free == NULL) {
-            /* TODO: implement proper packet dropper */
+            /* FIXME: implement proper packet dropper */
             return;
         }
 
-        /* add new output chunk */
-        ll = s->free;
+        /* append new output buffer */
+        l = s->free;
         s->free = s->free->next;
-        ll->next = NULL;
-
+        l->next = NULL;
         for(pl = &s->out; *pl; pl = &(*pl)->next);
-        *pl = ll;
+        *pl = l;
+        b = l->buf;
+        b->pos = b->last = b->start + NGX_RTMP_MAX_CHUNK_HEADER;
 
-        /* put payload at the end; leave space for header */
-        bb = ll->buf;
-        bb->pos = bb->last = bb->end - s->chunk_size;
+        /* copy payload to new buffer leaving space for header */
+        while (b->last < b->end) {
+            size = b->end - b->last;
+            if (size < bb->last - pp) {
+                b->last = ngx_cpymem(b->last, pp, size);
+                pp += size;
+                break;
+            }
+            b->last = ngx_cpymem(b->last, pp, bb->last - pp);
 
-        /* fill new chunk payload */
-        while(l && bb->pos != bb->last) {
-            size = ngx_min(bb->last - bb->pos, b->last - p);
-            bb->last = ngx_cpymem(bb->last, p, size);
-            p += size;
-            if (p != b->last)
-                continue;
-            l = l->next;
-            if (l) {
-                b = l->buf;
-                p = b->pos;
+            ll = ll->next;
+            if (ll == NULL) {
+                break;
+            }
+
+            bb = ll->buf;
+            pp = bb->pos;
+        }
+
+        /* FIXME: there can be some occasional 
+         * matches (h->msid == 0) on first out 
+         * packet when we compare it
+         * against initially zeroed header;
+         * Though it maybe OK */
+
+        /* fill header
+         * we have
+         *  h  - new header
+         *  lh - old header for diffs */
+        fmt = 0;
+        hsize = 12;
+
+        if (h->msid && lh->msid == h->msid) {
+            ++fmt;
+            hsize -= 4;
+            if (lh->type == h->type && lh->mlen == mlen) {
+                ++fmt;
+                hsize -= 4;
+                if (lh->timestamp == h->timestamp) {
+                    ++fmt;
+                    hsize -= 3;
+                }
             }
         }
 
-        lh = &s->out_hdr;
+        /* message header */
+        timestamp = (fmt ? h->timestamp 
+                : h->timestamp - lh->timestamp);
+        ext_timestamp = 0;
 
-        hsel = 0;
-
-        /* choose header size */
-        if (lh->hsize) {
-
-            if (lh->stream == h->stream)
-                ++hsel;
-
-            if (lh->type == h->type && lh->size == h->size)
-                ++hsel;
-
-            if (lh->timer == h->timer)
-                ++hsel;
+        if (timestamp >= 0x00ffffff) {
+           ext_timestamp = timestamp;
+           timestamp = 0x00ffffff;
+           hsize += 4;
         }
 
-        hsize = hdrsizes[hsel];
+        if (h->csid >= 64) {
+            ++hsize;
+            if (h->csid >= 320) {
+                ++hsize;
+            }
+        }
 
-        bb->pos -= hsize;
+        /* now we know header size */
+        b->pos -= hsize;
+        p = b->pos;
+
+        /* basic header */
+        *p = (fmt << 6);
+        if (h->csid >= 2 && h->csid <= 63) {
+            *p++ |= (((uint8_t)h->csid) & 0x3f);
+        } else if (h->csid >= 64 && h->csid < 320) {
+            ++p;
+            *p++ = (uint8_t)(h->csid - 64);
+        } else {
+            *p++ |= 1;
+            *p++ = (uint8_t)(h->csid - 64);
+            *p++ = (uint8_t)((h->csid - 64) >> 8);
+        }
+
+        /* message header */
+        if (fmt <= 2) {
+            pp = (u_char*)&timestamp;
+            *p++ = pp[2];
+            *p++ = pp[1];
+            *p++ = pp[0];
+            if (fmt <= 1) {
+                pp = (u_char*)&mlen;
+                *p++ = pp[2];
+                *p++ = pp[1];
+                *p++ = pp[0];
+                *p++ = h->type;
+                if (fmt == 0) {
+                    pp = (u_char*)&h->msid;
+                    *p++ = pp[0];
+                    *p++ = pp[1];
+                    *p++ = pp[2];
+                    *p++ = pp[3];
+                }
+            }
+        }
+
+        /* extended header */
+        if (ext_timestamp) {
+            pp = (u_char*)&ext_timestamp;
+            *p++ = pp[3];
+            *p++ = pp[2];
+            *p++ = pp[1];
+            *p++ = pp[0];
+        }
 
         *lh = *h;
-
-        /* fill header: bb->pos..bb->pos+hsize */
-        
-        pp = bb->pos;
-
-        *pp++ = (((uint8_t)hsel & 0x03) << 6) | (h->channel & 0x3f);
-
-        if (hsize == 1)
-            continue;
-
-        /* TODO: watch endians */
-
-        pp = ngx_cpymem(pp, &h->timer, 3);
-
-        if (hsize == 4)
-            continue;
-
-        pp = ngx_cpymem(pp, &h->size, 3);
-        *pp++ = h->type;
-
-        if (hsize == 8)
-            continue;
-
-        ngx_memcpy(pp, &h->stream, 4);
     }
+
+    ngx_rtmp_send(c->write);
 }
 
 
@@ -776,51 +868,49 @@ ngx_int_t ngx_rtmp_receive_packet(ngx_rtmp_session_t *s,
     };
     ngx_rtmp_amf0_ctx_t         amf_ctx;
 
-    c = s->connection;
-
     if (l == NULL) {
         return NGX_ERROR;
     }
 
+    c = s->connection;
+    b = l->buf;
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
+    /* a session handles only one chunk stream 
+     * but #2 is a special one for protocol messages */
+    if (h->csid != 2) {
+        s->csid = h->csid;
+    }
+
+
 #ifdef NGX_DEBUG
     {
-        int             nch;
+        int             nbufs;
         ngx_chain_t    *ch;
 
-        for(nch = 1, ch = l; ch->next; ch = ch->next, ++nch);
+        for(nbufs = 1, ch = l; 
+                ch->next; 
+                ch = ch->next, ++nbufs);
 
-        ngx_log_debug8(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                "RTMP packet %s (%d) ch=%d hd=%d "
-                "sz=%d tm=%D st=%D nbfs=%d", 
-                ngx_rtmp_packet_type(h->type),
-                (int)h->type, 
-                (int)h->channel, 
-                (int)h->hsize, 
-                (int)h->size, 
-                h->timer,
-                h->stream,
-                nch);
+        ngx_log_debug7(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                "RTMP recv %s (%d) csid=%D timestamp=%D "
+                "mlen=%D msid=%D nbufs=%d",
+                ngx_rtmp_packet_type(h->type), (int)h->type, 
+                h->csid, h->timestamp, h->mlen, h->msid, nbufs);
     }
 #endif
 
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
-
-    b = l->buf;
-    
     switch(h->type) {
         case NGX_RTMP_PACKET_CHUNK_SIZE:
-            if (b->last - b->pos < 4)
-                return NGX_ERROR;
-            /*ngx_rtmp_set_chunk_size(s, *(uint32_t*)(b->pos));*/
             break;
 
-        case NGX_RTMP_PACKET_BYTES_READ:
-            if (b->last - b->pos < 4)
-                return NGX_ERROR;
-            /*ngx_rtmp_set_bytes_read(s, *(uint32_t*)(b->pos));*/
+        case NGX_RTMP_PACKET_ABORT:
             break;
 
-        case NGX_RTMP_PACKET_PING:
+        case NGX_RTMP_PACKET_ACK:
+            break;
+
+        case NGX_RTMP_PACKET_CTL:
             if (b->last - b->pos < 6)
                 return NGX_ERROR;
 
@@ -829,53 +919,39 @@ ngx_int_t ngx_rtmp_receive_packet(ngx_rtmp_session_t *s,
             ping.v3 = (uint16_t*)(b->pos + 4);
 
             switch(*ping.v1) {
-
-                case NGX_RMTP_PING_CLEAR_STEAM:
+                case NGX_RTMP_CTL_STREAM_BEGIN:
                     break;
 
-                case NGX_RMTP_PING_CLEAR_BUFFER:
-                    /*ngx_rtmp_clear_buffer(s);*/
+                case NGX_RTMP_CTL_STREAM_EOF:
                     break;
 
-                case NGX_RMTP_PING_CLIENT_TIME:
-                    /*ngx_rtmp_set_client_buffer_time(s, *ping.v3);*/
+                case NGX_RTMP_CTL_STREAM_DRY:
                     break;
 
-                case NGX_RMTP_PING_RESET_STREAM:
+                case NGX_RTMP_CTL_SET_BUFLEN:
                     break;
 
-                case NGX_RMTP_PING_PING:
+                case NGX_RTMP_CTL_RECORDED:
+                    break;
+
+                case NGX_RTMP_CTL_PING_REQUEST:
                     /* ping client from server */
-                    *ping.v1 = NGX_RMTP_PING_PONG;
-                    ngx_rtmp_send_packet(s, h, l);
+                    /**ping.v1 = NGX_RTMP_PING_PONG;
+                    ngx_rtmp_send_packet(s, h, l);*/
                     break;
 
-                case NGX_RMTP_PING_PONG:
-                    /* TODO: wtf the arg? */
-                    /*ngx_rtmp_set_ping_time(s, *ping.v2);*/
+                case NGX_RTMP_CTL_PING_RESPONSE:
                     break;
             }
-
             break;
 
-        case NGX_RTMP_PACKET_SERVER_BW:
-            if (b->last - b->pos < 4)
-                return NGX_ERROR;
-
-            /*ngx_rtmp_set_server_bw(s, *(uint32_t*)b->pos,
-                    b->last - b->pos >= 5
-                    ? *(uint8_t*)(b->pos + 4)
-                    : 0);*/
+        case NGX_RTMP_PACKET_ACK_SIZE:
             break;
 
-        case NGX_RTMP_PACKET_CLIENT_BW:
-            if (b->last - b->pos < 4)
-                return NGX_ERROR;
+        case NGX_RTMP_PACKET_BANDWIDTH:
+            break;
 
-            /*ngx_rtmp_set_client_bw(s, *(uint32_t*)b->pos,
-                    b->last - b->pos >= 5
-                    ? *(uint8_t*)(b->pos + 4)
-                    : 0);*/
+        case NGX_RTMP_PACKET_EDGE:
             break;
 
         case NGX_RTMP_PACKET_AUDIO:
@@ -899,22 +975,21 @@ ngx_int_t ngx_rtmp_receive_packet(ngx_rtmp_session_t *s,
                 }
 
             }
-
             break;
 
-        case NGX_RTMP_PACKET_SO:
-            /* TODO: implement
-             * plain: name, version, persistent; + lots of amf key-values
-             * ignore so far */
+        case NGX_RTMP_PACKET_AMF3_META:
+        case NGX_RTMP_PACKET_AMF3_SHARED:
+        case NGX_RTMP_PACKET_AMF3_CMD:
+            /* FIXME: AMF3 it not yet supported */
             break;
 
-        case NGX_RTMP_PACKET_NOTIFY:
-            /* TODO: Implement HTTP callbacks on such packets 
-             * with AMF fields converted to HTTP
-             * GET vars*/
+        case NGX_RTMP_PACKET_AMF0_META:
             break;
 
-        case NGX_RTMP_PACKET_INVOKE:
+        case NGX_RTMP_PACKET_AMF0_SHARED:
+            break;
+
+        case NGX_RTMP_PACKET_AMF0_CMD:
             amf_ctx.link = &l;
             amf_ctx.free = &s->free;
             amf_ctx.log = c->log;
@@ -922,51 +997,43 @@ ngx_int_t ngx_rtmp_receive_packet(ngx_rtmp_session_t *s,
             memset(invoke_name, 0, sizeof(invoke_name));
             if (ngx_rtmp_amf0_read(&amf_ctx, &invoke_name_elt, 1) != NGX_OK) {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                        "RTMP invoke failed");
+                        "AMF0 cmd failed");
                 return NGX_ERROR;
             }
 
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                    "RTMP invoke '%s'",
+                    "AMF0 cmd '%s'",
                     invoke_name);
 
-#define INVOKE_CALL(name) \
+#define _CMD_CALL(name) \
             if (!strcasecmp(invoke_name, #name)) { \
-                return ngx_rtmp_##name(s, &l); \
+                return ngx_rtmp_##name(s, l); \
             }
 
             /* NetConnection calls */
-            INVOKE_CALL(connect);
-            INVOKE_CALL(call);
-            INVOKE_CALL(close);
-            INVOKE_CALL(createstream);
+            _CMD_CALL(connect);
+            _CMD_CALL(call);
+            _CMD_CALL(close);
+            _CMD_CALL(createstream);
             
             /* NetStream calls */
-            INVOKE_CALL(play);
-            INVOKE_CALL(play2);
-            INVOKE_CALL(deletestream);
-            INVOKE_CALL(closestream);
-            INVOKE_CALL(receiveaudio);
-            INVOKE_CALL(receivevideo);
-            INVOKE_CALL(publish);
-            INVOKE_CALL(seek);
-            INVOKE_CALL(pause);
+            _CMD_CALL(play);
+            _CMD_CALL(play2);
+            _CMD_CALL(deletestream);
+            _CMD_CALL(closestream);
+            _CMD_CALL(receiveaudio);
+            _CMD_CALL(receivevideo);
+            _CMD_CALL(publish);
+            _CMD_CALL(seek);
+            _CMD_CALL(pause);
 
-#undef INVOKE_CALL
+#undef _CMD_CALL
 
-            break;
-
-        case NGX_RTMP_PACKET_FLEX:
-        case NGX_RTMP_PACKET_FLEX_SO:
-        case NGX_RTMP_PACKET_FLEX_MSG:
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                   "flex packets are not supported %d", 
-                   (int)h->type);
             break;
 
         default:
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                   "unsupported packet type %d", 
+                   "unexpected packet type %d", 
                    (int)h->type);
     }
 
