@@ -108,7 +108,6 @@ typedef struct {
 
 
 typedef struct {
-    uint8_t                 fmt;        /* header format */
     uint32_t                csid;       /* chunk stream id */
     uint32_t                timestamp;
     uint32_t                mlen;       /* message length */
@@ -119,6 +118,12 @@ typedef struct {
 
 #define NGX_RTMP_PUBLISHER   0x01
 #define NGX_RTMP_SUBSCRIBER  0x02
+
+
+typedef struct ngx_rtmp_stream_t {
+    ngx_rtmp_packet_hdr_t   hdr;
+    ngx_chain_t            *in;
+} ngx_rtmp_stream_t;
 
 
 struct ngx_rtmp_session_s {
@@ -132,20 +137,19 @@ struct ngx_rtmp_session_s {
 
     ngx_str_t              *addr_text;
 
-    ngx_uint_t              chunk_size;
     ngx_chain_t            *free;
-
-    /* FIXME: there should probably be a better way
-     * to store handshake buffers & states
-     */
 
     /* handshake */
     ngx_buf_t               buf;
     ngx_uint_t              hs_stage;
 
-    /* input */
-    ngx_chain_t            *in;
-    ngx_rtmp_packet_hdr_t   in_hdr;
+    /* input
+     * stream 0 (reserved by RTMP spec)
+     * used for free chain link (0) */
+    ngx_rtmp_stream_t      *streams;
+    uint32_t                in_csid;
+    ngx_uint_t              in_chunk_size;
+    ngx_pool_t             *in_pool;
 
     /* output */
     ngx_chain_t            *out;
@@ -168,7 +172,8 @@ typedef struct ngx_rtmp_session_s ngx_rtmp_session_t;
 typedef struct {
     ngx_msec_t              timeout;
     ngx_flag_t              so_keepalive;
-    ngx_int_t               buffers;
+    /*ngx_int_t               buffers;*/
+    ngx_int_t               max_streams;
     ngx_msec_t              resolver_timeout;
     ngx_resolver_t         *resolver;
     ngx_rtmp_conf_ctx_t    *ctx;
@@ -277,22 +282,35 @@ void ngx_rtmp_send_packet(ngx_rtmp_session_t *s,
 
 
 /* NetConnection methods */
-ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_call(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_close(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_createstream(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, 
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_call(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_close(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_createstream(ngx_rtmp_session_t *s
+        double trans_id, , ngx_chain_t *l);
 
 
 /* NetStream methods */
-ngx_int_t ngx_rtmp_play(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_play2(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_deletestream(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_closestream(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_receiveaudio(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_receivevideo(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_publish(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_seek(ngx_rtmp_session_t *s, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_pause(ngx_rtmp_session_t *s, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_play(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_play2(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_deletestream(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_closestream(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_receiveaudio(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_receivevideo(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_publish(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_seek(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
+ngx_int_t ngx_rtmp_pause(ngx_rtmp_session_t *s,
+        double trans_id, ngx_chain_t *l);
 
 
 extern ngx_uint_t    ngx_rtmp_max_module;

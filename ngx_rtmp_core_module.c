@@ -65,6 +65,13 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, buffers),
       NULL },
 
+    { ngx_string("max_streams"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, max_streams),
+      NULL },
+
     { ngx_string("resolver"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_1MORE,
       ngx_rtmp_core_resolver,
@@ -155,6 +162,7 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     cscf->resolver_timeout = NGX_CONF_UNSET_MSEC;
     cscf->so_keepalive = NGX_CONF_UNSET;
     cscf->buffers = NGX_CONF_UNSET;
+    conf->max_streams = NGX_CONF_UNSET;
 
     cscf->resolver = NGX_CONF_UNSET_PTR;
 
@@ -174,6 +182,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
     ngx_conf_merge_value(conf->buffers, prev->buffers, 16);
+    ngx_conf_merge_value(conf->max_streams, prev->max_streams, 16);
 
     ngx_conf_merge_ptr_value(conf->resolver, prev->resolver, NULL);
 

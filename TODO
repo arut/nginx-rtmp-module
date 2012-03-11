@@ -1,25 +1,25 @@
-- RTMP replies
+- Implement modules support.
+  Move AMF0 handlers to modules.
+  Move broadcast to module.
 
-- standard-compliance
-    - improve handshake
-    - names
+- Implement helpers for issuing 
+  protocol control messages.
 
-- Input buffers:
-  allocate a continuous block &
-  allocate input buffers
-  in it. Upon chunk size change 
-  re-split the same buffer for
-  new chunk size. Use temp
-  buffer as temporary
-  storage of overflow data.
-  Max chunk size if 65K which is
-  really a lot.
++ Implement multiplexing on
+  chunk-stream-id. (Message-Streams
+  may not be multiplexed within
+  a Chunk Stream):
+  
+  "Typically, all messages in
+  the same chunk stream will come from the same message stream"
 
 - Output buffers:
   implement shared (per-loc/srv) buffers 
   for output of a) header(max 18b) b) chunk (fixed-sized)
   We never change output chunk size.
   Chunk buffers should be ref-counted.
+
+- 'packet' <-> 'message'
 
 - implement loc confs (=fms apps)
     loc options:
