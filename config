@@ -7,5 +7,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
                $ngx_addon_dir/ngx_rtmp_handler.c \
                $ngx_addon_dir/ngx_rtmp_core_module.c \
                $ngx_addon_dir/ngx_rtmp_amf0.c \
+               $ngx_addon_dir/ngx_rtmp_send.c \
+               \
                $ngx_addon_dir/ngx_rtmp_netconn.c \
                $ngx_addon_dir/ngx_rtmp_netstream.c"

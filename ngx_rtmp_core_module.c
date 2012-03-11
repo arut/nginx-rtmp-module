@@ -18,8 +18,6 @@ static char *ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-static char *ngx_rtmp_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
-    void *conf);
 
 
 static ngx_conf_deprecated_t  ngx_conf_deprecated_so_keepalive = {
@@ -58,13 +56,6 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, timeout),
       NULL },
 
-    { ngx_string("buffers"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
-      NGX_RTMP_SRV_CONF_OFFSET,
-      offsetof(ngx_rtmp_core_srv_conf_t, buffers),
-      NULL },
-
     { ngx_string("max_streams"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -72,18 +63,11 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, max_streams),
       NULL },
 
-    { ngx_string("resolver"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_1MORE,
-      ngx_rtmp_core_resolver,
-      NGX_RTMP_SRV_CONF_OFFSET,
-      0,
-      NULL },
-
-    { ngx_string("resolver_timeout"),
+    { ngx_string("out_chunk_size"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_msec_slot,
+      ngx_conf_set_num_slot,
       NGX_RTMP_SRV_CONF_OFFSET,
-      offsetof(ngx_rtmp_core_srv_conf_t, resolver_timeout),
+      offsetof(ngx_rtmp_core_srv_conf_t, out_chunk_size),
       NULL },
 
       ngx_null_command
@@ -159,12 +143,10 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
      */
 
     cscf->timeout = NGX_CONF_UNSET_MSEC;
-    cscf->resolver_timeout = NGX_CONF_UNSET_MSEC;
     cscf->so_keepalive = NGX_CONF_UNSET;
     cscf->buffers = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
-
-    cscf->resolver = NGX_CONF_UNSET_PTR;
+    conf->out_chunk_size = NGX_CONF_UNSET;
 
     return cscf;
 }
@@ -177,14 +159,12 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_core_srv_conf_t *conf = child;
 
     ngx_conf_merge_msec_value(conf->timeout, prev->timeout, 60000);
-    ngx_conf_merge_msec_value(conf->resolver_timeout, prev->resolver_timeout,
-                              30000);
 
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
-    ngx_conf_merge_value(conf->buffers, prev->buffers, 16);
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 16);
+    ngx_conf_merge_value(conf->out_chunk_size, prev->out_chunk_size, 128);
 
-    ngx_conf_merge_ptr_value(conf->resolver, prev->resolver, NULL);
+    conf->pool = ngx_create_pool(4096, cf->log);
 
     conf->sessions = ngx_pcalloc(cf->pool, 
         sizeof(ngx_rtmp_session_t*) * NGX_RTMP_SESSION_HASH_SIZE);
@@ -505,33 +485,6 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "the invalid \"%V\" parameter", &value[i]);
-        return NGX_CONF_ERROR;
-    }
-
-    return NGX_CONF_OK;
-}
-
-
-static char *
-ngx_rtmp_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_rtmp_core_srv_conf_t  *cscf = conf;
-
-    ngx_str_t  *value;
-
-    value = cf->args->elts;
-
-    if (cscf->resolver != NGX_CONF_UNSET_PTR) {
-        return "is duplicate";
-    }
-
-    if (ngx_strcmp(value[1].data, "off") == 0) {
-        cscf->resolver = NULL;
-        return NGX_CONF_OK;
-    }
-
-    cscf->resolver = ngx_resolver_create(cf, &value[1], cf->args->nelts - 1);
-    if (cscf->resolver == NULL) {
         return NGX_CONF_ERROR;
     }
 

@@ -18,6 +18,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 
+
+/*TODO: char -> u_char */
+
 typedef struct {
     ngx_int_t               type;
     char                   *name;
@@ -26,13 +29,19 @@ typedef struct {
 } ngx_rtmp_amf0_elt_t;
 
 
+typedef ngx_chain_t * (*ngx_rtmp_amf0_alloc_pt)
+
 typedef struct {
-    ngx_chain_t           **link, **free;
+    ngx_chain_t            *link, *first;
+    ngx_rtmp_amf0_alloc_pt  alloc;
+    void                   *arg;
     ngx_log_t              *log;
 } ngx_rtmp_amf0_ctx_t;
 
 
 /*
+ *
+ * Examples:
 
 struct {
    char    name[32];

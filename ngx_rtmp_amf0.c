@@ -5,13 +5,7 @@
 #include "ngx_rtmp_amf0.h"
 #include "ngx_rtmp.h"
 #include <string.h>
-/*
-#define NGX_RTMP_AMF0_SWAP_VALUES(x, y) \
-    (x) ^= (y); (y) ^= (x); (x) ^= (y)
 
-#define NGX_RTMP_AMF0_REVERSE2(x) \
-    NGX_RTMP_AMF0_SV(*(uint8_t*)(&x)    , *((uint8_t*)(&x) + 1))
-*/
 static inline void*
 ngx_rtmp_amf0_reverse_copy(void *dst, void* src, size_t len)
 {
@@ -108,32 +102,33 @@ ngx_rtmp_amf0_put(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
 {
     ngx_buf_t       *b;
     size_t          size;
-    ngx_chain_t   **l, **free;
+    ngx_chain_t    *l, *ln;
 
 #ifdef NGX_DEBUG
     ngx_rtmp_amf0_debug("write", ctx->log, (u_char*)p, n);
 #endif
 
     l = ctx->link;
-    free = ctx->free;
 
     while(n) {
-        b = (*l) ? (*l)->buf : NULL;
+        b = l ? l->buf : NULL;
 
         if (b == NULL || b->last == b->end) {
-            if (*free == NULL)
-                return NGX_ERROR;
 
-            if (*l == NULL) {
-                *l = *free;
-                *free = (*free)->next;
-            } else {
-                (*l)->next = *free;
-                *free = (*free)->next;
-                *l = (*l)->next;
+            ln = ctx->alloc(ctx->arg);
+            if (ln == NULL) {
+                return NGX_ERROR;
             }
-            (*l)->next = NULL;
-            b = (*l)->buf;
+
+            if (l == NULL) {
+                l = ln;
+                ctx->first = l;
+            } else {
+                l->next = ln;
+                l = ln;
+            }
+
+            b = l->buf;
             b->pos = b->last = b->start;
         }
 
