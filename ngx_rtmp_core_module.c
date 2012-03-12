@@ -75,11 +75,12 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
 
 
 static ngx_rtmp_module_t  ngx_rtmp_core_module_ctx = {
-    ngx_rtmp_core_create_main_conf,        /* create main configuration */
-    NULL,                                  /* init main configuration */
-
-    ngx_rtmp_core_create_srv_conf,         /* create server configuration */
-    ngx_rtmp_core_merge_srv_conf           /* merge server configuration */
+    NULL,                                   /* preconfiguration */
+    NULL,                                   /* postconfiguration */
+    ngx_rtmp_core_create_main_conf,         /* create main configuration */
+    NULL,                                   /* init main configuration */
+    ngx_rtmp_core_create_srv_conf,          /* create server configuration */
+    ngx_rtmp_core_merge_srv_conf            /* merge server configuration */
 };
 
 
@@ -129,22 +130,16 @@ ngx_rtmp_core_create_main_conf(ngx_conf_t *cf)
 static void *
 ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
 {
-    ngx_rtmp_core_srv_conf_t  *cscf;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+    size_t                      n
 
     cscf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_core_srv_conf_t));
     if (cscf == NULL) {
         return NULL;
     }
 
-    /*
-     * set by ngx_pcalloc():
-     *
-     *     cscf->protocol = NULL;
-     */
-
     cscf->timeout = NGX_CONF_UNSET_MSEC;
     cscf->so_keepalive = NGX_CONF_UNSET;
-    cscf->buffers = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
     conf->out_chunk_size = NGX_CONF_UNSET;
 
@@ -164,10 +159,14 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 16);
     ngx_conf_merge_value(conf->out_chunk_size, prev->out_chunk_size, 128);
 
-    conf->pool = ngx_create_pool(4096, cf->log);
+    if (prev->out_pool == NULL) {
+        prev->out_pool = ngx_create_pool(4096, cf->log);
+        if (prev->out_pool == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
 
-    conf->sessions = ngx_pcalloc(cf->pool, 
-        sizeof(ngx_rtmp_session_t*) * NGX_RTMP_SESSION_HASH_SIZE);
+    conf->out_pool = prev->out_pool;
 
     return NGX_CONF_OK;
 }

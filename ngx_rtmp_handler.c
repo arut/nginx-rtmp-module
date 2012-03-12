@@ -210,9 +210,9 @@ ngx_rtmp_init_session(ngx_connection_t *c)
         return;
     }
 
-    s->streams = ngx_pcalloc(c->pool, sizeof(ngx_rtmp_stream_t) 
+    s->in_streams = ngx_pcalloc(c->pool, sizeof(ngx_rtmp_stream_t) 
             * cmcf->max_streams);
-    if (s->streams == NULL) {
+    if (s->in_streams == NULL) {
         ngx_rtmp_close_session(s);
         return;
     }
@@ -377,7 +377,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
     uint32_t                    timestamp;
     size_t                      size;
     ngx_chain_t                *in;
-    ngx_rtmp_packet_hdr_t      *h;
+    ngx_rtmp_header_t      *h;
     uint8_t                     fmt;
     uint32_t                    csid;
     ngx_rtmp_stream_t          *st, st0;
@@ -391,7 +391,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
 
     for(;;) {
 
-        st = &s->streams[s->csid];
+        st = &s->in_streams[s->csid];
 
         if (st->in == NULL) {
             if ((st->in = ngx_alloc_chain_link(s->in_pool)) == NULL
@@ -492,7 +492,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
 
                 /* link to new stream */
                 s->csid = csid;
-                st = s->streams[csid];
+                st = s->in_streams[csid];
                 if (st->in == NULL) {
                     in->next = in;
                 } else {
@@ -595,7 +595,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             b->pos += h->mlen;
 
             /* add used bufs to stream #0 */
-            st0 = &s->streams[0];
+            st0 = &s->in_streams[0];
             st->in->next = st0->in->next;
             st0->in->next = head;
         }
@@ -687,17 +687,17 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s)
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     
-    if (cscf->free) {
-        out = cscf->free;
-        cscf->free = out->next;
+    if (cscf->out_free) {
+        out = cscf->out_free;
+        cscf->out_free = out->next;
 
     } else {
-        out = ngx_alloc_chain_link(cscf->pool);
+        out = ngx_alloc_chain_link(cscf->out_pool);
         if (out == NULL) {
             return NULL;
         }
 
-        out->buf = ngx_calloc_buf(cscf->pool);
+        out->buf = ngx_calloc_buf(cscf->out_pool);
         if (out->buf == NULL) {
             return NULL;
         }
@@ -705,7 +705,7 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s)
         size = cscf->out_chunk_size + NGX_RTMP_MAX_CHUNK_HEADER;
 
         b = out->buf;
-        b->start = ngx_palloc(cscf->pool, size);
+        b->start = ngx_palloc(cscf->out_pool, size);
         b->end = b->start + size;
     }
 
@@ -719,7 +719,7 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s)
 
 
 void 
-ngx_rtmp_prepare_message(ngx_rtmp_packet_hdr_t *h, ngx_chain_t *out, 
+ngx_rtmp_prepare_message(ngx_rtmp_header_t *h, ngx_chain_t *out, 
         uint8_t fmt)
 {
     ngx_chain_t            *l;
@@ -840,39 +840,14 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out)
 
 static ngx_int_t 
 ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
-        ngx_rtmp_packet_hdr_t *h, ngx_chain_t *l)
+        ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
-    ngx_rtmp_core_srv_conf_t   *cscf;
-    ngx_connection_t           *c;
-    ngx_buf_t                  *b;
-    struct {
-        uint16_t               *v1;
-        uint16_t               *v2;
-        uint16_t               *v3;
-    }                           ping;
-    ngx_rtmp_session_t         *ss;
-    static char                 invoke_name[64]; 
-    static double               trans_id;
-    static ngx_rtmp_amf0_elt_t  invoke_name_elt[] = { 
-        { NGX_RTMP_AMF0_STRING, NULL, invoke_name,  sizeof(invoke_name) },
-        { NGX_RTMP_AMF0_STRING, NULL, &trans_id,    sizeof(trans_id)    }
-    };
-    ngx_rtmp_amf0_ctx_t         amf_ctx;
+    ngx_rtmp_core_main_conf_t  *cmcf;
+    ngx_array_t                *evhs;
+    size_t                      n;
+    ngx_rtmp_event_handler_pt   evh;
 
-    if (l == NULL) {
-        return NGX_ERROR;
-    }
-
-    c = s->connection;
-    b = l->buf;
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
-
-    /* a session handles only one chunk stream 
-     * but #2 is a special one for protocol messages */
-    if (h->csid != 2) {
-        s->csid = h->csid;
-    }
-
+    cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
 
 #ifdef NGX_DEBUG
     {
@@ -891,142 +866,22 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
     }
 #endif
 
-    switch(h->type) {
-        case NGX_RTMP_MSG_CHUNK_SIZE:
-            break;
+    if (h->type >= NGX_RTMP_MSG_MAX) {
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                "unexpected RTMP message type: %d", (int)h->type);
+        return NGX_OK;
+    }
 
-        case NGX_RTMP_MSG_ABORT:
-            break;
-
-        case NGX_RTMP_MSG_ACK:
-            break;
-
-        case NGX_RTMP_MSG_CTL:
-            if (b->last - b->pos < 6)
-                return NGX_ERROR;
-
-            ping.v1 = (uint16_t*)(b->pos);
-            ping.v2 = (uint16_t*)(b->pos + 2);
-            ping.v3 = (uint16_t*)(b->pos + 4);
-
-            switch(*ping.v1) {
-                case NGX_RTMP_USER_STREAM_BEGIN:
-                    break;
-
-                case NGX_RTMP_USER_STREAM_EOF:
-                    break;
-
-                case NGX_RTMP_USER_STREAM_DRY:
-                    break;
-
-                case NGX_RTMP_USER_SET_BUFLEN:
-                    break;
-
-                case NGX_RTMP_USER_RECORDED:
-                    break;
-
-                case NGX_RTMP_USER_PING_REQUEST:
-                    /* ping client from server */
-                    /**ping.v1 = NGX_RTMP_PING_PONG;
-                    ngx_rtmp_send_message(s, h, l);*/
-                    break;
-
-                case NGX_RTMP_USER_PING_RESPONSE:
-                    break;
-            }
-            break;
-
-        case NGX_RTMP_MSG_ACK_SIZE:
-            break;
-
-        case NGX_RTMP_MSG_BANDWIDTH:
-            break;
-
-        case NGX_RTMP_MSG_EDGE:
-            break;
-
-        case NGX_RTMP_MSG_AUDIO:
-        case NGX_RTMP_MSG_VIDEO:
-            /*
-            if (!(s->flags & NGX_RTMP_PUBLISHER)) {
-                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                        "received audio/video from non-publisher");
-                return NGX_ERROR;
-            }
-
-            for(ss = *ngx_rtmp_get_session_head(s); 
-                    ss; ss = ss->next) 
-            {
-                if (s != ss 
-                        && ss->flags & NGX_RTMP_SUBSCRIBER
-                        && s->name.len == ss->name.len
-                        && !ngx_strncmp(s->name.data, ss->name.data, 
-                            s->name.len))
-                {
-                    ngx_rtmp_send_message(ss, h, l);
-                }
-
-            }*/
-            break;
-
-        case NGX_RTMP_MSG_AMF3_META:
-        case NGX_RTMP_MSG_AMF3_SHARED:
-        case NGX_RTMP_MSG_AMF3_CMD:
-            /* FIXME: AMF3 it not yet supported */
-            break;
-
-        case NGX_RTMP_MSG_AMF0_META:
-            break;
-
-        case NGX_RTMP_MSG_AMF0_SHARED:
-            break;
-
-        case NGX_RTMP_MSG_AMF0_CMD:
-            amf_ctx.link = &l;
-            amf_ctx.free = &s->free;
-            amf_ctx.log = c->log;
-
-            memset(invoke_name, 0, sizeof(invoke_name));
-            if (ngx_rtmp_amf0_read(&amf_ctx, &invoke_name_elt, 1) != NGX_OK) {
-                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                        "AMF0 cmd failed");
-                return NGX_ERROR;
-            }
-
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                    "AMF0 cmd '%s'",
-                    invoke_name);
-
-#define _CMD_CALL(name) \
-            if (!strcasecmp(invoke_name, #name)) { \
-                return ngx_rtmp_##name(s, trans_id, l); \
-            }
-
-            /* NetConnection calls */
-            _CMD_CALL(connect);
-            _CMD_CALL(call);
-            _CMD_CALL(close);
-            _CMD_CALL(createstream);
-            
-            /* NetStream calls */
-            _CMD_CALL(play);
-            _CMD_CALL(play2);
-            _CMD_CALL(deletestream);
-            _CMD_CALL(closestream);
-            _CMD_CALL(receiveaudio);
-            _CMD_CALL(receivevideo);
-            _CMD_CALL(publish);
-            _CMD_CALL(seek);
-            _CMD_CALL(pause);
-
-#undef _CMD_CALL
-
-            break;
-
-        default:
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                   "unexpected packet type %d", 
-                   (int)h->type);
+    evhs = &cmcf->events[h->type];
+    for(n = 0; n < evhs->nelts; ++n) {
+        evh = evh->elts[n];
+        if (!evh) {
+            continue;
+        }
+           
+        if (evh(s, h, in) != NGX_OK) {
+            return NGX_ERROR;
+        }
     }
 
     return NGX_OK;
@@ -1036,7 +891,19 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
 void
 ngx_rtmp_close_session(ngx_rtmp_session_t *s)
 {
-    ngx_rtmp_leave(s);
+    size_t                              n;
+    ngx_rtmp_core_main_conf_t          *cmcf;
+    ngx_rtmp_disconnect_handler_pt     *h;
+
+    cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
+
+    for(n = 0; n < cmcf->disconnect.nelts; ++n) {
+        h = &cmcf->disconnect.elts[n];
+        if (*h) {
+            (*h)(s);
+        }
+    }
+
     ngx_destroy_pool(s->in_pool);
     ngx_rtmp_close_connection(s->connection);
 }
@@ -1088,72 +955,3 @@ ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len)
 
     return p;
 }
-
-/************* this will go to module ****************/
-ngx_rtmp_session_t **
-ngx_rtmp_get_session_head(ngx_rtmp_session_t *s)
-{
-    ngx_rtmp_core_srv_conf_t  *cscf;
-
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
-
-    return &cscf->sessions[
-        ngx_hash_key(s->name.data, s->name.len) 
-        % NGX_RTMP_SESSION_HASH_SIZE];
-}
-
-
-void
-ngx_rtmp_join(ngx_rtmp_session_t *s, ngx_str_t *name, ngx_uint_t flags)
-{
-    ngx_rtmp_session_t    **ps;
-    ngx_connection_t       *c;
-
-    c = s->connection;
-
-    if (s->name.len) {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                "already joined");
-        return;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                   "RTMP join '%V'", 
-                   &name);
-
-    s->name = *name;
-    ps = ngx_rtmp_get_session_head(s);
-    s->next = *ps;
-    s->flags = flags;
-    *ps = s;
-}
-
-
-void
-ngx_rtmp_leave(ngx_rtmp_session_t *s)
-{
-    ngx_rtmp_session_t    **ps;
-    ngx_connection_t       *c;
-
-    c = s->connection;
-
-    if (!s->name.len)
-        return;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                   "RTMP leave '%V'", 
-                   &s->name);
-
-    ps = ngx_rtmp_get_session_head(s);
-
-    ngx_str_null(&s->name);
-
-    for(; *ps; ps = &(*ps)->next) {
-        if (*ps == s) {
-            *ps = (*ps)->next;
-            return;
-        }
-    }
-}
-
-

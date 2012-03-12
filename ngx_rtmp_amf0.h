@@ -19,8 +19,6 @@
 #include <ngx_core.h>
 
 
-/*TODO: char -> u_char */
-
 typedef struct {
     ngx_int_t               type;
     char                   *name;

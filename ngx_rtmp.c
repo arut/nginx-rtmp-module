@@ -20,6 +20,10 @@ static ngx_int_t ngx_rtmp_add_addrs6(ngx_conf_t *cf, ngx_rtmp_port_t *mport,
     ngx_rtmp_conf_addr_t *addr);
 #endif
 static ngx_int_t ngx_rtmp_cmp_conf_addrs(const void *one, const void *two);
+static ngx_int_t ngx_rtmp_init_events(ngx_conf_t *cf, 
+        ngx_rtmp_core_main_conf_t *cmcf);
+static ngx_int_t ngx_rtmp_init_phase_handlers(ngx_conf_t *cf, 
+        ngx_rtmp_core_main_conf_t *cmcf);
 
 
 ngx_uint_t  ngx_rtmp_max_module;
@@ -141,11 +145,24 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
-
-    /* parse inside the rtmp{} block */
-
     pcf = *cf;
     cf->ctx = ctx;
+
+    for (m = 0; ngx_modules[m]; m++) {
+        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+            continue;
+        }
+
+        module = ngx_modules[m]->ctx;
+
+        if (module->preconfiguration) {
+            if (module->preconfiguration(cf) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
+    /* parse inside the rtmp{} block */
 
     cf->module_type = NGX_RTMP_MODULE;
     cf->cmd_type = NGX_RTMP_MAIN_CONF;
@@ -200,8 +217,29 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    if (ngx_rtmp_init_events(cf, cmcf) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    for (m = 0; ngx_modules[m]; m++) {
+        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+            continue;
+        }
+
+        module = ngx_modules[m]->ctx;
+
+        if (module->postconfiguration) {
+            if (module->postconfiguration(cf) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
     *cf = pcf;
 
+    if (ngx_rtmp_init_event_handlers(cf, cmcf) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
 
     if (ngx_array_init(&ports, cf->temp_pool, 4, sizeof(ngx_rtmp_conf_port_t))
         != NGX_OK)
@@ -218,6 +256,87 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     return ngx_rtmp_optimize_servers(cf, &ports);
+}
+
+
+static ngx_int_t
+ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
+{
+    for(n = 0; n < NGX_RTMP_MSG_MAX; ++n) {
+        if (ngx_array_init(&cmcf->events[n], cf->pool, 1, 
+                sizeof(ngx_rtmp_event_handler_pt)) != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+    }
+
+    if (ngx_init_array(&conf->calls, cf->pool, 1, 
+                sizeof(ngx_hash_key_t)) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_init_array(&conf->disconnect, cf->pool, 1,
+            sizeof(ngx_rtmp_disconnect_handler_pt)) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
+{
+    ngx_hash_init_t         calls_hash;
+    ngx_event_handler_pt   *eh;
+    ngx_hash_key_t         *h;
+    size_t                  n;
+    static size_t           pm_events[] = {
+        NGX_RTMP_MSG_CHUNK_SIZE,
+        NGX_RTMP_MSG_ABORT,
+        NGX_RTMP_MSG_ACK,
+        NGX_RTMP_MSG_USER,
+        NGX_RTMP_MSG_ACK_SIZE,
+        NGX_RTMP_MSG_BANDWIDTH
+    };
+
+    /* init events */
+    for(n = 0; n < sizeof(pm_events) / sizeof(p_events[0]); ++n) {
+        eh = ngx_array_push(&cmcf->events[pm_events[n]]);
+        *eh = ngx_rtmp_protocol_message_handler;
+    }
+
+    eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_USER]);
+    *eh = ngx_rtmp_user_message_handler;
+
+    eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AMF0_CMD]);
+    *eh = ngx_rtmp_amf0_message_handler;
+
+
+    /* init calls */
+    for(n = 0; n < cmcf->nelts; ++n) {
+        h = &cmcf->calls.elts[n];
+        h->key_hash = ngx_hash_key_lc(h->key.data, h->key.len);
+    }
+
+    calls_hash.hash = &cmcf->calls_hash;
+    calls_hash.key = ngx_hash_key_lc;
+    calls_hash.max_size = 1024;
+    calls_hash.bucket_size = ngx_cacheline_size;
+    calls_hash.name = "calls_hash";
+    calls_hash.pool = cf->pool;
+    calls_hash.temp_pool = NULL;
+
+    if (ngx_hash_init(&calls_hash, cmcf->calls.elts, cmcf->calls.nelts)
+            != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
 }
 
 

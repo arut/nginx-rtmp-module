@@ -13,13 +13,6 @@
 #include <ngx_event_connect.h>
 
 
-#define NGX_RTMP_HANDSHAKE_SIZE    1536
-
-#define NGX_RTMP_DEFAULT_CHUNK_SIZE 128
-
-#define NGX_LOG_DEBUG_RTMP NGX_LOG_DEBUG_CORE
-
-
 typedef struct {
     void                  **main_conf;
     void                  **srv_conf;
@@ -101,115 +94,11 @@ typedef struct {
 } ngx_rtmp_conf_addr_t;
 
 
-typedef struct {
-    ngx_array_t             servers;    /* ngx_rtmp_core_srv_conf_t */
-    ngx_array_t             listen;     /* ngx_rtmp_listen_t */
-} ngx_rtmp_core_main_conf_t;
+#define NGX_RTMP_HANDSHAKE_SIZE         1536
 
+#define NGX_RTMP_DEFAULT_CHUNK_SIZE     128
 
-typedef struct {
-    uint32_t                csid;       /* chunk stream id */
-    uint32_t                timestamp;
-    uint32_t                mlen;       /* message length */
-    uint8_t                 type;       /* message type id */
-    uint32_t                msid;       /* message stream id */
-} ngx_rtmp_packet_hdr_t;
-
-
-#define NGX_RTMP_PUBLISHER   0x01
-#define NGX_RTMP_SUBSCRIBER  0x02
-
-
-typedef struct ngx_rtmp_stream_t {
-    ngx_rtmp_packet_hdr_t   hdr;
-    ngx_chain_t            *in;
-} ngx_rtmp_stream_t;
-
-
-struct ngx_rtmp_session_s {
-    uint32_t                signature;         /* "RTMP" */
-
-    ngx_connection_t       *connection;
-
-    void                  **ctx;
-    void                  **main_conf;
-    void                  **srv_conf;
-
-    ngx_str_t              *addr_text;
-
-    /* handshake */
-    ngx_buf_t               buf;
-    ngx_uint_t              hs_stage;
-
-    /* input
-     * stream 0 (reserved by RTMP spec)
-     * used for free chain link */
-
-    /* TODO: make stream #1 handle ANY single stream;
-     * that'll introduce support for
-     * unlimited number of streams given
-     * there's no interleaving between them */
-
-    ngx_rtmp_stream_t      *streams;
-    uint32_t                in_csid;
-    ngx_uint_t              in_chunk_size;
-    ngx_pool_t             *in_pool;
-
-    /* output */
-    ngx_chain_t            *out;
-    ngx_rtmp_packet_hdr_t   out_hdr;
-
-    /* broadcast */
-    ngx_str_t               name;
-    struct ngx_rtmp_session_s
-                            *next;
-    ngx_uint_t              flags;
-    uint32_t                csid;
-};
-
-typedef struct ngx_rtmp_session_s ngx_rtmp_session_t;
-
-
-#define NGX_RTMP_SESSION_HASH_SIZE 16384
-
-
-typedef struct {
-    ngx_msec_t              timeout;
-    ngx_flag_t              so_keepalive;
-    ngx_int_t               max_streams;
-    
-    /* shared output buffers */
-    ngx_uint_t              out_chunk_size;
-    ngx_pool_t             *pool;
-    ngx_chain_t            *free;
-
-    ngx_rtmp_session_t    **sessions;  /* session hash map: name->session */
-
-    ngx_rtmp_conf_ctx_t    *ctx;
-} ngx_rtmp_core_srv_conf_t;
-
-
-typedef struct {
-    ngx_str_t              *client;
-    ngx_rtmp_session_t     *session;
-} ngx_rtmp_log_ctx_t;
-
-
-typedef struct {
-    void                 *(*create_main_conf)(ngx_conf_t *cf);
-    char                 *(*init_main_conf)(ngx_conf_t *cf, void *conf);
-
-    void                 *(*create_srv_conf)(ngx_conf_t *cf);
-    char                 *(*merge_srv_conf)(ngx_conf_t *cf, void *prev,
-                                      void *conf);
-} ngx_rtmp_module_t;
-
-
-/* Chunk header:
- *   max 3  basic header
- * + max 11 message header
- * + max 4  extended header (timestamp) */
-#define NGX_RTMP_MAX_CHUNK_HEADER       18
+#define NGX_LOG_DEBUG_RTMP              NGX_LOG_DEBUG_CORE
 
 
 /* RTMP message types*/
@@ -229,6 +118,7 @@ typedef struct {
 #define NGX_RTMP_MSG_AMF0_SHARED        19
 #define NGX_RTMP_MSG_AMF0_CMD           20
 #define NGX_RTMP_MSG_AGGREGATE          22
+#define NGX_RTMP_MSG_MAX                23
 
 
 /* RMTP control message types */
@@ -240,6 +130,104 @@ typedef struct {
 #define NGX_RTMP_USER_PING_REQUEST      6
 #define NGX_RTMP_USER_PING_RESPONSE     7
 
+
+/* Chunk header:
+ *   max 3  basic header
+ * + max 11 message header
+ * + max 4  extended header (timestamp) */
+#define NGX_RTMP_MAX_CHUNK_HEADER       18
+
+
+typedef struct {
+    uint32_t                csid;       /* chunk stream id */
+    uint32_t                timestamp;
+    uint32_t                mlen;       /* message length */
+    uint8_t                 type;       /* message type id */
+    uint32_t                msid;       /* message stream id */
+} ngx_rtmp_header_t;
+
+
+typedef struct ngx_rtmp_stream_t {
+    ngx_rtmp_header_t   hdr;
+    ngx_chain_t            *in;
+} ngx_rtmp_stream_t;
+
+
+typedef struct {
+    uint32_t                signature;         /* "RTMP" */
+
+    ngx_connection_t       *connection;
+
+    void                  **ctx;
+    void                  **main_conf;
+    void                  **srv_conf;
+
+    ngx_str_t              *addr_text;
+
+    /* handshake */
+    ngx_buf_t               buf;
+    ngx_uint_t              hs_stage;
+
+    /* input stream 0 (reserved by RTMP spec)
+     * used for free chain link */
+
+    ngx_rtmp_stream_t      *in_streams;
+    uint32_t                in_csid;
+    ngx_uint_t              in_chunk_size;
+    ngx_pool_t             *in_pool;
+
+    ngx_chain_t            *out;
+} ngx_rtmp_session_t;
+
+
+typedef ngx_int_t (*ngx_rtmp_event_handler_pt)(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
+typedef ngx_int_t (*ngx_rtmp_call_handler_pt)(ngx_rtmp_session_t *s,
+        double trans, ngx_chain_t *in);
+typedef ngx_int_t (*ngx_rtmp_disconnect_handler_pt)(ngx_rtmp_session_t *s);
+
+
+typedef struct {
+    ngx_array_t             servers;    /* ngx_rtmp_core_srv_conf_t */
+    ngx_array_t             listen;     /* ngx_rtmp_listen_t */
+
+    ngx_array_t             events[NGX_RTMP_MSG_MAX];
+    ngx_hash_t              calls_hash;
+    ngx_array_t             calls;
+    ngx_array_t             disconect;
+} ngx_rtmp_core_main_conf_t;
+
+
+typedef struct {
+    ngx_msec_t              timeout;
+    ngx_flag_t              so_keepalive;
+    ngx_int_t               max_streams;
+    
+    ngx_uint_t              out_chunk_size;
+    ngx_pool_t             *out_pool;
+    ngx_chain_t            *out_free;
+
+    ngx_rtmp_conf_ctx_t    *ctx;
+} ngx_rtmp_core_srv_conf_t;
+
+
+typedef struct {
+    ngx_str_t              *client;
+    ngx_rtmp_session_t     *session;
+} ngx_rtmp_log_ctx_t;
+
+
+typedef struct {
+    ngx_int_t             (*preconfiguration)(ngx_conf_t *cf);
+    ngx_int_t             (*postconfiguration)(ngx_conf_t *cf);
+
+    void                 *(*create_main_conf)(ngx_conf_t *cf);
+    char                 *(*init_main_conf)(ngx_conf_t *cf, void *conf);
+
+    void                 *(*create_srv_conf)(ngx_conf_t *cf);
+    char                 *(*merge_srv_conf)(ngx_conf_t *cf, void *prev,
+                                      void *conf);
+} ngx_rtmp_module_t;
 
 #define NGX_RTMP_MODULE                 0x504D5452     /* "RTMP" */
 
@@ -265,13 +253,23 @@ typedef struct {
 #define ngx_rtmp_conf_get_module_srv_conf(cf, module)                        \
     ((ngx_rtmp_conf_ctx_t *) cf->ctx)->srv_conf[module.ctx_index]
 
+
 void ngx_rtmp_init_connection(ngx_connection_t *c);    
 void ngx_rtmp_close_session(ngx_rtmp_session_t *s);
 u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
+
+/* Receiving messages */
+ngx_int_t ngx_rtmp_protocol_message_handler(ngx_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
+ngx_int_t ngx_rtmp_user_message_handler(ngx_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
+ngx_int_t ngx_rtmp_amf0_message_handler(ngx_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
+
 /* Sending messages */
 ngx_chain_t * ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s);
-void ngx_rtmp_prepare_message(ngx_rtmp_packet_hdr_t *h, 
+void ngx_rtmp_prepare_message(ngx_rtmp_header_t *h, 
         ngx_chain_t *out, uint8_t fmt);
 void ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out);
 
@@ -314,42 +312,6 @@ ngx_int_t ngx_rtmp_send_amf0(ngx_session_t *s,
 ngx_int_t ngx_rtmp_receive_amf0(ngx_session_t *s, ngx_chain_t *in, 
         ngx_rtmp_amf0_elt_t *elts, size_t nelts)
 
-
-/************** will go to modules */
-
-/* Broadcasting */
-void ngx_rtmp_join(ngx_rtmp_session_t *s, ngx_str_t *name, ngx_uint_t flags);
-void ngx_rtmp_leave(ngx_rtmp_session_t *s);
-
-/* NetConnection methods */
-ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, 
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_call(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_close(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_createstream(ngx_rtmp_session_t *s
-        double trans_id, , ngx_chain_t *l);
-
-/* NetStream methods */
-ngx_int_t ngx_rtmp_play(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_play2(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_deletestream(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_closestream(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_receiveaudio(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_receivevideo(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_publish(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_seek(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
-ngx_int_t ngx_rtmp_pause(ngx_rtmp_session_t *s,
-        double trans_id, ngx_chain_t *l);
 
 extern ngx_uint_t    ngx_rtmp_max_module;
 extern ngx_module_t  ngx_rtmp_core_module;

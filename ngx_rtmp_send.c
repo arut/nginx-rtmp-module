@@ -1,5 +1,11 @@
+/*
+ * Copyright (c) 2012 Roman Arutyunyan
+ */
+
+
 #include "ngx_rtmp.h.h"
 #include "ngx_rtmp_amf0.h"
+
 
 #define NGX_RTMP_CTL_START(s, type)             \
     ngx_rtmp_packet_hdr_t   __h;                \
@@ -21,10 +27,6 @@
     *(__p->last++) = (u_char)(utype);
 
 #define NGX_RTMP_CTL_OUT1(v)                    \
-    *(__p->last++) = ((u_char*)&v)[0];
-
-#define NGX_RTMP_CTL_OUT2(v)                    \
-    *(__p->last++) = ((u_char*)&v)[1];          \
     *(__p->last++) = ((u_char*)&v)[0];
 
 #define NGX_RTMP_CTL_OUT4(v)                    \
@@ -210,17 +212,5 @@ ngx_rtmp_send_amf0(ngx_session_t *s, uint32_t csid, uint32_t msid,
     }
 
     NGX_RTMP_AMF0_END(s);
-}
-
-ngx_int_t
-ngx_rtmp_receive_amf0(ngx_session_t *s, ngx_chain_t *in,
-        ngx_rtmp_amf0_elt_t *elts, size_t nelts)
-{
-    ngx_rtmp_amf0_ctx_t     act;
-
-    act.link = in;
-    act.log = s->connection->log;
-
-    return ngx_rtmp_amf0_read(&act, elts, nelts);
 }
 

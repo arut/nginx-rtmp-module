@@ -2,24 +2,7 @@
   Move AMF0 handlers to modules.
   Move broadcast to module.
 
-- Implement helpers for issuing 
-  protocol control messages.
-
-+ Implement multiplexing on
-  chunk-stream-id. (Message-Streams
-  may not be multiplexed within
-  a Chunk Stream):
-  
-  "Typically, all messages in
-  the same chunk stream will come from the same message stream"
-
-- Output buffers:
-  implement shared (per-loc/srv) buffers 
-  for output of a) header(max 18b) b) chunk (fixed-sized)
-  We never change output chunk size.
-  Chunk buffers should be ref-counted.
-
-- 'packet' <-> 'message'
+- remove macros hell from ngx_rtmp_send.c
 
 - implement loc confs (=fms apps)
     loc options:
