@@ -9,7 +9,7 @@
 
 
 ngx_int_t 
-ngx_rtmp_protocol_message_handler(ngx_session_t *s,
+ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
     ngx_buf_t              *b;
@@ -28,7 +28,7 @@ ngx_rtmp_protocol_message_handler(ngx_session_t *s,
         return NGX_OK;
     }
 
-    p = &val;
+    p = (u_char*)&val;
     p[0] = b->pos[3];
     p[1] = b->pos[2];
     p[2] = b->pos[1];
@@ -72,7 +72,7 @@ ngx_rtmp_protocol_message_handler(ngx_session_t *s,
 
 
 ngx_int_t 
-ngx_rtmp_user_message_handler(ngx_session_t *s,
+ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
     ngx_buf_t              *b;
@@ -91,11 +91,11 @@ ngx_rtmp_user_message_handler(ngx_session_t *s,
         return NGX_OK;
     }
 
-    p = &evt;
+    p = (u_char*)&evt;
     p[0] = b->pos[1];
     p[1] = b->pos[0];
 
-    p = &val;
+    p = (u_char*)&val;
     p[0] = b->pos[5];
     p[1] = b->pos[4];
     p[2] = b->pos[3];
@@ -116,7 +116,7 @@ ngx_rtmp_user_message_handler(ngx_session_t *s,
 
         case NGX_RTMP_USER_SET_BUFLEN:
             if (b->last - b->pos >= 10) {
-                p = &arg;
+                p = (u_char*)&arg;
                 p[0] = b->pos[9];
                 p[1] = b->pos[8];
                 p[2] = b->pos[7];
@@ -153,7 +153,7 @@ ngx_rtmp_user_message_handler(ngx_session_t *s,
 
 
 ngx_int_t 
-ngx_rtmp_amf0_message_handler(ngx_session_t *s,
+ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
     ngx_rtmp_amf0_ctx_t         act;
@@ -178,7 +178,7 @@ ngx_rtmp_amf0_message_handler(ngx_session_t *s,
     act.log = s->connection->log;
     memset(func, 0, sizeof(func));
 
-    if (ngx_rtmp_amf0_read(&ect, elts, 
+    if (ngx_rtmp_amf0_read(&act, elts, 
                 sizeof(elts) / sizeof(elts[0])) != NGX_OK) 
     {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
@@ -196,13 +196,13 @@ ngx_rtmp_amf0_message_handler(ngx_session_t *s,
             ngx_hash_key_lc(func, len), func, len);
 
     if (ch) {
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
             "AMF0 func '%s' @%f passed to handler", func, trans);
 
         return (*ch)(s, trans, in);
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
             "AMF0 cmd '%s' @%f no handler", func, trans);
 
     return NGX_OK;
@@ -210,7 +210,7 @@ ngx_rtmp_amf0_message_handler(ngx_session_t *s,
 
 
 ngx_int_t
-ngx_rtmp_receive_amf0(ngx_session_t *s, ngx_chain_t *in,
+ngx_rtmp_receive_amf0(ngx_rtmp_session_t *s, ngx_chain_t *in,
         ngx_rtmp_amf0_elt_t *elts, size_t nelts)
 {
     ngx_rtmp_amf0_ctx_t     act;

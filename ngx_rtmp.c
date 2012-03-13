@@ -22,7 +22,7 @@ static ngx_int_t ngx_rtmp_add_addrs6(ngx_conf_t *cf, ngx_rtmp_port_t *mport,
 static ngx_int_t ngx_rtmp_cmp_conf_addrs(const void *one, const void *two);
 static ngx_int_t ngx_rtmp_init_events(ngx_conf_t *cf, 
         ngx_rtmp_core_main_conf_t *cmcf);
-static ngx_int_t ngx_rtmp_init_phase_handlers(ngx_conf_t *cf, 
+static ngx_int_t ngx_rtmp_init_event_handlers(ngx_conf_t *cf, 
         ngx_rtmp_core_main_conf_t *cmcf);
 
 
@@ -262,6 +262,8 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static ngx_int_t
 ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 {
+    size_t      n;
+
     for(n = 0; n < NGX_RTMP_MSG_MAX; ++n) {
         if (ngx_array_init(&cmcf->events[n], cf->pool, 1, 
                 sizeof(ngx_rtmp_event_handler_pt)) != NGX_OK)
@@ -270,13 +272,13 @@ ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
         }
     }
 
-    if (ngx_init_array(&conf->calls, cf->pool, 1, 
+    if (ngx_array_init(&cmcf->calls, cf->pool, 1, 
                 sizeof(ngx_hash_key_t)) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    if (ngx_init_array(&conf->disconnect, cf->pool, 1,
+    if (ngx_array_init(&cmcf->disconnect, cf->pool, 1,
             sizeof(ngx_rtmp_disconnect_handler_pt)) != NGX_OK)
     {
         return NGX_ERROR;
@@ -290,11 +292,11 @@ ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 static ngx_int_t
 ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 {
-    ngx_hash_init_t         calls_hash;
-    ngx_event_handler_pt   *eh;
-    ngx_hash_key_t         *h;
-    size_t                  n;
-    static size_t           pm_events[] = {
+    ngx_hash_init_t             calls_hash;
+    ngx_rtmp_event_handler_pt  *eh;
+    ngx_hash_key_t             *h;
+    size_t                      n;
+    static size_t               pm_events[] = {
         NGX_RTMP_MSG_CHUNK_SIZE,
         NGX_RTMP_MSG_ABORT,
         NGX_RTMP_MSG_ACK,
@@ -304,7 +306,7 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     };
 
     /* init events */
-    for(n = 0; n < sizeof(pm_events) / sizeof(p_events[0]); ++n) {
+    for(n = 0; n < sizeof(pm_events) / sizeof(pm_events[0]); ++n) {
         eh = ngx_array_push(&cmcf->events[pm_events[n]]);
         *eh = ngx_rtmp_protocol_message_handler;
     }
@@ -317,8 +319,8 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 
 
     /* init calls */
-    for(n = 0; n < cmcf->nelts; ++n) {
-        h = &cmcf->calls.elts[n];
+    h = cmcf->calls.elts;
+    for(n = 0; n < cmcf->calls.nelts; ++n, ++h) {
         h->key_hash = ngx_hash_key_lc(h->key.data, h->key.len);
     }
 

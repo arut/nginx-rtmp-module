@@ -4,12 +4,11 @@
 
 - remove macros hell from ngx_rtmp_send.c
 
+- packet dropping
+
+- shortcuts for big-endian copy
+
 - implement loc confs (=fms apps)
     loc options:
-    - session buckets
     - broadcast/file
-    - input buffer size per connection
-    - output chunk size
-    - output chunk buffer size
-    - output header buffer size
     - HTTP callbacks on invoke calls

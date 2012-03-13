@@ -12,6 +12,8 @@
 #include <ngx_event.h>
 #include <ngx_event_connect.h>
 
+#include "ngx_rtmp_amf0.h"
+
 
 typedef struct {
     void                  **main_conf;
@@ -153,7 +155,7 @@ typedef struct ngx_rtmp_stream_t {
 } ngx_rtmp_stream_t;
 
 
-typedef struct {
+typedef struct ngx_rtmp_session_s {
     uint32_t                signature;         /* "RTMP" */
 
     ngx_connection_t       *connection;
@@ -194,7 +196,7 @@ typedef struct {
     ngx_array_t             events[NGX_RTMP_MSG_MAX];
     ngx_hash_t              calls_hash;
     ngx_array_t             calls;
-    ngx_array_t             disconect;
+    ngx_array_t             disconnect;
 } ngx_rtmp_core_main_conf_t;
 
 
@@ -203,7 +205,7 @@ typedef struct {
     ngx_flag_t              so_keepalive;
     ngx_int_t               max_streams;
     
-    ngx_uint_t              out_chunk_size;
+    ngx_int_t               out_chunk_size;
     ngx_pool_t             *out_pool;
     ngx_chain_t            *out_free;
 
@@ -260,11 +262,11 @@ u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
 
 /* Receiving messages */
-ngx_int_t ngx_rtmp_protocol_message_handler(ngx_session_t *s,
+ngx_int_t ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-ngx_int_t ngx_rtmp_user_message_handler(ngx_session_t *s,
+ngx_int_t ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-ngx_int_t ngx_rtmp_amf0_message_handler(ngx_session_t *s,
+ngx_int_t ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 /* Sending messages */
@@ -286,7 +288,7 @@ ngx_int_t ngx_rtmp_send_ack(ngx_rtmp_session_t *s,
         uint32_t seq);
 ngx_int_t ngx_rtmp_send_ack_size(ngx_rtmp_session_t *s, 
         uint32_t ack_size);
-ngx_int_t ngx_rtmp_send_bandwidth(ngx_rtmp_session_r *s, 
+ngx_int_t ngx_rtmp_send_bandwidth(ngx_rtmp_session_t *s, 
         uint32_t ack_size, uint8_t limit_type);
 
 /* User control messages */
@@ -306,11 +308,11 @@ ngx_int_t ngx_rtmp_send_user_ping_response(ngx_rtmp_session_t *s,
         uint32_t timestamp);
 
 /* AMF0 sender/receiver */
-ngx_int_t ngx_rtmp_send_amf0(ngx_session_t *s, 
+ngx_int_t ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, 
         uint32_t csid, uint32_t msid,
         ngx_rtmp_amf0_elt_t *elts, size_t nelts);
-ngx_int_t ngx_rtmp_receive_amf0(ngx_session_t *s, ngx_chain_t *in, 
-        ngx_rtmp_amf0_elt_t *elts, size_t nelts)
+ngx_int_t ngx_rtmp_receive_amf0(ngx_rtmp_session_t *s, ngx_chain_t *in, 
+        ngx_rtmp_amf0_elt_t *elts, size_t nelts);
 
 
 extern ngx_uint_t    ngx_rtmp_max_module;

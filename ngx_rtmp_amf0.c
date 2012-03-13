@@ -57,7 +57,7 @@ ngx_rtmp_amf0_get(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
 {
     ngx_buf_t      *b;
     size_t          size;
-    ngx_chain_t   **l;
+    ngx_chain_t    *l;
 #ifdef NGX_DEBUG
     void           *op = p;
 #endif
@@ -65,9 +65,9 @@ ngx_rtmp_amf0_get(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
     if (!n)
         return NGX_OK;
 
-    for(l = ctx->link; *l; l = &(*l)->next) {
+    for(l = ctx->link; l; l = l->next) {
 
-        b = (*l)->buf;
+        b = l->buf;
 
         if (b->last > n + b->pos) {
             if (p) {

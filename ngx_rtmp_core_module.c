@@ -130,20 +130,19 @@ ngx_rtmp_core_create_main_conf(ngx_conf_t *cf)
 static void *
 ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
 {
-    ngx_rtmp_core_srv_conf_t   *cscf;
-    size_t                      n
+    ngx_rtmp_core_srv_conf_t   *conf;
 
-    cscf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_core_srv_conf_t));
-    if (cscf == NULL) {
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_core_srv_conf_t));
+    if (conf == NULL) {
         return NULL;
     }
 
-    cscf->timeout = NGX_CONF_UNSET_MSEC;
-    cscf->so_keepalive = NGX_CONF_UNSET;
+    conf->timeout = NGX_CONF_UNSET_MSEC;
+    conf->so_keepalive = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
     conf->out_chunk_size = NGX_CONF_UNSET;
 
-    return cscf;
+    return conf;
 }
 
 

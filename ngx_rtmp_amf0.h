@@ -27,7 +27,9 @@ typedef struct {
 } ngx_rtmp_amf0_elt_t;
 
 
-typedef ngx_chain_t * (*ngx_rtmp_amf0_alloc_pt)
+struct ngx_rtmp_session_s;
+
+typedef ngx_chain_t * (*ngx_rtmp_amf0_alloc_pt)(struct ngx_rtmp_session_s *s);
 
 typedef struct {
     ngx_chain_t            *link, *first;
