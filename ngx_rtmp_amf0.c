@@ -39,11 +39,17 @@ ngx_rtmp_amf0_debug(const char* op, ngx_log_t *log, u_char *p, size_t n)
 
     for(i = 0; i < n && i < NGX_RTMP_AMF0_DEBUG_SIZE; ++i) {
         *hp++ = ' ';
-        *hp++ = hex[(*p & 0xf0) >> 4];
-        *hp++ = hex[*p & 0x0f];
-        *sp++ = (*p >= 0x20 && *p <= 0x7e) ?
-            *p : (u_char)'?';
-        ++p;
+        if (p) {
+            *hp++ = hex[(*p & 0xf0) >> 4];
+            *hp++ = hex[*p & 0x0f];
+            *sp++ = (*p >= 0x20 && *p <= 0x7e) ?
+                *p : (u_char)'?';
+            ++p;
+        } else {
+            *hp++ = 'X';
+            *hp++ = 'X';
+            *sp++ = '?';
+        }
     }
     *hp = *sp = '\0';
 
@@ -69,7 +75,7 @@ ngx_rtmp_amf0_get(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
 
         b = l->buf;
 
-        if (b->last > n + b->pos) {
+        if (b->last >= n + b->pos) {
             if (p) {
                 p = ngx_cpymem(p, b->pos, n);
             }
@@ -128,6 +134,7 @@ ngx_rtmp_amf0_put(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
                 l = ln;
             }
 
+            ctx->link = l;
             b = l->buf;
             b->pos = b->last = b->start;
         }
@@ -156,6 +163,7 @@ ngx_rtmp_amf0_read_object(ngx_rtmp_amf0_ctx_t *ctx, ngx_rtmp_amf0_elt_t *elts,
     uint16_t                len;
     size_t                  n, namelen, maxlen;
     ngx_int_t               rc;
+    u_char                  buf[2];
 
     maxlen = 0;
     for(n = 0; n < nelts; ++n) {
@@ -169,8 +177,10 @@ ngx_rtmp_amf0_read_object(ngx_rtmp_amf0_ctx_t *ctx, ngx_rtmp_amf0_elt_t *elts,
         char    name[maxlen + 1];
 
         /* read key */
-        if (ngx_rtmp_amf0_get(ctx, &len, sizeof(len)) != NGX_OK)
+        if (ngx_rtmp_amf0_get(ctx, buf, 2) != NGX_OK)
             return NGX_ERROR;
+
+        ngx_rtmp_amf0_reverse_copy(&len, buf, 2);
 
         if (!len)
             break;
@@ -241,7 +251,7 @@ ngx_rtmp_amf0_read(ngx_rtmp_amf0_ctx_t *ctx, ngx_rtmp_amf0_elt_t *elts, size_t n
                 if (ngx_rtmp_amf0_get(ctx, buf, 8) != NGX_OK) {
                     return NGX_ERROR;
                 }
-                ngx_rtmp_amf0_reverse_copy(data, buf, 0);
+                ngx_rtmp_amf0_reverse_copy(data, buf, 8);
                 break;
 
             case NGX_RTMP_AMF0_BOOLEAN:

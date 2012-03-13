@@ -230,7 +230,7 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         p += (l->buf->end - l->buf->last);
     }
 
-    ngx_rtmp_prepare_message(h, out, 0/*fmt*/);
+    ngx_rtmp_prepare_message(s, h, out, 0/*fmt*/);
 
     /* broadcast to all subscribers */
     for(cctx = *ngx_rtmp_broadcast_get_head(s); 
@@ -242,7 +242,9 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 && !ngx_strncmp(cctx->stream.data, ctx->stream.data, 
                     ctx->stream.len))
         {
-            ngx_rtmp_send_message(s, out);
+            if (ngx_rtmp_send_message(s, out) != NGX_OK) {
+                return NGX_ERROR;
+            }
         }
     }
 
@@ -261,7 +263,7 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, double in_trans,
 
     static ngx_rtmp_amf0_elt_t      in_cmd[] = {
         { NGX_RTMP_AMF0_STRING, "app",          app,        sizeof(app)     },
-        { NGX_RTMP_AMF0_STRING, "pageUrl",      url,        sizeof(url)     },
+        { NGX_RTMP_AMF0_STRING, "tcUrl"  ,      url,        sizeof(url)     },
     };
 
     static ngx_rtmp_amf0_elt_t      out_inf[] = {
@@ -272,7 +274,6 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, double in_trans,
 
     static ngx_rtmp_amf0_elt_t      in_elts[] = {
         { NGX_RTMP_AMF0_OBJECT, NULL,   in_cmd,     sizeof(in_cmd)          },
-        { NGX_RTMP_AMF0_NULL,   NULL,   NULL,       0                       },
     };
 
     static ngx_rtmp_amf0_elt_t      out_elts[] = {

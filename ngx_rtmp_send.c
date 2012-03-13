@@ -7,7 +7,7 @@
 #include "ngx_rtmp_amf0.h"
 
 
-#define NGX_RTMP_USER_START(s, tp)               \
+#define NGX_RTMP_USER_START(s, tp)              \
     ngx_rtmp_header_t       __h;                \
     ngx_chain_t            *__l;                \
     ngx_buf_t              *__b;                \
@@ -22,23 +22,22 @@
     __b = __l->buf;     
 
 #define NGX_RTMP_UCTL_START(s, type, utype)     \
-    NGX_RTMP_USER_START(s, type);                \
+    NGX_RTMP_USER_START(s, type);               \
     *(__b->last++) = (u_char)((utype) >> 8);    \
     *(__b->last++) = (u_char)(utype);
 
-#define NGX_RTMP_USER_OUT1(v)                    \
+#define NGX_RTMP_USER_OUT1(v)                   \
     *(__b->last++) = ((u_char*)&v)[0];
 
-#define NGX_RTMP_USER_OUT4(v)                    \
+#define NGX_RTMP_USER_OUT4(v)                   \
     *(__b->last++) = ((u_char*)&v)[3];          \
     *(__b->last++) = ((u_char*)&v)[2];          \
     *(__b->last++) = ((u_char*)&v)[1];          \
     *(__b->last++) = ((u_char*)&v)[0];
 
-#define NGX_RTMP_USER_END(s)                     \
-    ngx_rtmp_prepare_message(&__h, __l, 0);     \
-    ngx_rtmp_send_message(s, __l);              \
-    return NGX_OK;
+#define NGX_RTMP_USER_END(s)                    \
+    ngx_rtmp_prepare_message(s, &__h, __l, 0);  \
+    return ngx_rtmp_send_message(s, __l);       \
 
 
 /* Protocol control messages */
@@ -202,8 +201,8 @@ ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, uint32_t csid, uint32_t msid,
     }
 
     if (act.first) {
-        ngx_rtmp_prepare_message(&h, act.first, 0);
-        ngx_rtmp_send_message(s, act.first);
+        ngx_rtmp_prepare_message(s, &h, act.first, 0);
+        return ngx_rtmp_send_message(s, act.first);
     }
 
     return NGX_OK;
