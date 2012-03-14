@@ -136,7 +136,6 @@ ngx_rtmp_amf0_put(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
 
             ctx->link = l;
             b = l->buf;
-            b->pos = b->last = b->start;
         }
 
         size = b->end - b->last;

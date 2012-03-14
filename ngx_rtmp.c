@@ -317,7 +317,6 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AMF0_CMD]);
     *eh = ngx_rtmp_amf0_message_handler;
 
-
     /* init calls */
     h = cmcf->calls.elts;
     for(n = 0; n < cmcf->calls.nelts; ++n, ++h) {
@@ -326,7 +325,7 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 
     calls_hash.hash = &cmcf->calls_hash;
     calls_hash.key = ngx_hash_key_lc;
-    calls_hash.max_size = 1024;
+    calls_hash.max_size = 512;
     calls_hash.bucket_size = ngx_cacheline_size;
     calls_hash.name = "calls_hash";
     calls_hash.pool = cf->pool;

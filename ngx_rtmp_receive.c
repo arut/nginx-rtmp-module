@@ -193,7 +193,7 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
      * because ngx_hash_find only returns one item;
      * no good to patch NGINX core ;) */
     ch = ngx_hash_find(&cmcf->calls_hash, 
-            ngx_hash_key_lc(func, len), func, len);
+            ngx_hash_strlow(func, func, len), func, len);
 
     if (ch) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,

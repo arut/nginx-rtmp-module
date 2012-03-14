@@ -150,7 +150,7 @@ typedef struct {
 
 
 typedef struct ngx_rtmp_stream_t {
-    ngx_rtmp_header_t   hdr;
+    ngx_rtmp_header_t       hdr;
     ngx_chain_t            *in;
 } ngx_rtmp_stream_t;
 
@@ -257,7 +257,6 @@ typedef struct {
 
 
 void ngx_rtmp_init_connection(ngx_connection_t *c);    
-/*void ngx_rtmp_close_session(ngx_rtmp_session_t *s);*/
 void ngx_rtmp_close_connection(ngx_connection_t *c);
 u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
 
@@ -272,6 +271,8 @@ ngx_int_t ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
 
 /* Sending messages */
 ngx_chain_t * ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s);
+ngx_int_t ngx_rtmp_release_shared_buf(ngx_rtmp_session_t *s,
+        ngx_chain_t *out);
 void ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *out, uint8_t fmt);
 ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out);
