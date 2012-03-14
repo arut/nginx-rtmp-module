@@ -19,6 +19,8 @@ static ngx_int_t ngx_rtmp_broadcast_create_stream(ngx_rtmp_session_t *s,
         double in_trans, ngx_chain_t *in);
 static ngx_int_t ngx_rtmp_broadcast_publish(ngx_rtmp_session_t *s, 
         double in_trans, ngx_chain_t *in);
+static ngx_int_t ngx_rtmp_broadcast_play(ngx_rtmp_session_t *s, 
+        double in_trans, ngx_chain_t *in);
 static ngx_int_t ngx_rtmp_broadcast_ok(ngx_rtmp_session_t *s, 
         double in_trans, ngx_chain_t *in);
 
@@ -33,8 +35,10 @@ static ngx_rtmp_broadcast_map_t ngx_rtmp_broadcast_map[] = {
     { ngx_string("connect"),            ngx_rtmp_broadcast_connect          },
     { ngx_string("createStream"),       ngx_rtmp_broadcast_create_stream    },
     { ngx_string("publish"),            ngx_rtmp_broadcast_publish          },
+    { ngx_string("play"),               ngx_rtmp_broadcast_play             },
     { ngx_string("releaseStream"),      ngx_rtmp_broadcast_ok               },
     { ngx_string("FCPublish"),          ngx_rtmp_broadcast_ok               },
+    { ngx_string("FCSubscribe"),        ngx_rtmp_broadcast_ok               },
 };
 
 
@@ -179,7 +183,7 @@ ngx_rtmp_broadcast_join(ngx_rtmp_session_t *s, ngx_str_t *stream,
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                   "join broadcast stream '%V'", &stream);
+                   "join broadcast stream '%V'", stream);
 
     ctx->stream = *stream;
     hctx = ngx_rtmp_broadcast_get_head(s);
@@ -233,7 +237,9 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
-    if (ctx == NULL || !(ctx->flags & NGX_RTMP_BROADCAST_PUBLISHER)) {
+    if (ctx == NULL 
+            || !(ctx->flags & NGX_RTMP_BROADCAST_PUBLISHER)) 
+    {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
                 "received audio/video from non-publisher");
         return NGX_ERROR;
@@ -288,7 +294,7 @@ done:
                 && !ngx_strncmp(cctx->stream.data, ctx->stream.data, 
                     ctx->stream.len))
         {
-            if (ngx_rtmp_send_message(s, out) != NGX_OK) {
+            if (ngx_rtmp_send_message(cctx->session, out) != NGX_OK) {
                 return NGX_ERROR;
             }
             ++nsubs;
@@ -418,7 +424,7 @@ ngx_rtmp_broadcast_publish(ngx_rtmp_session_t *s, double in_trans,
     };
 
     static ngx_rtmp_amf0_elt_t      out_elts[] = {
-        { NGX_RTMP_AMF0_STRING, NULL,   "onStatus",  sizeof("onStatus") - 1 },
+        { NGX_RTMP_AMF0_STRING, NULL,   "onStatus", sizeof("onStatus") - 1 },
         { NGX_RTMP_AMF0_NUMBER, NULL,   &trans,     sizeof(trans)           },
         { NGX_RTMP_AMF0_NULL  , NULL,   NULL,       0                       },    
         { NGX_RTMP_AMF0_OBJECT, NULL,   out_inf,    sizeof(out_inf)         },
@@ -441,6 +447,61 @@ ngx_rtmp_broadcast_publish(ngx_rtmp_session_t *s, double in_trans,
     ngx_str_set(&out_inf[0], "NetStream.Publish.Start");
     ngx_str_set(&out_inf[1], "status");
     ngx_str_set(&out_inf[2], "Publish succeeded.");
+
+    if (ngx_rtmp_send_amf0(s, 3, 0, out_elts,
+                sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_broadcast_play(ngx_rtmp_session_t *s, double in_trans,
+        ngx_chain_t *in)
+{
+    static double       trans;
+    static u_char       pub_name[1024];
+    static u_char       pub_type[1024];
+
+    static ngx_rtmp_amf0_elt_t      out_inf[] = {
+        { NGX_RTMP_AMF0_STRING, "code",         NULL,       0               },
+        { NGX_RTMP_AMF0_STRING, "level",        NULL,       0               },
+        { NGX_RTMP_AMF0_STRING, "description",  NULL,       0               },
+    };
+
+    static ngx_rtmp_amf0_elt_t      in_elts[] = {
+        { NGX_RTMP_AMF0_NULL,   NULL,   NULL,       0                       },
+        { NGX_RTMP_AMF0_STRING, NULL,   pub_name,   sizeof(pub_name)        },
+        { NGX_RTMP_AMF0_STRING, NULL,   pub_type,   sizeof(pub_type)        },
+    };
+
+    static ngx_rtmp_amf0_elt_t      out_elts[] = {
+        { NGX_RTMP_AMF0_STRING, NULL,   "onStatus", sizeof("onStatus") - 1 },
+        { NGX_RTMP_AMF0_NUMBER, NULL,   &trans,     sizeof(trans)           },
+        { NGX_RTMP_AMF0_NULL  , NULL,   NULL,       0                       },    
+        { NGX_RTMP_AMF0_OBJECT, NULL,   out_inf,    sizeof(out_inf)         },
+    };
+
+
+    if (ngx_rtmp_receive_amf0(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "publish() called; pubName='%s' pubType='%s'",
+            pub_name, pub_type);
+
+    ngx_rtmp_broadcast_set_flags(s, NGX_RTMP_BROADCAST_SUBSCRIBER);
+
+    trans = in_trans;
+    ngx_str_set(&out_inf[0], "NetStream.Play.Start");
+    ngx_str_set(&out_inf[1], "status");
+    ngx_str_set(&out_inf[2], "Started playing.");
 
     if (ngx_rtmp_send_amf0(s, 3, 0, out_elts,
                 sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK)

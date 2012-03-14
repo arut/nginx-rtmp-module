@@ -1,6 +1,4 @@
-~ Implement modules support.
-  Move AMF0 handlers to modules.
-  Move broadcast to module.
+- implement chain-reuse for output
 
 - remove macros hell from ngx_rtmp_send.c
 

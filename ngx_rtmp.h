@@ -151,12 +151,13 @@ typedef struct {
 
 typedef struct ngx_rtmp_stream_t {
     ngx_rtmp_header_t       hdr;
+    uint32_t                len;        /* current fragment length */
     ngx_chain_t            *in;
 } ngx_rtmp_stream_t;
 
 
 typedef struct ngx_rtmp_session_s {
-    uint32_t                signature;         /* "RTMP" */
+    uint32_t                signature;  /* "RTMP" */ /* <-- FIXME wtf */
 
     ngx_connection_t       *connection;
 

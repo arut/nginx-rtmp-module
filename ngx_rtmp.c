@@ -300,7 +300,6 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
         NGX_RTMP_MSG_CHUNK_SIZE,
         NGX_RTMP_MSG_ABORT,
         NGX_RTMP_MSG_ACK,
-        NGX_RTMP_MSG_USER,
         NGX_RTMP_MSG_ACK_SIZE,
         NGX_RTMP_MSG_BANDWIDTH
     };
