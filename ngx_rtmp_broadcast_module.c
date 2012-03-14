@@ -227,7 +227,7 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_broadcast_ctx_t       *ctx, *cctx;
     ngx_chain_t                    *out, *l, **ll;
     u_char                         *p;
-    size_t                          nsubs;
+    size_t                          nsubs, size;
 
     c = s->connection;
 
@@ -267,9 +267,9 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             p = in->buf->pos;
         }
 
-        l->buf->last = ngx_cpymem(l->buf->last, p,
-                l->buf->end - l->buf->last);
-        p += (l->buf->end - l->buf->last);
+        size = l->buf->end - l->buf->last;
+        l->buf->last = ngx_cpymem(l->buf->last, p, size);
+        p += size;
     }
 
 done:

@@ -11,6 +11,8 @@
 - closing session on send error
   causes crash because of double-freeing stack
 
+- add max message size
+
 - recognize amf-meta
 
 - shortcuts for big-endian copy
