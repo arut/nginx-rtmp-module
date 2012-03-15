@@ -63,6 +63,13 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, max_streams),
       NULL },
 
+    { ngx_string("ack_window"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, ack_window),
+      NULL },
+
     { ngx_string("out_chunk_size"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -141,6 +148,7 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->so_keepalive = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
     conf->out_chunk_size = NGX_CONF_UNSET;
+    conf->ack_window = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -157,6 +165,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 16);
     ngx_conf_merge_value(conf->out_chunk_size, prev->out_chunk_size, 128);
+    ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
 
     if (prev->out_pool == NULL) {
         prev->out_pool = ngx_create_pool(4096, cf->log);

@@ -176,7 +176,9 @@ typedef struct ngx_rtmp_session_s {
 
     ngx_str_t              *addr_text;
 
-    ngx_buf_t               hs_buf;
+    /* TODO: allocate this bufs from shared pool */
+    ngx_buf_t               hs_in_buf;
+    ngx_buf_t               hs_out_buf;
     ngx_uint_t              hs_stage;
 
     /* connection timestamps */
@@ -190,6 +192,8 @@ typedef struct ngx_rtmp_session_s {
     uint32_t                in_csid;
     ngx_uint_t              in_chunk_size;
     ngx_pool_t             *in_pool;
+    uint32_t                in_bytes;
+    uint32_t                in_last_ack;
 
     ngx_chain_t            *out;
 } ngx_rtmp_session_t;
@@ -217,6 +221,8 @@ typedef struct {
     ngx_msec_t              timeout;
     ngx_flag_t              so_keepalive;
     ngx_int_t               max_streams;
+
+    ngx_uint_t              ack_window;
     
     ngx_int_t               out_chunk_size;
     ngx_pool_t             *out_pool;

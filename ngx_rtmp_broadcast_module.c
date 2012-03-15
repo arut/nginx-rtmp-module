@@ -90,6 +90,7 @@ ngx_module_t  ngx_rtmp_broadcast_module = {
 
 #define NGX_RTMP_BROADCAST_PUBLISHER        0x01
 #define NGX_RTMP_BROADCAST_SUBSCRIBER       0x02
+#define NGX_RTMP_BROADCAST_WANT_KEYFRAME    0x04
 
 
 typedef struct ngx_rtmp_broadcast_ctx_s {
@@ -223,6 +224,18 @@ ngx_rtmp_broadcast_leave(ngx_rtmp_session_t *s)
 }
 
 
+#define NGX_RTMP_VIDEO_KEY_FRAME            1
+#define NGX_RTMP_VIDEO_INTER_FRAME          2
+#define NGX_RTMP_VIDEO_DISPOSABLE_FRAME     3
+
+
+static ngx_int_t
+ngx_rtmp_get_video_frame_type(ngx_chain_t *in)
+{
+    return (in->buf->pos[0] & 0xf0) >> 4;
+}
+
+
 static ngx_int_t
 ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *in)
@@ -232,13 +245,16 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t                    *out, *l, **ll;
     u_char                         *p;
     size_t                          nsubs, size;
+    ngx_int_t                       vftype;
 
     c = s->connection;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
+    /*
     h->timestamp -= s->peer_epoch;
     h->timestamp += s->epoch;
+    */
 
     if (ctx == NULL 
             || !(ctx->flags & NGX_RTMP_BROADCAST_PUBLISHER)) 
@@ -250,6 +266,11 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     if (in == NULL || in->buf == NULL) {
         return NGX_OK;
+    }
+
+    vftype = 0;
+    if (h->type == NGX_RTMP_MSG_VIDEO) {
+        vftype = ngx_rtmp_get_video_frame_type(in);
     }
 
     /* copy data to output stream */
@@ -297,6 +318,14 @@ done:
                 && !ngx_strncmp(cctx->stream.data, ctx->stream.data, 
                     ctx->stream.len))
         {
+            if (h->type == NGX_RTMP_MSG_VIDEO 
+                && cctx->flags & NGX_RTMP_BROADCAST_WANT_KEYFRAME) 
+            {
+                if (vftype && vftype != NGX_RTMP_VIDEO_KEY_FRAME) {
+                    continue;
+                }
+                cctx->flags &= ~NGX_RTMP_BROADCAST_WANT_KEYFRAME;
+            }
             if (ngx_rtmp_send_message(cctx->session, out) != NGX_OK) {
                 return NGX_ERROR;
             }
@@ -319,11 +348,13 @@ static ngx_int_t
 ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, double in_trans,
         ngx_chain_t *in)
 {
-    static double       trans;
-    static u_char       app[1024];
-    static u_char       url[1024];
-    static u_char       acodecs[1024];
-    static ngx_str_t    app_str;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+
+    static double               trans;
+    static u_char               app[1024];
+    static u_char               url[1024];
+    static u_char               acodecs[1024];
+    static ngx_str_t            app_str;
 
     static ngx_rtmp_amf0_elt_t      in_cmd[] = {
         { NGX_RTMP_AMF0_STRING, "app",          app,        sizeof(app)     },
@@ -354,6 +385,8 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, double in_trans,
         return NGX_ERROR;
     }
 
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
     trans = in_trans;
     ngx_str_set(&out_inf[0], "NetConnection.Connect.Success");
     ngx_str_set(&out_inf[1], "status");
@@ -373,8 +406,8 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, double in_trans,
     */
     ngx_rtmp_broadcast_join(s, &app_str, 0);
 
-    return ngx_rtmp_send_ack_size(s, 2500000)
-        || ngx_rtmp_send_bandwidth(s, 2500000, NGX_RTMP_LIMIT_DYNAMIC)
+    return ngx_rtmp_send_ack_size(s, cscf->ack_window)
+        || ngx_rtmp_send_bandwidth(s, cscf->ack_window, NGX_RTMP_LIMIT_SOFT)
         || ngx_rtmp_send_user_stream_begin(s, 0)
         || ngx_rtmp_send_amf0(s, 3, 0, out_elts,
                 sizeof(out_elts) / sizeof(out_elts[0]))
@@ -498,10 +531,11 @@ ngx_rtmp_broadcast_play(ngx_rtmp_session_t *s, double in_trans,
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "publish() called; pubName='%s' pubType='%s'",
+            "play() called; pubName='%s' pubType='%s'",
             pub_name, pub_type);
 
-    ngx_rtmp_broadcast_set_flags(s, NGX_RTMP_BROADCAST_SUBSCRIBER);
+    ngx_rtmp_broadcast_set_flags(s, NGX_RTMP_BROADCAST_SUBSCRIBER
+            | NGX_RTMP_BROADCAST_WANT_KEYFRAME);
 
     trans = in_trans;
     ngx_str_set(&out_inf[0], "NetStream.Play.Start");

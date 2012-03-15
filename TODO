@@ -1,5 +1,7 @@
 - implement chain-reuse for output
 
+- get rid of greedy send_chain
+
 - remove macros hell from ngx_rtmp_send.c
 
 - packet dropping
