@@ -96,14 +96,23 @@ typedef struct {
 } ngx_rtmp_conf_addr_t;
 
 
+#define NGX_RTMP_VERSION                3
+
+#define NGX_LOG_DEBUG_RTMP              NGX_LOG_DEBUG_CORE
+
 #define NGX_RTMP_HANDSHAKE_SIZE         1536
 
 #define NGX_RTMP_DEFAULT_CHUNK_SIZE     128
 
-#define NGX_LOG_DEBUG_RTMP              NGX_LOG_DEBUG_CORE
+
+/* RTMP handshake stages */
+#define NGX_RTMP_HS_READ_DATA           0
+#define NGX_RTMP_HS_WRITE_DATA          1
+#define NGX_RTMP_HS_WRITE_ECHO          2
+#define NGX_RTMP_HS_READ_ECHO           3
 
 
-/* RTMP message types*/
+/* RTMP message types */
 #define NGX_RTMP_MSG_CHUNK_SIZE         1
 #define NGX_RTMP_MSG_ABORT              2
 #define NGX_RTMP_MSG_ACK                3
@@ -142,7 +151,7 @@ typedef struct {
 
 typedef struct {
     uint32_t                csid;       /* chunk stream id */
-    uint32_t                timestamp;
+    uint32_t                timestamp;  /* timestamp (delta) */
     uint32_t                mlen;       /* message length */
     uint8_t                 type;       /* message type id */
     uint32_t                msid;       /* message stream id */
@@ -167,12 +176,15 @@ typedef struct ngx_rtmp_session_s {
 
     ngx_str_t              *addr_text;
 
-    /* handshake */
-    ngx_buf_t               buf;
+    ngx_buf_t               hs_buf;
     ngx_uint_t              hs_stage;
 
+    /* connection timestamps */
+    uint32_t                epoch;
+    uint32_t                peer_epoch;
+
     /* input stream 0 (reserved by RTMP spec)
-     * used for free chain link */
+     * is used as free chain link */
 
     ngx_rtmp_stream_t      *in_streams;
     uint32_t                in_csid;
@@ -260,6 +272,7 @@ typedef struct {
 void ngx_rtmp_init_connection(ngx_connection_t *c);    
 void ngx_rtmp_close_connection(ngx_connection_t *c);
 u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
+uint32_t ngx_rtmp_get_timestamp();
 
 
 /* Receiving messages */
