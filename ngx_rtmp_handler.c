@@ -360,6 +360,7 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_buf_t                  *b;
     size_t                      offs;
+    static u_char               zeroes[4];
 
     c = wev->data;
     s = c->data;
@@ -393,6 +394,9 @@ restart:
         } else if (b->pos  - b->start < 4) {
             /* use the timestamp from echo packet */
             n = c->send(c, b->pos + 4, 4 - (b->pos - b->start));
+
+        } else if (b->pos - b->start < 8) {
+            n = c->send(c, zeroes, 8 - (b->pos - b->start));
 
         } else {
             offs = (b->pos - b->start - 4) % sizeof(handshake_text);
@@ -659,8 +663,8 @@ ngx_rtmp_recv(ngx_event_t *rev)
         if (fsize > s->in_chunk_size) {
             /* collect fragmented chunks */
             st->len += s->in_chunk_size;
-
-            old_pos = b->pos + s->in_chunk_size;
+            b->last = b->pos + s->in_chunk_size;
+            old_pos = b->last;
             old_size = size - s->in_chunk_size;
 
         } else {
@@ -747,6 +751,7 @@ ngx_rtmp_send(ngx_event_t *wev)
 
             l = s->out;
             if (l->buf->pos < l->buf->last) {
+                l->buf->pos = l->buf->last;
                 break;
             }
 

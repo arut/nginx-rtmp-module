@@ -237,6 +237,9 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
+    h->timestamp -= s->peer_epoch;
+    h->timestamp += s->epoch;
+
     if (ctx == NULL 
             || !(ctx->flags & NGX_RTMP_BROADCAST_PUBLISHER)) 
     {
@@ -319,11 +322,13 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, double in_trans,
     static double       trans;
     static u_char       app[1024];
     static u_char       url[1024];
+    static u_char       acodecs[1024];
     static ngx_str_t    app_str;
 
     static ngx_rtmp_amf0_elt_t      in_cmd[] = {
         { NGX_RTMP_AMF0_STRING, "app",          app,        sizeof(app)     },
         { NGX_RTMP_AMF0_STRING, "tcUrl"  ,      url,        sizeof(url)     },
+        { NGX_RTMP_AMF0_STRING, "audiocodecs"  ,      acodecs,        sizeof(acodecs)     },
     };
 
     static ngx_rtmp_amf0_elt_t      out_inf[] = {

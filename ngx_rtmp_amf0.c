@@ -66,6 +66,7 @@ ngx_rtmp_amf0_get(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
     ngx_chain_t    *l;
 #ifdef NGX_DEBUG
     void           *op = p;
+    size_t          on = n;
 #endif
 
     if (!n)
@@ -80,9 +81,11 @@ ngx_rtmp_amf0_get(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
                 p = ngx_cpymem(p, b->pos, n);
             }
             b->pos += n;
+
+            ctx->link = l;
             
 #ifdef NGX_DEBUG
-            ngx_rtmp_amf0_debug("read", ctx->log, (u_char*)op, n);
+            ngx_rtmp_amf0_debug("read", ctx->log, (u_char*)op, on);
 #endif
 
             return NGX_OK;
@@ -90,8 +93,9 @@ ngx_rtmp_amf0_get(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
 
         size = b->last - b->pos;
 
-        if (p)
+        if (p) {
             p = ngx_cpymem(p, b->pos, size);
+        }
 
         n -= size;
     }
