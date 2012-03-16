@@ -25,8 +25,8 @@ static ngx_int_t ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
 
 
 #ifdef NGX_DEBUG
-static char*
-ngx_rtmp_packet_type(uint8_t type) {
+char*
+ngx_rtmp_message_type(uint8_t type) {
     static char* types[] = {
         "?",
         "chunk_size",
@@ -55,6 +55,24 @@ ngx_rtmp_packet_type(uint8_t type) {
 
     return type < sizeof(types) / sizeof(types[0])
         ? types[type]
+        : "?";
+}
+
+
+char*
+ngx_rtmp_user_message_type(uint16_t evt) {
+    static char* evts[] = {
+        "stream_begin",
+        "stream_eof",
+        "stream dry",
+        "set_buflen",
+        "recorded",
+        "ping_request",
+        "ping_response",
+    };
+
+    return evt < sizeof(evts) / sizeof(evts[0])
+        ? evts[evt]
         : "?";
 }
 #endif
@@ -216,14 +234,12 @@ ngx_rtmp_init_session(ngx_connection_t *c)
         ngx_rtmp_close_connection(c);
         return;
     }
-    
+
+    size = NGX_RTMP_HANDSHAKE_SIZE + 1;
     s->in_chunk_size = NGX_RTMP_DEFAULT_CHUNK_SIZE;
-    s->in_pool = ngx_create_pool(2 * (NGX_RTMP_HANDSHAKE_SIZE + 1)
-            + sizeof(ngx_pool_t), c->log);
+    s->in_pool = ngx_create_pool(2 * size + sizeof(ngx_pool_t), c->log);
 
     /* start handshake */
-    size = NGX_RTMP_HANDSHAKE_SIZE + 1;
-
     b = &s->hs_in_buf;
     b->start = b->pos = b->last = ngx_pcalloc(s->in_pool, size);
     b->end = b->start + size;
@@ -350,7 +366,7 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
         }
 
         /* reply timestamp is the same as out epoch */
-        ngx_memcpy(s->hs_in_buf.pos + 4, b->pos + 1, 4);
+        /*ngx_memcpy(s->hs_in_buf.pos + 4, b->pos + 1, 4);*/
 
         ngx_rtmp_handshake_send(c->write);
 
@@ -439,6 +455,8 @@ restart:
     ngx_rtmp_handshake_recv(c->read);
 }
 
+ngx_chain_t * tmp;
+
 
 void
 ngx_rtmp_recv(ngx_event_t *rev)
@@ -482,6 +500,10 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 ngx_rtmp_close_connection(c);
                 return;
             }
+
+            ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                    "allocating input buffer %p : %p", 
+                    st->in, st->in->buf);
 
             st->in->next = NULL;
             b = st->in->buf;
@@ -577,7 +599,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
 
             if (csid >= cscf->max_streams) {
                 ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR,
-                    "RTMP chunk stream too big: %D >= %D",
+                    "RTMP in chunk stream too big: %D >= %D",
                     csid, cscf->max_streams);
                 ngx_rtmp_close_connection(c);
                 return;
@@ -648,12 +670,13 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 if (timestamp == 0x00ffffff) {
                     if (b->last - p < 4)
                         continue;
-                    pp = (u_char*)&h->timestamp;
+                    pp = (u_char*)&timestamp;
                     pp[3] = *p++;
                     pp[2] = *p++;
                     pp[1] = *p++;
                     pp[0] = *p++;
-                } else if (fmt) {
+                }
+                if (fmt) {
                     h->timestamp += timestamp;
                 } else {
                     h->timestamp = timestamp;
@@ -662,9 +685,14 @@ ngx_rtmp_recv(ngx_event_t *rev)
 
             ngx_log_debug6(NGX_LOG_DEBUG_RTMP, c->log, 0,
                     "RTMP mheader %s (%d) "
-                    "timestamp=%D mlen=%D len=%D msid=%D",
-                    ngx_rtmp_packet_type(h->type), (int)h->type,
+                    "timestamp=%uD mlen=%D len=%D msid=%D",
+                    ngx_rtmp_message_type(h->type), (int)h->type,
                     h->timestamp, h->mlen, st->len, h->msid);
+
+            if (h->mlen==51441 && st->len==20864) {
+                /*asm("int $0x03");*/
+                tmp = in;
+            }
 
             /* header done */
             b->pos = p;
@@ -689,7 +717,8 @@ ngx_rtmp_recv(ngx_event_t *rev)
             /* handle! */
             head = st->in->next;
             st->in->next = NULL;
-            old_pos = b->pos + fsize;
+            b->last = b->pos + fsize;
+            old_pos = b->last;
             old_size = size - fsize;
             st->len = 0;
 
@@ -713,7 +742,6 @@ ngx_rtmp_recv(ngx_event_t *rev)
 #define ngx_rtmp_buf_addref(b) \
     (++*(int*)&((b)->tag))
 
-
 #define ngx_rtmp_buf_release(b) \
     (--*(int*)&((b)->tag))
 
@@ -725,6 +753,7 @@ ngx_rtmp_send(ngx_event_t *wev)
     ngx_rtmp_session_t         *s;
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_chain_t                *out, *l;
+    u_char                     *p;
 
     c = wev->data;
     s = c->data;
@@ -747,6 +776,8 @@ ngx_rtmp_send(ngx_event_t *wev)
     }
 
     while (s->out) {
+        p = s->out->buf->pos;
+
         out = c->send_chain(c, s->out, 0);
 
         if (out == NGX_CHAIN_ERROR) {
@@ -754,9 +785,7 @@ ngx_rtmp_send(ngx_event_t *wev)
             return;
         }
 
-        if (out == s->out 
-                && out->buf->pos == out->buf->last) 
-        {
+        if (out == s->out && out->buf->pos == p) {
             cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
             ngx_add_timer(c->write, cscf->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
@@ -769,7 +798,7 @@ ngx_rtmp_send(ngx_event_t *wev)
 
             l = s->out;
             if (l->buf->pos < l->buf->last) {
-                l->buf->pos = l->buf->last;
+                /*l->buf->pos = l->buf->last;*/
                 break;
             }
 
@@ -784,7 +813,7 @@ ngx_rtmp_send(ngx_event_t *wev)
             }
 
             /* return buffer to core */
-            if (ngx_rtmp_release_shared_buf(s, l)) {
+            if (ngx_rtmp_free_shared_buf(s, l)) {
                 ngx_rtmp_close_connection(c);
                 return;
             }
@@ -815,14 +844,7 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s)
         out = cscf->out_free;
         cscf->out_free = out->next;
 
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                "reuse shared buf");
-
     } else {
-
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                "alloc shared buf");
-        
         out = ngx_alloc_chain_link(cscf->out_pool);
         if (out == NULL) {
             return NULL;
@@ -850,8 +872,74 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s)
 }
 
 
+ngx_chain_t *
+ngx_rtmp_append_shared_bufs(ngx_rtmp_session_t *s, ngx_chain_t *out, 
+        ngx_chain_t *in)
+{
+    ngx_connection_t               *c;
+    ngx_chain_t                    *l, **ll;
+    u_char                         *p;
+    size_t                          size;
+
+    c = s->connection;
+    ll = &out;
+    p = in->buf->pos;
+    l = out;
+
+    if (l) {
+        for(; l->next; l = l->next);
+        ll = &l->next;
+    }
+
+    for ( ;; ) {
+
+        if (l == NULL || l->buf->last == l->buf->end) {
+            l = ngx_rtmp_alloc_shared_buf(s);
+            if (l == NULL || l->buf == NULL) {
+                return NULL;
+            }
+
+            *ll = l;
+            ll = &l->next;
+        }
+
+        while (l->buf->end - l->buf->last >= in->buf->last - p) {
+            l->buf->last = ngx_cpymem(l->buf->last, p, 
+                    in->buf->last - p);
+            in = in->next;
+            if (in == NULL) {
+                goto done;
+            }
+            ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                    "copy link %p : %p", in, in->buf);
+            p = in->buf->pos;
+        }
+
+        size = l->buf->end - l->buf->last;
+        l->buf->last = ngx_cpymem(l->buf->last, p, size);
+        p += size;
+    }
+
+done:
+    *ll = NULL;
+
+    return out;
+}
+
+
 ngx_int_t 
-ngx_rtmp_release_shared_buf(ngx_rtmp_session_t *s,
+ngx_rtmp_addref_shared_bufs(ngx_chain_t *in)
+{
+    for(; in; in = in->next) {
+        ngx_rtmp_buf_addref(in->buf);
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t 
+ngx_rtmp_free_shared_buf(ngx_rtmp_session_t *s,
         ngx_chain_t *out)
 {
     ngx_rtmp_core_srv_conf_t   *cscf;
@@ -875,14 +963,28 @@ ngx_rtmp_release_shared_buf(ngx_rtmp_session_t *s,
 
 void 
 ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
-        ngx_chain_t *out, uint8_t fmt)
+        ngx_rtmp_header_t *lh, ngx_chain_t *out)
 {
-    ngx_chain_t            *l;
-    u_char                 *p, *pp;
-    ngx_int_t               hsize, thsize, nbufs;
-    uint32_t                mlen, timestamp, ext_timestamp;
-    static uint8_t          hdrsize[] = { 12, 8, 4, 1 };
-    u_char                  th[3];
+    ngx_chain_t                *l;
+    u_char                     *p, *pp;
+    ngx_int_t                   hsize, thsize, nbufs;
+    uint32_t                    mlen, timestamp, ext_timestamp;
+    static uint8_t              hdrsize[] = { 12, 8, 4, 1 };
+    u_char                      th[3];
+    ngx_rtmp_core_srv_conf_t   *cscf;
+    uint8_t                     fmt;
+    ngx_connection_t           *c;
+
+    c = s->connection;
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
+    if (h->csid >= cscf->max_streams) {
+        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR,
+                "RTMP out chunk stream too big: %D >= %D",
+                h->csid, cscf->max_streams);
+        ngx_rtmp_close_connection(c);
+        return;
+    }
 
     /* detect packet size */
     mlen = 0;
@@ -892,22 +994,40 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ++nbufs;
     }
 
-    ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "RTMP prep %s (%d) fmt=%d csid=%D timestamp=%D "
-            "mlen=%D msid=%D nbufs=%d",
-            ngx_rtmp_packet_type(h->type), (int)h->type, (int)fmt,
-            h->csid, h->timestamp, mlen, h->msid, nbufs);
-
-    /* determine initial header size */
-    hsize = hdrsize[fmt];
-
-    if (h->timestamp >= 0x00ffffff) {
-        timestamp = 0x00ffffff;
-        ext_timestamp = h->timestamp;
-        hsize += 4;
+    fmt = 0;
+    if (lh && lh->csid && h->msid == lh->msid) {
+        ++fmt;
+        if (h->type == lh->type
+                && mlen == lh->mlen) 
+        {
+            ++fmt;
+            if (h->timestamp == lh->timestamp) {
+                ++fmt;
+            }
+        }
+        timestamp = h->timestamp - lh->timestamp;
     } else {
         timestamp = h->timestamp;
-        ext_timestamp = 0;
+    }
+
+    if (lh) {
+        *lh = *h;
+        lh->mlen = mlen;
+    }
+
+    hsize = hdrsize[fmt];
+
+    ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "RTMP prep %s (%d) fmt=%d csid=%uD timestamp=%uD "
+            "mlen=%uD msid=%uD nbufs=%d",
+            ngx_rtmp_message_type(h->type), (int)h->type, (int)fmt,
+            h->csid, h->timestamp, h->mlen, h->msid, nbufs);
+
+    ext_timestamp = 0;
+    if (timestamp >= 0x00ffffff) {
+        ext_timestamp = timestamp;
+        timestamp = 0x00ffffff;
+        hsize += 4;
     }
 
     if (h->csid >= 64) {
@@ -1041,7 +1161,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
         ngx_log_debug7(NGX_LOG_DEBUG_RTMP, c->log, 0,
                 "RTMP recv %s (%d) csid=%D timestamp=%D "
                 "mlen=%D msid=%D nbufs=%d",
-                ngx_rtmp_packet_type(h->type), (int)h->type, 
+                ngx_rtmp_message_type(h->type), (int)h->type, 
                 h->csid, h->timestamp, h->mlen, h->msid, nbufs);
     }
 #endif
@@ -1105,6 +1225,11 @@ ngx_rtmp_close_connection(ngx_connection_t *c)
         if (s->in_pool) {
             ngx_destroy_pool(s->in_pool);
         }
+    }
+
+    if (s->out) {
+        ngx_rtmp_free_shared_buf(s, s->out);
+        s->out = NULL;
     }
 
     c->destroyed = 1;

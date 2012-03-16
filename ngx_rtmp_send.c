@@ -36,7 +36,7 @@
     *(__b->last++) = ((u_char*)&v)[0];
 
 #define NGX_RTMP_USER_END(s)                    \
-    ngx_rtmp_prepare_message(s, &__h, __l, 0);  \
+    ngx_rtmp_prepare_message(s, &__h, NULL, __l);  \
     return ngx_rtmp_send_message(s, __l);       \
 
 
@@ -180,10 +180,9 @@ ngx_rtmp_send_user_ping_response(ngx_rtmp_session_t *s, uint32_t timestamp)
 
 /* AMF0 sender */
 ngx_int_t
-ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, uint32_t csid, uint32_t msid,
+ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_amf0_elt_t *elts, size_t nelts)
 {
-    ngx_rtmp_header_t       h;
     ngx_rtmp_amf0_ctx_t     act;
 
     memset(&act, 0, sizeof(act));
@@ -191,17 +190,12 @@ ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, uint32_t csid, uint32_t msid,
     act.alloc = ngx_rtmp_alloc_shared_buf;
     act.log = s->connection->log;
 
-    memset(&h, 0, sizeof(h));
-    h.type = NGX_RTMP_MSG_AMF0_CMD;
-    h.csid = csid;
-    h.msid = msid;
-
     if (ngx_rtmp_amf0_write(&act, elts, nelts) != NGX_OK) {
         return NGX_ERROR;
     }
 
     if (act.first) {
-        ngx_rtmp_prepare_message(s, &h, act.first, 0);
+        ngx_rtmp_prepare_message(s, h, NULL, act.first);
         return ngx_rtmp_send_message(s, act.first);
     }
 

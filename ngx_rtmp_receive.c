@@ -95,6 +95,10 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
     p[0] = b->pos[1];
     p[1] = b->pos[0];
 
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            "RTMP recv user evt %s (%d)", 
+            ngx_rtmp_user_message_type(evt), (int)evt);
+
     p = (u_char*)&val;
     p[0] = b->pos[5];
     p[1] = b->pos[4];
@@ -159,7 +163,7 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
     ngx_rtmp_amf0_ctx_t         act;
     ngx_connection_t           *c;
     ngx_rtmp_core_main_conf_t  *cmcf;
-    ngx_rtmp_call_handler_pt    ch;
+    ngx_rtmp_event_handler_pt   ch;
     size_t                      len;
 
     static double               trans;
@@ -167,7 +171,6 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
 
     static ngx_rtmp_amf0_elt_t  elts[] = {
         { NGX_RTMP_AMF0_STRING, 0,  func,   sizeof(func)    },
-        { NGX_RTMP_AMF0_NUMBER, 0,  &trans, sizeof(trans)   },
     };
 
     c = s->connection;
@@ -192,14 +195,14 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
      * only the first handler is called so far
      * because ngx_hash_find only returns one item;
      * no good to patch NGINX core ;) */
-    ch = ngx_hash_find(&cmcf->calls_hash, 
+    ch = ngx_hash_find(&cmcf->amf0_hash, 
             ngx_hash_strlow(func, func, len), func, len);
 
     if (ch) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
             "AMF0 func '%s' trans=%f passed to handler", func, trans);
 
-        return ch(s, trans, in);
+        return ch(s, h, in);
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,

@@ -168,7 +168,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
 
     if (prev->out_pool == NULL) {
-        prev->out_pool = ngx_create_pool(4096, cf->log);
+        prev->out_pool = ngx_create_pool(8192, cf->log);
         if (prev->out_pool == NULL) {
             return NGX_CONF_ERROR;
         }
