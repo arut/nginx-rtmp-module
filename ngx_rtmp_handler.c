@@ -904,7 +904,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             "RTMP prep %s (%d) fmt=%d csid=%uD timestamp=%uD "
             "mlen=%uD msid=%uD nbufs=%d",
             ngx_rtmp_message_type(h->type), (int)h->type, (int)fmt,
-            h->csid, h->timestamp, h->mlen, h->msid, nbufs);
+            h->csid, h->timestamp, mlen, h->msid, nbufs);
 
     ext_timestamp = 0;
     if (timestamp >= 0x00ffffff) {

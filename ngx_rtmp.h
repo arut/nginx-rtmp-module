@@ -140,6 +140,7 @@ typedef struct {
 #define NGX_RTMP_USER_RECORDED          4
 #define NGX_RTMP_USER_PING_REQUEST      6
 #define NGX_RTMP_USER_PING_RESPONSE     7
+#define NGX_RTMP_USER_UNKNOWN           8
 
 
 /* Chunk header:
@@ -343,6 +344,8 @@ ngx_int_t ngx_rtmp_send_user_recorded(ngx_rtmp_session_t *s,
 ngx_int_t ngx_rtmp_send_user_ping_request(ngx_rtmp_session_t *s,
         uint32_t timestamp);
 ngx_int_t ngx_rtmp_send_user_ping_response(ngx_rtmp_session_t *s, 
+        uint32_t timestamp);
+ngx_int_t ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s, 
         uint32_t timestamp);
 
 /* AMF0 sender/receiver */

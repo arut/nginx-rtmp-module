@@ -166,7 +166,6 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
     ngx_rtmp_event_handler_pt   ch;
     size_t                      len;
 
-    static double               trans;
     static u_char               func[128];
 
     static ngx_rtmp_amf0_elt_t  elts[] = {
@@ -199,14 +198,14 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
             ngx_hash_strlow(func, func, len), func, len);
 
     if (ch) {
-        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
-            "AMF0 func '%s' trans=%f passed to handler", func, trans);
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            "AMF0 func '%s' passed to handler", func);
 
         return ch(s, h, in);
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
-            "AMF0 cmd '%s' trans=%f no handler", func, trans);
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            "AMF0 cmd '%s' no handler", func);
 
     return NGX_OK;
 }

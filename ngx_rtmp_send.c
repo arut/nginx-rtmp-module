@@ -184,6 +184,24 @@ ngx_rtmp_send_user_ping_response(ngx_rtmp_session_t *s, uint32_t timestamp)
 }
 
 
+ngx_int_t
+ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s, uint32_t timestamp) 
+{
+    static uint32_t     zero;
+    static uint32_t     one = 1;
+    uint32_t            val;
+
+    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_UNKNOWN);
+
+    NGX_RTMP_USER_OUT4(zero);
+    NGX_RTMP_USER_OUT4(one);
+    val = timestamp & 0x7fffffff;
+    NGX_RTMP_USER_OUT4(val);
+
+    NGX_RTMP_USER_END(s);
+}
+
+
 /* AMF0 sender */
 ngx_int_t
 ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,

@@ -251,9 +251,11 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t                    *out;
     ngx_int_t                       vftype;
     ngx_rtmp_core_srv_conf_t       *cscf;
+    ngx_rtmp_header_t              sh;
 
     c = s->connection;
-
+    sh = *h;
+    sh.csid = 4;
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
@@ -270,13 +272,13 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     vftype = 0;
-    if (h->type == NGX_RTMP_MSG_VIDEO) {
+    if (sh.type == NGX_RTMP_MSG_VIDEO) {
         vftype = ngx_rtmp_get_video_frame_type(in);
     }
 
     out = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
 
-    ngx_rtmp_prepare_message(s, h, &ctx->lh, out);
+    ngx_rtmp_prepare_message(s, &sh, &ctx->lh, out);
 
     /* broadcast to all subscribers */
     for (cctx = *ngx_rtmp_broadcast_get_head(s); 
@@ -307,7 +309,7 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
             /* is the subscriber waiting for
              * a key frame? */
-            if (h->type == NGX_RTMP_MSG_VIDEO 
+            if (sh.type == NGX_RTMP_MSG_VIDEO 
                 && cctx->flags & NGX_RTMP_BROADCAST_WANT_KEYFRAME) 
             {
                 if (vftype && vftype != NGX_RTMP_VIDEO_KEY_FRAME) {
@@ -340,6 +342,8 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static u_char               url[1024];
     static u_char               acodecs[1024];
     static ngx_str_t            app_str;
+    static double               capabilities = 31;
+    static double               object_enc;
 
     static ngx_rtmp_amf0_elt_t      in_cmd[] = {
         { NGX_RTMP_AMF0_STRING, "app",          app,        sizeof(app)     },
@@ -347,10 +351,16 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         { NGX_RTMP_AMF0_STRING, "audiocodecs"  ,      acodecs,        sizeof(acodecs)     },
     };
 
+    static ngx_rtmp_amf0_elt_t      out_obj[] = {
+        { NGX_RTMP_AMF0_STRING, "fmsVer",        "FMS/3,0,1,123" ,       sizeof("FMS/3,0,1,123")-1               },
+        { NGX_RTMP_AMF0_NUMBER, "capabilities",   &capabilities,       sizeof(capabilities)               },
+    };
+
     static ngx_rtmp_amf0_elt_t      out_inf[] = {
-        { NGX_RTMP_AMF0_STRING, "code",         NULL,       0               },
         { NGX_RTMP_AMF0_STRING, "level",        NULL,       0               },
+        { NGX_RTMP_AMF0_STRING, "code",         NULL,       0               },
         { NGX_RTMP_AMF0_STRING, "description",  NULL,       0               },
+        { NGX_RTMP_AMF0_NUMBER, "objectEncoding", &object_enc ,       sizeof(object_enc)               },
     };
 
     static ngx_rtmp_amf0_elt_t      in_elts[] = {
@@ -361,7 +371,7 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static ngx_rtmp_amf0_elt_t      out_elts[] = {
         { NGX_RTMP_AMF0_STRING, NULL,   "_result",  sizeof("_result") - 1   },
         { NGX_RTMP_AMF0_NUMBER, NULL,   &trans,     sizeof(trans)           },
-        { NGX_RTMP_AMF0_NULL  , NULL,   NULL,       0                       },    
+        { NGX_RTMP_AMF0_OBJECT, NULL,   out_obj,    sizeof(out_obj)         },    
         { NGX_RTMP_AMF0_OBJECT, NULL,   out_inf,    sizeof(out_inf)         },
     };
 
@@ -373,8 +383,8 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
-    ngx_str_set(&out_inf[0], "NetConnection.Connect.Success");
-    ngx_str_set(&out_inf[1], "status");
+    ngx_str_set(&out_inf[0], "status");
+    ngx_str_set(&out_inf[1], "NetConnection.Connect.Success");
     ngx_str_set(&out_inf[2], "Connection succeeded.");
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -392,11 +402,12 @@ ngx_rtmp_broadcast_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_broadcast_join(s, &app_str, 0);
 
     return ngx_rtmp_send_ack_size(s, cscf->ack_window)
-        || ngx_rtmp_send_bandwidth(s, cscf->ack_window, NGX_RTMP_LIMIT_SOFT)
+        || ngx_rtmp_send_bandwidth(s, cscf->ack_window, NGX_RTMP_LIMIT_DYNAMIC)
         || ngx_rtmp_send_user_stream_begin(s, 0)
+        || ngx_rtmp_send_chunk_size(s, cscf->out_chunk_size)
         || ngx_rtmp_send_amf0(s, h, out_elts,
                 sizeof(out_elts) / sizeof(out_elts[0]))
-        ? NGX_ERROR
+        ? NGX_OK
         : NGX_OK;
 }
 
