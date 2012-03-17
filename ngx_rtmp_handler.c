@@ -744,8 +744,10 @@ ngx_rtmp_send(ngx_event_t *wev)
     ngx_connection_t           *c;
     ngx_rtmp_session_t         *s;
     ngx_rtmp_core_srv_conf_t   *cscf;
-    ngx_chain_t                *out, *l;
+    ngx_chain_t                *out, *l, *cl;
     u_char                     *p;
+    off_t                       limit;
+    size_t                      n;
 
     c = wev->data;
     s = c->data;
@@ -770,7 +772,38 @@ ngx_rtmp_send(ngx_event_t *wev)
     while (s->out) {
         p = s->out->buf->pos;
 
-        out = c->send_chain(c, s->out, 0);
+        /* send_chain calls writev for output.
+         * It uses mixed allocation model for
+         * for iovecs passed to writev. Only 64
+         * structs fit into stack. When writing more
+         * memory is allocated from c->pool and
+         * **NEVER EVER** returned back.
+         * IOV_MAX=1024 on Linux.
+         *
+         * The only way to escape allocation is
+         * limiting the number of output data blocks
+         * being written at once with NGX_HEADERS
+         * (64 by default).
+         *
+         * FIXME: NGINX 
+         * Unfortunately NGINX API does not allow
+         * us to specify max number of such blocks
+         * but only size limit. We're left with
+         * limiting by size which leads to extra
+         * loop here to find size of first 64
+         * blocks in output.
+         * */
+
+        limit = 0;
+        n = 0;
+        cl = s->out;
+        while (cl && n < 64) {
+            ++n;
+            limit += cl->buf->last - cl->buf->pos;
+            cl = cl->next;
+        }
+
+        out = c->send_chain(c, s->out, limit);
 
         if (out == NGX_CHAIN_ERROR) {
             ngx_rtmp_close_connection(c);
@@ -986,10 +1019,6 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out)
         b = (*ll)->buf;
         *b = *l->buf;
 
-        if ((*ll)->buf->in_file) {
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, "in file buf!!");
-        }
-
         ngx_rtmp_acquire_shared_buf(b);
 
         ll = &(*ll)->next;
@@ -1111,9 +1140,10 @@ ngx_rtmp_close_connection(ngx_connection_t *c)
         }
     }
 
-    if (s->out) {
-        ngx_rtmp_free_shared_bufs(cscf, s->out);
-        s->out = NULL;
+    /* release only buffers, links are local 
+     * and will be released as part of pool */
+    for (; s->out; s->out = s->out->next) {
+        ngx_rtmp_free_shared_buf(cscf, s->out->buf);
     }
 
     c->destroyed = 1;
