@@ -237,7 +237,7 @@ ngx_rtmp_init_session(ngx_connection_t *c)
 
     size = NGX_RTMP_HANDSHAKE_SIZE + 1;
     s->in_chunk_size = NGX_RTMP_DEFAULT_CHUNK_SIZE;
-    s->in_pool = ngx_create_pool(2 * size + sizeof(ngx_pool_t), c->log);
+    s->in_pool = ngx_create_pool(4096/*2 * size + sizeof(ngx_pool_t)*/, c->log);
 
     /* start handshake */
     b = &s->hs_in_buf;

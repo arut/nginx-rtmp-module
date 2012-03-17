@@ -3,31 +3,21 @@
 
 /* Store refcount in negative bytes of shared buffer */
 
-#define NGX_RTMP_REFCOUNT_TYPE      uint32_t
-#define NGX_RTMP_REFCOUNT_BYTES     sizeof(NGX_RTMP_REFCOUNT_TYPE)
+#define NGX_RTMP_REFCOUNT_TYPE          uint32_t
+#define NGX_RTMP_REFCOUNT_BYTES         sizeof(NGX_RTMP_REFCOUNT_TYPE)
 
-#define ngx_rtmp_ref(b) \
+#define ngx_rtmp_ref(b)                 \
     *((NGX_RTMP_REFCOUNT_TYPE*)(b) - 1)
 
-#define ngx_rtmp_ref_set(b, v)  \
+#define ngx_rtmp_ref_set(b, v)          \
     ngx_rtmp_ref(b) = v
 
-#define ngx_rtmp_ref_get(b)     \
+#define ngx_rtmp_ref_get(b)             \
     ++ngx_rtmp_ref(b)
 
-#define ngx_rtmp_ref_put(b)     \
+#define ngx_rtmp_ref_put(b)             \
     --ngx_rtmp_ref(b)
 
-/*
-#define ngx_rtmp_ref_set(b, v)  \
-    *(int*)&((b)->tag) = v
-
-#define ngx_rtmp_ref_get(b)     \
-    (++*(int*)&((b)->tag))
-
-#define ngx_rtmp_ref_put(b)     \
-    (--*(int*)&((b)->tag))
-*/
 
 ngx_chain_t * 
 ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
