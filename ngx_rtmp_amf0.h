@@ -20,22 +20,23 @@
 
 
 typedef struct {
-    ngx_int_t               type;
-    char                   *name;
-    void                   *data;
-    size_t                  len;
+    ngx_int_t                           type;
+    char                               *name;
+    void                               *data;
+    size_t                              len;
 } ngx_rtmp_amf0_elt_t;
 
 
-struct ngx_rtmp_session_s;
+struct ngx_rtmp_core_srv_conf_s;
 
-typedef ngx_chain_t * (*ngx_rtmp_amf0_alloc_pt)(struct ngx_rtmp_session_s *s);
+typedef ngx_chain_t * (*ngx_rtmp_amf0_alloc_pt)(struct ngx_rtmp_core_srv_conf_s
+        *cscf);
 
 typedef struct {
-    ngx_chain_t            *link, *first;
-    ngx_rtmp_amf0_alloc_pt  alloc;
-    void                   *arg;
-    ngx_log_t              *log;
+    ngx_chain_t                        *link, *first;
+    ngx_rtmp_amf0_alloc_pt             alloc;
+    struct ngx_rtmp_core_srv_conf_s    *cscf;
+    ngx_log_t                          *log;
 } ngx_rtmp_amf0_ctx_t;
 
 

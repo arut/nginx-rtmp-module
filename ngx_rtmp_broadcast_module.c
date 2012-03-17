@@ -249,11 +249,12 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_connection_t               *c;
     ngx_rtmp_broadcast_ctx_t       *ctx, *cctx;
     ngx_chain_t                    *out;
-    size_t                          nsubs;
     ngx_int_t                       vftype;
+    ngx_rtmp_core_srv_conf_t       *cscf;
 
     c = s->connection;
 
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
     if (ctx == NULL 
@@ -273,12 +274,11 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         vftype = ngx_rtmp_get_video_frame_type(in);
     }
 
-    out = ngx_rtmp_append_shared_bufs(s, NULL, in);
+    out = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
 
     ngx_rtmp_prepare_message(s, h, &ctx->lh, out);
 
     /* broadcast to all subscribers */
-    nsubs = 0;
     for (cctx = *ngx_rtmp_broadcast_get_head(s); 
             cctx; cctx = cctx->next) 
     {
@@ -299,7 +299,8 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 if (ngx_rtmp_send_message(cctx->session, ctx->data_frame) 
                         != NGX_OK)
                 {
-                    return NGX_ERROR;
+                    ngx_log_error(NGX_LOG_INFO, cctx->session->connection->log, 0, 
+                        "error sending message");
                 }
                 cctx->flags |= NGX_RTMP_BROADCAST_DATA_FRAME;
             }
@@ -316,20 +317,13 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
 
             if (ngx_rtmp_send_message(cctx->session, out) != NGX_OK) {
-                return NGX_ERROR;
+                ngx_log_error(NGX_LOG_INFO, cctx->session->connection->log, 0, 
+                        "error sending message");
             }
-            ++nsubs;
         }
     }
 
-    /* TODO: implement proper (refcount-based) buffer deletion */
-
-    /* no one subscriber? */
-    if (!nsubs 
-            && ngx_rtmp_free_shared_buf(s, out) != NGX_OK) 
-    {
-        return NGX_ERROR;
-    }
+    ngx_rtmp_free_shared_bufs(cscf, out);
 
     return NGX_OK;
 }
@@ -620,6 +614,7 @@ ngx_rtmp_broadcast_set_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_broadcast_ctx_t       *ctx;
     ngx_rtmp_amf0_ctx_t             act;
     ngx_rtmp_header_t               sh;
+    ngx_rtmp_core_srv_conf_t       *cscf;
 
     static ngx_rtmp_amf0_elt_t      out_elts[] = {
         {   NGX_RTMP_AMF0_STRING,   NULL,   
@@ -628,6 +623,7 @@ ngx_rtmp_broadcast_set_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     c = s->connection;
 
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, "data_frame arrived");
@@ -640,13 +636,16 @@ ngx_rtmp_broadcast_set_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* create full metadata chain for output */
     memset(&act, 0, sizeof(act));
-    act.arg = s;
+    act.cscf = cscf;
     act.alloc = ngx_rtmp_alloc_shared_buf;
     act.log = c->log;
 
     if (ngx_rtmp_amf0_write(&act, out_elts, 
                 sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK) 
     {
+        if (act.first) {
+            ngx_rtmp_free_shared_bufs(cscf, act.first);
+        }
         return NGX_ERROR;
     }
 
@@ -656,7 +655,10 @@ ngx_rtmp_broadcast_set_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx->data_frame = act.first;
 
-    if (ngx_rtmp_append_shared_bufs(s, ctx->data_frame, in) == NULL) {
+    if (ngx_rtmp_append_shared_bufs(cscf, ctx->data_frame, in) == NULL) {
+        if (ctx->data_frame) {
+            ngx_rtmp_free_shared_bufs(cscf, ctx->data_frame);
+        }
         return NGX_ERROR;
     }
 
@@ -664,8 +666,6 @@ ngx_rtmp_broadcast_set_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     sh.csid = 5;
     sh.msid = h->msid;
     sh.type = h->type;
-
-    ngx_rtmp_addref_shared_bufs(ctx->data_frame);
 
     ngx_rtmp_prepare_message(s, h, NULL, ctx->data_frame);
 

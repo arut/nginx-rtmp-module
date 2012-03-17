@@ -125,7 +125,7 @@ ngx_rtmp_amf0_put(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
 
         if (b == NULL || b->last == b->end) {
 
-            ln = ctx->alloc(ctx->arg);
+            ln = ctx->alloc(ctx->cscf);
             if (ln == NULL) {
                 return NGX_ERROR;
             }

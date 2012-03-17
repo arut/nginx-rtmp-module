@@ -8,14 +8,20 @@
 
 
 #define NGX_RTMP_USER_START(s, tp)              \
-    ngx_rtmp_header_t       __h;                \
-    ngx_chain_t            *__l;                \
-    ngx_buf_t              *__b;                \
+    ngx_rtmp_header_t         __h;              \
+    ngx_chain_t              *__l;              \
+    ngx_buf_t                *__b;              \
+    ngx_rtmp_core_srv_conf_t *__cscf;           \
                                                 \
+    __cscf = ngx_rtmp_get_module_srv_conf(      \
+            s, ngx_rtmp_core_module);           \
     memset(&__h, 0, sizeof(__h));               \
     __h.type = tp;                              \
     __h.csid = 2;                               \
-    __l = ngx_rtmp_alloc_shared_buf(s);         \
+    __l = ngx_rtmp_alloc_shared_buf(__cscf);    \
+        if (__l->buf->in_file) {                                            \
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, "send in file buf!!");         \
+        }                                                                           \
     if (__l == NULL) {                          \
         return NGX_ERROR;                       \
     }                                           \
@@ -183,14 +189,20 @@ ngx_int_t
 ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_amf0_elt_t *elts, size_t nelts)
 {
-    ngx_rtmp_amf0_ctx_t     act;
+    ngx_rtmp_amf0_ctx_t         act;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     memset(&act, 0, sizeof(act));
-    act.arg = s;
+    act.cscf = cscf;
     act.alloc = ngx_rtmp_alloc_shared_buf;
     act.log = s->connection->log;
 
     if (ngx_rtmp_amf0_write(&act, elts, nelts) != NGX_OK) {
+        if (act.first) {
+            ngx_rtmp_free_shared_bufs(cscf, act.first);
+        }
         return NGX_ERROR;
     }
 

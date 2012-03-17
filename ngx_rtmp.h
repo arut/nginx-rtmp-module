@@ -165,7 +165,7 @@ typedef struct {
 } ngx_rtmp_stream_t;
 
 
-typedef struct ngx_rtmp_session_s {
+typedef struct {
     uint32_t                signature;  /* "RTMP" */ /* <-- FIXME wtf */
 
     ngx_connection_t       *connection;
@@ -196,6 +196,7 @@ typedef struct ngx_rtmp_session_s {
     uint32_t                in_last_ack;
 
     ngx_chain_t            *out;
+    ngx_chain_t            *out_free_chains;
 } ngx_rtmp_session_t;
 
 
@@ -217,7 +218,7 @@ typedef struct {
 } ngx_rtmp_core_main_conf_t;
 
 
-typedef struct {
+typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_msec_t              timeout;
     ngx_flag_t              so_keepalive;
     ngx_int_t               max_streams;
@@ -227,6 +228,7 @@ typedef struct {
     ngx_int_t               out_chunk_size;
     ngx_pool_t             *out_pool;
     ngx_chain_t            *out_free;
+    ngx_chain_t            *out_free_chains;
 
     ngx_rtmp_conf_ctx_t    *ctx;
 } ngx_rtmp_core_srv_conf_t;
@@ -294,14 +296,19 @@ ngx_int_t ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
 ngx_int_t ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 
-/* Sending messages */
-ngx_chain_t * ngx_rtmp_alloc_shared_buf(ngx_rtmp_session_t *s);
-ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_session_t *s, 
-        ngx_chain_t *out, ngx_chain_t *in);
-ngx_int_t ngx_rtmp_addref_shared_bufs(ngx_chain_t *in);
-ngx_int_t ngx_rtmp_free_shared_buf(ngx_rtmp_session_t *s,
-        ngx_chain_t *out);
 
+/* Shared output buffers */
+ngx_chain_t * ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf);
+void ngx_rtmp_free_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, 
+        ngx_chain_t *out);
+void ngx_rtmp_free_shared_buf(ngx_rtmp_core_srv_conf_t *cscf,
+        ngx_buf_t *b);
+void ngx_rtmp_acquire_shared_buf(ngx_buf_t *b);
+ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, 
+        ngx_chain_t *head, ngx_chain_t *in);
+
+
+/* Sending messages */
 void ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_rtmp_header_t *lh, ngx_chain_t *out);
 ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out);
