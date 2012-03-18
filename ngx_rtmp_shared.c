@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2012 Roman Arutyunyan
+ */
+
+
 #include "ngx_rtmp.h"
 
 
@@ -26,37 +31,37 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
     ngx_buf_t                 *b;
     size_t                     size;
 
-    if (cscf->out_free) {
-        out = cscf->out_free;
-        cscf->out_free = out->next;
+    if (cscf->free) {
+        out = cscf->free;
+        cscf->free = out->next;
 
     } else {
 
-        if (cscf->out_free_chains) {
-            out = cscf->out_free_chains;
-            cscf->out_free_chains = out->next;
+        if (cscf->free_chains) {
+            out = cscf->free_chains;
+            cscf->free_chains = out->next;
 
         } else {
-            out = ngx_alloc_chain_link(cscf->out_pool);
+            out = ngx_alloc_chain_link(cscf->pool);
             if (out == NULL) {
                 return NULL;
             }
 
-            out->buf = ngx_calloc_buf(cscf->out_pool);
+            out->buf = ngx_calloc_buf(cscf->pool);
             if (out->buf == NULL) {
-                ngx_free_chain(cscf->out_pool, out);
+                ngx_free_chain(cscf->pool, out);
                 return NULL;
             }
         }
 
-        size = cscf->out_chunk_size + NGX_RTMP_MAX_CHUNK_HEADER 
+        size = cscf->chunk_size + NGX_RTMP_MAX_CHUNK_HEADER 
             + NGX_RTMP_REFCOUNT_BYTES;
 
         b = out->buf;
-        b->start = ngx_palloc(cscf->out_pool, size);
+        b->start = ngx_palloc(cscf->pool, size);
         if (b->start == NULL) {
-            out->next = cscf->out_free_chains;
-            cscf->out_free_chains = out;
+            out->next = cscf->free_chains;
+            cscf->free_chains = out;
             return NULL;
         }
 
@@ -88,16 +93,16 @@ ngx_rtmp_free_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, ngx_chain_t *out)
         if (ngx_rtmp_ref_put(cl->buf->start) == 0) {
             /* both chain & buf are free;
              * put the whole chain in free list */
-            cl->next = cscf->out_free;
-            cscf->out_free = cl;
+            cl->next = cscf->free;
+            cscf->free = cl;
             continue;
         }
 
         /* only chain is free;
          * buf is still used by somebody & will
          * be freed in ngx_rtmp_free_shared_buf */
-         cl->next = cscf->out_free_chains;
-         cscf->out_free_chains = cl;
+         cl->next = cscf->free_chains;
+         cscf->free_chains = cl;
     }
 }
 
@@ -118,27 +123,27 @@ ngx_rtmp_free_shared_buf(ngx_rtmp_core_srv_conf_t *cscf, ngx_buf_t *b)
         return;
     }
 
-    if (cscf->out_free_chains) {
-        cl = cscf->out_free_chains;
-        cscf->out_free_chains = cl->next;
+    if (cscf->free_chains) {
+        cl = cscf->free_chains;
+        cscf->free_chains = cl->next;
 
     } else {
-        cl = ngx_alloc_chain_link(cscf->out_pool);
+        cl = ngx_alloc_chain_link(cscf->pool);
         if (cl == NULL) {
             return;
         }
 
-        cl->buf = ngx_calloc_buf(cscf->out_pool);
+        cl->buf = ngx_calloc_buf(cscf->pool);
         if (cl->buf == NULL) {
-            ngx_free_chain(cscf->out_pool, cl);
+            ngx_free_chain(cscf->pool, cl);
             return;
         }
     }
 
     cl->buf->start = b->start;
     cl->buf->end = b->end;
-    cl->next = cscf->out_free;
-    cscf->out_free = cl;
+    cl->next = cscf->free;
+    cscf->free = cl;
 }
 
 

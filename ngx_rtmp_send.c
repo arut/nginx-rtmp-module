@@ -43,7 +43,7 @@
 
 #define NGX_RTMP_USER_END(s)                    \
     ngx_rtmp_prepare_message(s, &__h, NULL, __l);  \
-    return ngx_rtmp_send_message(s, __l);       \
+    return ngx_rtmp_send_message(s, __l, 0);    \
 
 
 /* Protocol control messages */
@@ -226,7 +226,7 @@ ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     if (act.first) {
         ngx_rtmp_prepare_message(s, h, NULL, act.first);
-        return ngx_rtmp_send_message(s, act.first);
+        return ngx_rtmp_send_message(s, act.first, 0);
     }
 
     return NGX_OK;

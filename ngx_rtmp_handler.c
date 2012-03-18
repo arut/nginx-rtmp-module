@@ -880,9 +880,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     fmt = 0;
     if (lh && lh->csid && h->msid == lh->msid) {
         ++fmt;
-        if (h->type == lh->type
-                && mlen == lh->mlen) 
-        {
+        if (h->type == lh->type && mlen == lh->mlen) {
             ++fmt;
             if (h->timestamp == lh->timestamp) {
                 ++fmt;
@@ -982,22 +980,36 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
 
 ngx_int_t
-ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out)
+ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out, 
+        ngx_uint_t priority)
 {
-    ngx_chain_t        *l, **ll, *cout;
-    size_t              nbytes, nbufs, noutbytes, noutbufs;
-    ngx_connection_t   *c;
-    ngx_buf_t          *b;
+    ngx_chain_t                    *l, **ll;
+    ngx_connection_t               *c;
+    ngx_buf_t                      *b;
+    ngx_rtmp_core_srv_conf_t       *cscf;
+    size_t                          nbytes, nbufs, qbytes, qbufs;
 
     c = s->connection;
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+    qbytes = 0;
+    qbufs = 0;
     nbytes = 0;
     nbufs = 0;
-    noutbytes = 0;
-    noutbufs = 0;
 
-    /* create locally-linked chain of shared buffers */
-    cout = NULL;
-    ll = &cout;
+    for(ll = &s->out; *ll; ll = &(*ll)->next) {
+        qbytes += (*ll)->buf->last - (*ll)->buf->pos;
+        ++qbufs;
+    }
+
+    /* drop packet? */
+    if (qbytes > cscf->max_buf / (priority + 1)) {
+        ngx_log_debug3(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                "drop message bytes=%uz, bufs=%uz priority=%ui",
+                qbytes, qbufs, priority);
+        return NGX_AGAIN;
+    }
+
+    /* append locally-linked chain of shared buffers */
     for(l = out; l; l = l->next) {
 
         if (s->out_free_chains) {
@@ -1028,18 +1040,11 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out)
     }
     *ll = NULL;
 
-    /* TODO: optimize lookup */
-    /* TODO: implement dropper */
-    for(ll = &s->out; *ll; ll = &(*ll)->next) {
-        noutbytes += (*ll)->buf->last - (*ll)->buf->pos;
-        ++noutbufs;
-    }
-
-    *ll = cout;
-
-    ngx_log_debug6(NGX_LOG_DEBUG_RTMP, c->log, 0,
-            "RTMP send nbytes=%d (%d), nbufs=%d (%d) ready=%d; active=%d",
-            nbytes, noutbytes, nbufs, noutbufs, c->write->ready, c->write->active);
+    ngx_log_debug7(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            "RTMP send bytes=%uz+%uz, bufs=%uz+%uz, priority=%ui, "
+            "ready=%d, active=%d",
+            qbytes, nbytes, qbufs, nbufs, priority,
+            c->write->ready, c->write->active);
 
     ngx_rtmp_send(c->write);
 

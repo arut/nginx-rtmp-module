@@ -70,11 +70,25 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, ack_window),
       NULL },
 
-    { ngx_string("out_chunk_size"),
+    { ngx_string("chunk_size"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
       NGX_RTMP_SRV_CONF_OFFSET,
-      offsetof(ngx_rtmp_core_srv_conf_t, out_chunk_size),
+      offsetof(ngx_rtmp_core_srv_conf_t, chunk_size),
+      NULL },
+
+    { ngx_string("max_buf"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, max_buf),
+      NULL },
+
+    { ngx_string("wait_key_frame"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, wait_key_frame),
       NULL },
 
       ngx_null_command
@@ -147,8 +161,10 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->timeout = NGX_CONF_UNSET_MSEC;
     conf->so_keepalive = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
-    conf->out_chunk_size = NGX_CONF_UNSET;
+    conf->chunk_size = NGX_CONF_UNSET;
     conf->ack_window = NGX_CONF_UNSET;
+    conf->max_buf = NGX_CONF_UNSET;
+    conf->wait_key_frame = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -164,17 +180,19 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 16);
-    ngx_conf_merge_value(conf->out_chunk_size, prev->out_chunk_size, 4096);
+    ngx_conf_merge_value(conf->chunk_size, prev->chunk_size, 4096);
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
+    ngx_conf_merge_size_value(conf->max_buf, prev->max_buf, 128 * 1024);
+    ngx_conf_merge_value(conf->wait_key_frame, prev->wait_key_frame, 1);
 
-    if (prev->out_pool == NULL) {
-        prev->out_pool = ngx_create_pool(8192, cf->log);
-        if (prev->out_pool == NULL) {
+    if (prev->pool == NULL) {
+        prev->pool = ngx_create_pool(8192, cf->log);
+        if (prev->pool == NULL) {
             return NGX_CONF_ERROR;
         }
     }
 
-    conf->out_pool = prev->out_pool;
+    conf->pool = prev->pool;
 
     return NGX_CONF_OK;
 }

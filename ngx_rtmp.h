@@ -226,10 +226,12 @@ typedef struct ngx_rtmp_core_srv_conf_s {
 
     ngx_uint_t              ack_window;
     
-    ngx_int_t               out_chunk_size;
-    ngx_pool_t             *out_pool;
-    ngx_chain_t            *out_free;
-    ngx_chain_t            *out_free_chains;
+    ngx_int_t               chunk_size;
+    ngx_pool_t             *pool;
+    ngx_chain_t            *free;
+    ngx_chain_t            *free_chains;
+    size_t                  max_buf;
+    ngx_flag_t              wait_key_frame;
 
     ngx_rtmp_conf_ctx_t    *ctx;
 } ngx_rtmp_core_srv_conf_t;
@@ -312,7 +314,12 @@ ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf,
 /* Sending messages */
 void ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_rtmp_header_t *lh, ngx_chain_t *out);
-ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out);
+ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
+        ngx_uint_t priority);
+
+/* Note on priorities:
+ * the bigger value the lower the priority.
+ * priority=0 is the highest */
 
 #define NGX_RTMP_LIMIT_SOFT         0
 #define NGX_RTMP_LIMIT_HARD         1
