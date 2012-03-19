@@ -261,19 +261,28 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
     ngx_connection_t               *c;
-    ngx_rtmp_broadcast_ctx_t       *ctx, *cctx;
+    ngx_rtmp_broadcast_ctx_t       *ctx, *cctx, *cnext;
     ngx_chain_t                    *out;
     ngx_rtmp_core_srv_conf_t       *cscf;
-    ngx_rtmp_header_t               sh;
     ngx_rtmp_session_t             *ss;
+    ngx_rtmp_header_t               sh;
     ngx_uint_t                      priority;
+    ngx_int_t                       rc;
     int                             keyframe;
 
     c = s->connection;
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
-    sh = *h;
+    memset(&sh, 0, sizeof(sh));
+    sh.timestamp = h->timestamp + s->epoch;
+    sh.msid = NGX_RTMP_BROADCAST_MSID;
+    sh.type = h->type;
+
+    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            "av packet; peer_epoch=%uD; my_epoch=%uD timestamp=%uD; r=%uD",
+            s->peer_epoch, s->epoch, h->timestamp, sh.timestamp);
+
     keyframe = 0;
     if (h->type == NGX_RTMP_MSG_VIDEO) {
         sh.csid = NGX_RTMP_BROADCAST_CSID_VIDEO;
@@ -282,9 +291,12 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             keyframe = 1;
         }
 
-    } else {
+    } else if (h->type == NGX_RTMP_MSG_AUDIO) {
         sh.csid = NGX_RTMP_BROADCAST_CSID_AUDIO;
         priority = NGX_RTMP_AUDIO_FRAME;
+        
+    } else {
+        return NGX_OK;
     }
 
     if (ctx == NULL 
@@ -304,9 +316,11 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_prepare_message(s, &sh, NULL, out);
 
     /* broadcast to all subscribers */
-    for (cctx = *ngx_rtmp_broadcast_get_head(s); 
-            cctx; cctx = cctx->next) 
-    {
+    for (cctx = *ngx_rtmp_broadcast_get_head(s); cctx; cctx = cnext) {
+        /* session can die further in loop
+         * so save next ptr while it's not too late */
+        cnext = cctx->next;
+
         if (cctx != ctx
                 && cctx->flags & NGX_RTMP_BROADCAST_SUBSCRIBER
                 && cctx->stream.len == ctx->stream.len
@@ -317,21 +331,19 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
             /* if we have metadata check if the subscriber
              * has already received one */
-            if (ctx->data_frame
+            if (ctx->data_frame && 0
                 && !(cctx->flags & NGX_RTMP_BROADCAST_DATA_FRAME))
             {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                         "sending data_frame");
 
-                switch (ngx_rtmp_send_message(ss, ctx->data_frame, 0)) {
-                    case NGX_OK:
-                        cctx->flags |= NGX_RTMP_BROADCAST_DATA_FRAME;
-                        break;
-                    case NGX_AGAIN:
-                        break;
-                    default:
-                        ngx_log_error(NGX_LOG_INFO, ss->connection->log, 0, 
-                            "error sending message");
+                rc = ngx_rtmp_send_message(ss, ctx->data_frame, 0);
+                if (rc == NGX_ERROR) {
+                    continue;
+                }
+
+                if (rc == NGX_OK) {
+                    cctx->flags |= NGX_RTMP_BROADCAST_DATA_FRAME;
                 }
             }
 
@@ -344,13 +356,13 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 continue;
             }
 
-            if (ngx_rtmp_send_message(ss, out, priority) == NGX_OK) {
-                if (keyframe) {
-                    cctx->flags |= NGX_RTMP_BROADCAST_KEYFRAME;
-                }
-            } else {
-                ngx_log_error(NGX_LOG_INFO, ss->connection->log, 0, 
-                        "error sending message");
+            if (ngx_rtmp_send_message(ss, out, priority) == NGX_OK
+                && keyframe 
+                && !(cctx->flags & NGX_RTMP_BROADCAST_KEYFRAME)) 
+            {
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                        "keyframe sent");
+                cctx->flags |= NGX_RTMP_BROADCAST_KEYFRAME;
             }
         }
     }
@@ -697,8 +709,8 @@ ngx_rtmp_broadcast_set_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     memset(&sh, 0, sizeof(sh));
     sh.csid = NGX_RTMP_BROADCAST_CSID_AMF0;
-    sh.msid = h->msid;
-    sh.type = h->type;
+    sh.msid = NGX_RTMP_BROADCAST_MSID;
+    sh.type = NGX_RTMP_MSG_AMF0_META;
 
     ngx_rtmp_prepare_message(s, h, NULL, ctx->data_frame);
 
@@ -715,7 +727,7 @@ ngx_rtmp_broadcast_ok(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static double                   trans;
 
     static ngx_rtmp_amf0_elt_t      in_elts[] = {
-        { NGX_RTMP_AMF0_NUMBER, 0,      &trans,     sizeof(trans)           },
+        { NGX_RTMP_AMF0_NUMBER, 0,      &trans,     sizeof(trans)             },
     };
 
     static ngx_rtmp_amf0_elt_t      out_elts[] = {
@@ -733,9 +745,9 @@ ngx_rtmp_broadcast_ok(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     memset(&sh, 0, sizeof(sh));
-    sh.csid = NGX_RTMP_BROADCAST_CSID_AMF0;
-    sh.type = NGX_RTMP_MSG_AMF0_META;
-    sh.msid = h->msid;
+    sh.csid = h->csid;/*NGX_RTMP_BROADCAST_CSID_AMF0;*/
+    sh.type = NGX_RTMP_MSG_AMF0_CMD;
+    sh.msid = 0;//NGX_RTMP_BROADCAST_MSID;
 
     /* send simple _result */
     return ngx_rtmp_send_amf0(s, &sh, out_elts,

@@ -126,9 +126,9 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
                 p[2] = b->pos[7];
                 p[3] = b->pos[6];
 
-                (void)arg;
-
                 /* use =val as stream id && arg as buflen in msec*/
+                ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                        "msid=%uD buflen: %uD (msec)", val, arg);
             }
             break;
 

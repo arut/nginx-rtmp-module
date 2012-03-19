@@ -1,1 +1,36 @@
-This is an early version of module
+==nginx-rtmp-module==
+
+NGINX-based RTMP server
+
+* Live streaming of video/audio
+
+* Advanced buffering techniques
+  to keep memory allocations at a minimum
+  level for faster streaming and low
+  memory footprint
+
+* Works with Flash RTMP clients as well as
+  ffmpeg/rtmpdump/flvstreamer etc
+  (see examples in test/ subdir)
+
+
+Example nginx.conf:
+
+
+rtmp {
+
+    server {
+
+        listen 1935;
+
+        wait_key_frame on;
+
+        chunk_size 128;
+
+        max_buf 1000000;
+
+    }
+}
+
+(c) 2012 Roman Arutyunyan
+

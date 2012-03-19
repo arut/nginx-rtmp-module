@@ -5,14 +5,14 @@
 <div id="container">Loading the player ...</div>
     <script type="text/javascript">
         jwplayer("container").setup({
-        image: "http://10.31.1.78/showme.jpg",
         modes: [
             {   type: "flash",
                 src: "/jwplayer/player.swf",
                 config: {
-                    file: "video.mp4",
-                    streamer: "rtmp://10.31.1.78/helo",
-                    provider: "rtmp"
+                bufferlength: 3,
+                    file: "livepresentation",
+                    streamer: "rtmp://192.168.0.100/helo",
+                    provider: "rtmp",
                 }
             }
         ]
