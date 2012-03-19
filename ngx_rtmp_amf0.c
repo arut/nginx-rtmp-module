@@ -405,6 +405,10 @@ ngx_rtmp_amf0_write(ngx_rtmp_amf0_ctx_t *ctx,
                 break;
 
             case NGX_RTMP_AMF0_STRING:
+                if (len == 0 && data) {
+                    len = ngx_strlen((u_char*)data);
+                }
+
                 if (ngx_rtmp_amf0_put(ctx, 
                             ngx_rtmp_amf0_reverse_copy(buf, 
                                 &len, 2), 2) != NGX_OK) 
