@@ -18,7 +18,7 @@ Build:
 
 cd to NGINX source directory & run this:
 
-./configure --add-module=<path-to-nginx-rtmp-module> --with-debug
+./configure --add-module=<path-to-nginx-rtmp-module>
 make
 make install
 
