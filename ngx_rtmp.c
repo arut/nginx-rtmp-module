@@ -288,42 +288,6 @@ ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     return NGX_OK;
 }
 
-/*
-static ngx_int_t
-ngx_rtmp_init_amf0_handler(ngx_rtmp_core_main_conf_t *cmcf, 
-        ngx_int_t id, ngx_array_t *array, ngx_hash_t *hash, 
-        ngx_rtmp_event_handler_pt handler)
-{
-    ngx_hash_init_t             calls_hash;
-    ngx_rtmp_event_handler_pt  *eh;
-    ngx_hash_key_t             *h;
-    size_t                      n;
-
-    eh = ngx_array_push(&cmcf->events[id]);
-    *eh = handler;
-
-    h = array->elts;
-    for(n = 0; n < array->nelts; ++n, ++h) {
-        h->key_hash = ngx_hash_key_lc(h->key.data, h->key.len);
-    }
-
-    calls_hash.hash = hash;
-    calls_hash.key = ngx_hash_key_lc;
-    calls_hash.max_size = 512;
-    calls_hash.bucket_size = ngx_cacheline_size;
-    calls_hash.name = "amf0_hash";
-    calls_hash.pool = cf->pool;
-    calls_hash.temp_pool = NULL;
-
-    if (ngx_hash_init(&calls_hash, array->elts, array->nelts)
-            != NGX_OK)
-    {
-        return NGX_ERROR;
-    }
-
-    return NGX_OK;
-}
-*/
 
 static ngx_int_t
 ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
@@ -689,3 +653,19 @@ ngx_rtmp_cmp_conf_addrs(const void *one, const void *two)
 
     return 0;
 }
+
+void *
+ngx_rtmp_rmemcpy(void *dst, void* src, size_t n)
+{
+    u_char     *d, *s;
+
+    d = dst;
+    s = (u_char*)src + n - 1;
+
+    while(s >= (u_char*)src) {
+        *d++ = *s--;
+    }
+
+    return dst;
+}
+

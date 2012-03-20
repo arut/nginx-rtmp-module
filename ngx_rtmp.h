@@ -291,6 +291,13 @@ u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
 uint32_t ngx_rtmp_get_timestamp();
 
 
+/* Bit reverse: we need big-endians in many places  */
+void * ngx_rtmp_rmemcpy(void *dst, void* src, size_t n);
+
+#define ngx_rtmp_rcpymem(dst, src, n) \
+    (((u_char*)ngx_rtmp_rmemcpy(dst, src, n)) + (n))
+
+
 /* Receiving messages */
 ngx_int_t ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
