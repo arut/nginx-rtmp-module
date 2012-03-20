@@ -14,6 +14,15 @@ NGINX-based RTMP server
   (see examples in test/ subdir)
 
 
+Build:
+
+cd to NGINX source directory & run this:
+
+./configure --add-module=<path-to-nginx-rtmp-module> --with-debug
+make
+make install
+
+
 Example nginx.conf:
 
 
@@ -31,6 +40,4 @@ rtmp {
 
     }
 }
-
-(c) 2012 Roman Arutyunyan
 
