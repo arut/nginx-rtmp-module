@@ -1,8 +1,8 @@
+- fix time wrapping problem (% 0x00ffffff)
+
 - add support of flv file streaming
 
-- compile in release configuration
-
-- add RTMP authorization
+- add RTMP authorization (SecureToken)
 
 - remove macros hell from ngx_rtmp_send.c
 
@@ -10,7 +10,3 @@
 
 - shortcuts for big-endian copy
 
-- implement loc confs (=fms apps)
-    loc options:
-    - broadcast/file
-    - HTTP callbacks on invoke calls

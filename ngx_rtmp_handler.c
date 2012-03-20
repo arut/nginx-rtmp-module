@@ -1046,7 +1046,9 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
             qbytes, nbytes, qbufs, nbufs, priority,
             c->write->ready, c->write->active);
 
-    ngx_rtmp_send(c->write);
+    if (!c->write->active) {
+        ngx_rtmp_send(c->write);
+    }
 
     return c->destroyed ? NGX_ERROR : NGX_OK;
 }
