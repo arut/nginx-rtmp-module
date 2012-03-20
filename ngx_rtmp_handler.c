@@ -265,7 +265,7 @@ ngx_rtmp_get_timestamp()
     tod = ngx_timeofday();
 
     /* FIXME: divisor */
-    return (uint32_t)(tod->sec * 1000 + tod->msec / 1000) % 0x00ffffff;
+    return (uint32_t)(tod->sec * 1000 + tod->msec) % 0x00ffffff;
 }
 
 
