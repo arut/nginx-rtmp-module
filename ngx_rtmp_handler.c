@@ -213,10 +213,13 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
 static void
 ngx_rtmp_init_session(ngx_connection_t *c)
 {
-    ngx_rtmp_session_t        *s;
-    ngx_rtmp_core_srv_conf_t  *cscf;
-    ngx_buf_t                 *b;
-    size_t                     size;
+    ngx_rtmp_session_t             *s;
+    ngx_rtmp_core_main_conf_t      *cmcf;
+    ngx_rtmp_core_srv_conf_t       *cscf;
+    ngx_buf_t                      *b;
+    size_t                          n, size;
+    ngx_rtmp_handler_pt            *h;
+    ngx_array_t                    *ch;
 
     s = c->data;
 
@@ -234,7 +237,6 @@ ngx_rtmp_init_session(ngx_connection_t *c)
         ngx_rtmp_close_connection(c);
         return;
     }
-
     size = NGX_RTMP_HANDSHAKE_SIZE + 1;
     s->in_chunk_size = NGX_RTMP_DEFAULT_CHUNK_SIZE;
     s->in_pool = ngx_create_pool(4096/*2 * size + sizeof(ngx_pool_t)*/, c->log);
@@ -252,6 +254,20 @@ ngx_rtmp_init_session(ngx_connection_t *c)
 
     c->write->handler = ngx_rtmp_handshake_send;
     c->read->handler  = ngx_rtmp_handshake_recv;
+
+    /* call connect callbacks */
+    cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
+
+    ch = &cmcf->events[NGX_RTMP_CONNECT];
+    h = ch->elts;
+    for(n = 0; n < ch->nelts; ++n, ++h) {
+        if (*h) {
+            if ((*h)(s, NULL, NULL) != NGX_OK) {
+                ngx_rtmp_close_connection(c);
+                return;
+            }
+        }
+    }
 
     ngx_rtmp_handshake_recv(c->read);
 }
@@ -1061,7 +1077,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
     ngx_rtmp_core_main_conf_t  *cmcf;
     ngx_array_t                *evhs;
     size_t                      n;
-    ngx_rtmp_event_handler_pt  *evh;
+    ngx_rtmp_handler_pt        *evh;
     ngx_connection_t           *c;
 
     c = s->connection;
@@ -1103,10 +1119,13 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
                 "calling handler %d", n);
            
-        if ((*evh)(s, h, in) != NGX_OK) {
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                    "handler %d failed", n);
-            return NGX_ERROR;
+        switch ((*evh)(s, h, in)) {
+            case NGX_ERROR:
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                        "handler %d failed", n);
+                return NGX_ERROR;
+            case NGX_DONE:
+                return NGX_OK;
         }
     }
 
@@ -1121,7 +1140,8 @@ ngx_rtmp_close_connection(ngx_connection_t *c)
     ngx_pool_t                         *pool;
     ngx_rtmp_core_main_conf_t          *cmcf;
     ngx_rtmp_core_srv_conf_t           *cscf;
-    ngx_rtmp_disconnect_handler_pt     *h;
+    ngx_rtmp_handler_pt                *h;
+    ngx_array_t                        *dh;
     size_t                              n;
 
     if (c->destroyed) {
@@ -1135,10 +1155,12 @@ ngx_rtmp_close_connection(ngx_connection_t *c)
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, "close connection");
 
     if (s) {
-        h = cmcf->disconnect.elts;
-        for(n = 0; n < cmcf->disconnect.nelts; ++n, ++h) {
+        dh = &cmcf->events[NGX_RTMP_DISCONNECT];
+        h = dh->elts;
+
+        for(n = 0; n < dh->nelts; ++n, ++h) {
             if (*h) {
-                (*h)(s);
+                (*h)(s, NULL, NULL);
             }
         }
 

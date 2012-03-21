@@ -163,8 +163,9 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
     ngx_rtmp_amf0_ctx_t         act;
     ngx_connection_t           *c;
     ngx_rtmp_core_main_conf_t  *cmcf;
-    ngx_rtmp_event_handler_pt   ch;
-    size_t                      len;
+    ngx_array_t                *ch;
+    ngx_rtmp_handler_pt        *ph;
+    size_t                      len, n;
 
     static u_char               func[128];
 
@@ -190,22 +191,26 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
 
     len = ngx_strlen(func);
 
-    /* lookup function handler 
-     * only the first handler is called so far
-     * because ngx_hash_find only returns one item;
-     * no good to patch NGINX core ;) */
     ch = ngx_hash_find(&cmcf->amf0_hash, 
             ngx_hash_strlow(func, func, len), func, len);
 
-    if (ch) {
+    if (ch && ch->nelts) {
+        ph = ch->elts;
+        for (n = 0; n < ch->nelts; ++n, ++ph) {
+            ngx_log_debug3(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                "AMF0 func '%s' passed to handler %d/%d", 
+                func, n, ch->nelts);
+            switch ((*ph)(s, h, in)) {
+                case NGX_ERROR:
+                    return NGX_ERROR;
+                case NGX_DONE:
+                    return NGX_OK;
+            }
+        }
+    } else {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-            "AMF0 func '%s' passed to handler", func);
-
-        return ch(s, h, in);
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
             "AMF0 cmd '%s' no handler", func);
+    }
 
     return NGX_OK;
 }

@@ -129,7 +129,11 @@ typedef struct {
 #define NGX_RTMP_MSG_AMF0_SHARED        19
 #define NGX_RTMP_MSG_AMF0_CMD           20
 #define NGX_RTMP_MSG_AGGREGATE          22
-#define NGX_RTMP_MSG_MAX                23
+#define NGX_RTMP_MSG_MAX                22
+
+#define NGX_RTMP_CONNECT                NGX_RTMP_MSG_MAX + 1
+#define NGX_RTMP_DISCONNECT             NGX_RTMP_MSG_MAX + 2
+#define NGX_RTMP_MAX_EVENT              NGX_RTMP_MSG_MAX + 3
 
 
 /* RMTP control message types */
@@ -201,21 +205,29 @@ typedef struct {
 } ngx_rtmp_session_t;
 
 
-typedef ngx_int_t (*ngx_rtmp_event_handler_pt)(ngx_rtmp_session_t *s,
+/* handler result code:
+ *  NGX_ERROR - error
+ *  NGX_OK    - success
+ *  NGX_DONE  - success, but do not call more handlers on this event */
+typedef ngx_int_t (*ngx_rtmp_handler_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-typedef ngx_int_t (*ngx_rtmp_disconnect_handler_pt)(ngx_rtmp_session_t *s);
+
+
+typedef struct {
+    ngx_str_t               name;
+    ngx_rtmp_handler_pt     handler;
+} ngx_rtmp_amf0_handler_t;
 
 
 typedef struct {
     ngx_array_t             servers;    /* ngx_rtmp_core_srv_conf_t */
     ngx_array_t             listen;     /* ngx_rtmp_listen_t */
 
-    ngx_array_t             events[NGX_RTMP_MSG_MAX];
+    ngx_array_t             events[NGX_RTMP_MAX_EVENT];
 
     ngx_hash_t              amf0_hash;
+    ngx_array_t             amf0_arrays;
     ngx_array_t             amf0;
-
-    ngx_array_t             disconnect;
 } ngx_rtmp_core_main_conf_t;
 
 
