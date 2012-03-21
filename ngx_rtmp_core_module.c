@@ -84,6 +84,13 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, max_buf),
       NULL },
 
+    { ngx_string("max_message"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, max_message),
+      NULL },
+
     { ngx_string("wait_key_frame"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
@@ -164,6 +171,7 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->chunk_size = NGX_CONF_UNSET;
     conf->ack_window = NGX_CONF_UNSET;
     conf->max_buf = NGX_CONF_UNSET;
+    conf->max_message = NGX_CONF_UNSET;
     conf->wait_key_frame = NGX_CONF_UNSET;
 
     return conf;
@@ -183,6 +191,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->chunk_size, prev->chunk_size, 4096);
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
     ngx_conf_merge_size_value(conf->max_buf, prev->max_buf, 128 * 1024);
+    ngx_conf_merge_size_value(conf->max_message, prev->max_message, 1024 * 1024);
     ngx_conf_merge_value(conf->wait_key_frame, prev->wait_key_frame, 1);
 
     if (prev->pool == NULL) {

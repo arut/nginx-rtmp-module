@@ -1,14 +1,13 @@
-- fix time wrapping problem (% 0x00ffffff)
-
 - add support of flv file writing & streaming
-
-- check compilation with IPv6 enabled
-
-- fix broken data_frame
 
 - add HTTP callbacks for all calls
 
+
+- check compilation with IPv6 enabled
+
 - remove macros hell from ngx_rtmp_send.c
 
-- add max message size
+- fix broken data_frame(?)
+
+- fix time wrapping problem (% 0x00ffffff)
 

@@ -712,6 +712,13 @@ ngx_rtmp_recv(ngx_event_t *rev)
 
             /* header done */
             b->pos = p;
+
+            if (h->mlen > cscf->max_message) {
+                ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR, 
+                        "too big message: %uz", cscf->max_message);
+                ngx_rtmp_close_connection(c);
+                return;
+            }
         }
 
         size = b->last - b->pos;

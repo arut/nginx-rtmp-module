@@ -243,6 +243,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_chain_t            *free;
     ngx_chain_t            *free_chains;
     size_t                  max_buf;
+    size_t                  max_message;
     ngx_flag_t              wait_key_frame;
 
     ngx_rtmp_conf_ctx_t    *ctx;
