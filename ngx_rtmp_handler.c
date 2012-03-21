@@ -281,7 +281,7 @@ ngx_rtmp_get_timestamp()
     tod = ngx_timeofday();
 
     /* FIXME: divisor */
-    return (uint32_t)(tod->sec * 1000 + tod->msec) % 0x00ffffff;
+    return (uint32_t)(tod->sec * 1000 + tod->msec) /*& 0x00ffffff*/;
 }
 
 
@@ -470,8 +470,6 @@ restart:
     b->pos = b->last = b->start + 1;
     ngx_rtmp_handshake_recv(c->read);
 }
-
-ngx_chain_t * tmp;
 
 
 void
@@ -681,9 +679,16 @@ ngx_rtmp_recv(ngx_event_t *rev)
                         pp[3] = *p++;
                     }
                 }
+            }
 
-                /* extended header */
-                if (timestamp == 0x00ffffff) {
+            /* extended header */
+            if (timestamp >= 0x00ffffff) {
+                /* Messages with type=3 should
+                 * never have ext timestamp field
+                 * according to standard.
+                 * However that's not always the case
+                 * in real life */
+                if (fmt <= 2 || cscf->publish_time_fix) {
                     if (b->last - p < 4)
                         continue;
                     pp = (u_char*)&timestamp;
@@ -692,11 +697,12 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     pp[1] = *p++;
                     pp[0] = *p++;
                 }
-                if (fmt) {
-                    h->timestamp += timestamp;
-                } else {
-                    h->timestamp = timestamp;
-                }
+            }
+
+            if (fmt == 1 || fmt == 2) {
+                h->timestamp += timestamp;
+            } else {
+                h->timestamp = timestamp;
             }
 
             ngx_log_debug6(NGX_LOG_DEBUG_RTMP, c->log, 0,
@@ -704,11 +710,6 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     "timestamp=%uD mlen=%D len=%D msid=%D",
                     ngx_rtmp_message_type(h->type), (int)h->type,
                     h->timestamp, h->mlen, st->len, h->msid);
-
-            if (h->mlen==51441 && st->len==20864) {
-                /*asm("int $0x03");*/
-                tmp = in;
-            }
 
             /* header done */
             b->pos = p;
@@ -876,7 +877,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_int_t                   hsize, thsize, nbufs;
     uint32_t                    mlen, timestamp, ext_timestamp;
     static uint8_t              hdrsize[] = { 12, 8, 4, 1 };
-    u_char                      th[3];
+    u_char                      th[7];
     ngx_rtmp_core_srv_conf_t   *cscf;
     uint8_t                     fmt;
     ngx_connection_t           *c;
@@ -992,6 +993,15 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         *p++ = pp[2];
         *p++ = pp[1];
         *p++ = pp[0];
+
+        /* This CONTRADICTS the standard 
+         * but that's the way flash client
+         * wants data to be encoded;
+         * ffmpeg complains */
+        if (cscf->play_time_fix) {
+            ngx_memcpy(&th[thsize], p - 4, 4);
+            thsize += 4;
+        }
     }
 
     /* append headers to successive fragments */

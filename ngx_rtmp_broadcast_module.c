@@ -33,6 +33,8 @@ static ngx_int_t ngx_rtmp_broadcast_set_data_frame(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 static ngx_int_t ngx_rtmp_broadcast_ok(ngx_rtmp_session_t *s, 
         ngx_rtmp_header_t *h, ngx_chain_t *in);
+static ngx_int_t ngx_rtmp_broadcast_stream_length(ngx_rtmp_session_t *s, 
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 
 static ngx_rtmp_amf0_handler_t ngx_rtmp_broadcast_map[] = {
@@ -42,6 +44,7 @@ static ngx_rtmp_amf0_handler_t ngx_rtmp_broadcast_map[] = {
     { ngx_string("play"),               ngx_rtmp_broadcast_play             },
     { ngx_string("-@setDataFrame"),     ngx_rtmp_broadcast_set_data_frame   },
     { ngx_string("releaseStream"),      ngx_rtmp_broadcast_ok               },
+    { ngx_string("getStreamLength"),    ngx_rtmp_broadcast_stream_length    },
     { ngx_string("FCPublish"),          ngx_rtmp_broadcast_ok               },
     { ngx_string("FCSubscribe"),        ngx_rtmp_broadcast_ok               },
 };
@@ -265,7 +268,7 @@ ngx_rtmp_broadcast_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_broadcast_module);
 
     memset(&sh, 0, sizeof(sh));
-    sh.timestamp = h->timestamp + s->epoch;
+    sh.timestamp = (h->timestamp + s->epoch);/* & 0x00ffffff*/; /*FIXME*/
     sh.msid = NGX_RTMP_BROADCAST_MSID;
     sh.type = h->type;
 
@@ -735,6 +738,43 @@ ngx_rtmp_broadcast_ok(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         { NGX_RTMP_AMF0_NUMBER, NULL,   &trans,                             0 },
         { NGX_RTMP_AMF0_NULL  , NULL,   NULL,                               0 },
         { NGX_RTMP_AMF0_NULL  , NULL,   NULL,                               0 },
+    };
+
+    /* parse input */
+    if (ngx_rtmp_receive_amf0(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    {
+        return NGX_ERROR;
+    }
+
+    memset(&sh, 0, sizeof(sh));
+    sh.csid = h->csid;
+    sh.type = NGX_RTMP_MSG_AMF0_CMD;
+    sh.msid = 0;
+
+    /* send simple _result */
+    return ngx_rtmp_send_amf0(s, &sh, out_elts,
+                sizeof(out_elts) / sizeof(out_elts[0]));
+}
+
+
+static ngx_int_t 
+ngx_rtmp_broadcast_stream_length(ngx_rtmp_session_t *s, 
+        ngx_rtmp_header_t *h, ngx_chain_t *in)
+{
+    ngx_rtmp_header_t               sh;
+
+    static double                   trans;
+    static double                   length;
+
+    static ngx_rtmp_amf0_elt_t      in_elts[] = {
+        { NGX_RTMP_AMF0_NUMBER, 0,      &trans,     sizeof(trans)             },
+    };
+
+    static ngx_rtmp_amf0_elt_t      out_elts[] = {
+        { NGX_RTMP_AMF0_STRING, NULL,   "_result",                          0 },
+        { NGX_RTMP_AMF0_NUMBER, NULL,   &trans,                             0 },
+        { NGX_RTMP_AMF0_NUMBER, NULL,   &length,                            0 },
     };
 
     /* parse input */

@@ -245,6 +245,8 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     size_t                  max_buf;
     size_t                  max_message;
     ngx_flag_t              wait_key_frame;
+    ngx_flag_t              play_time_fix;
+    ngx_flag_t              publish_time_fix;
 
     ngx_rtmp_conf_ctx_t    *ctx;
 } ngx_rtmp_core_srv_conf_t;

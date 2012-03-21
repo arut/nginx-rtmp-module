@@ -3,11 +3,11 @@
 - add HTTP callbacks for all calls
 
 
+- support client chunk size change
+
 - check compilation with IPv6 enabled
 
 - remove macros hell from ngx_rtmp_send.c
 
 - fix broken data_frame(?)
-
-- fix time wrapping problem (% 0x00ffffff)
 
