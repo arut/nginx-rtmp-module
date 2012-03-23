@@ -473,7 +473,7 @@ ngx_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_ERROR;
     }
 
-    return NGX_DONE;
+    return NGX_OK;
 }
 
 
@@ -685,7 +685,7 @@ ngx_rtmp_live_set_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_rtmp_prepare_message(s, &sh, NULL, ctx->data_frame);
 
-    return NGX_DONE;
+    return NGX_OK;
 }
 
 
