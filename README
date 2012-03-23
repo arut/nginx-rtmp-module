@@ -31,7 +31,7 @@ rtmp://rtmp.example.com/<app>[/<name>]
 
 <app> -  should match one of application {}
          blocks in config
-<path> - interpreted by each application
+<name> - interpreted by each application
          can be empty
 
 
