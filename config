@@ -3,6 +3,7 @@ ngx_addon_name="ngx_rtmp_module"
 CORE_MODULES="$CORE_MODULES 
                 ngx_rtmp_module                             \
                 ngx_rtmp_core_module                        \
+                ngx_rtmp_cmd_module                         \
                 ngx_rtmp_access_module                      \
                 ngx_rtmp_live_module                        \
                 ngx_rtmp_record_module                      \
@@ -10,13 +11,13 @@ CORE_MODULES="$CORE_MODULES
 
 NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp.c                   \
-                $ngx_addon_dir/ngx_rtmp_app.c               \
                 $ngx_addon_dir/ngx_rtmp_amf0.c              \
                 $ngx_addon_dir/ngx_rtmp_send.c              \
                 $ngx_addon_dir/ngx_rtmp_shared.c            \
                 $ngx_addon_dir/ngx_rtmp_handler.c           \
                 $ngx_addon_dir/ngx_rtmp_receive.c           \
                 $ngx_addon_dir/ngx_rtmp_core_module.c       \
+                $ngx_addon_dir/ngx_rtmp_cmd_module.c        \
                 $ngx_addon_dir/ngx_rtmp_access_module.c     \
                 $ngx_addon_dir/ngx_rtmp_live_module.c       \
                 $ngx_addon_dir/ngx_rtmp_record_module.c     \

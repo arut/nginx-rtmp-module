@@ -219,8 +219,9 @@ typedef struct {
 
 /* handler result code:
  *  NGX_ERROR - error
- *  NGX_OK    - success
- *  NGX_DONE  - success, but do not call more handlers on this event */
+ *  NGX_OK    - success, may continue
+ *  NGX_DONE  - success, input parsed, reply sent; need no
+ *      more calls on this event */
 typedef ngx_int_t (*ngx_rtmp_handler_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 
@@ -347,14 +348,6 @@ ngx_int_t ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-
-/* Standard AMF0 handlers */
-ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_chain_t *in);
-ngx_int_t ngx_rtmp_create_stream(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_chain_t *in);
-ngx_int_t ngx_rtmp_amf0_default(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_chain_t *in);
 
 
 /* Shared output buffers */

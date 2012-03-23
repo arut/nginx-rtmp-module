@@ -347,7 +347,6 @@ static ngx_int_t
 ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 {
     size_t                      n;
-    ngx_rtmp_amf0_handler_t    *h;
 
     for(n = 0; n < NGX_RTMP_MAX_EVENT; ++n) {
         if (ngx_array_init(&cmcf->events[n], cf->pool, 1, 
@@ -362,11 +361,6 @@ ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     {
         return NGX_ERROR;
     }
-
-    /* this handler of connect should always be the first */
-    h = ngx_array_push(&cmcf->amf0);
-    ngx_str_set(&h->name, "connect");
-    h->handler = ngx_rtmp_connect;
 
     return NGX_OK;
 }
@@ -410,11 +404,6 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     /* init user protocol events */
     eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_USER]);
     *eh = ngx_rtmp_user_message_handler;
-
-    /* init several AMF0 callbacks */
-    h = ngx_array_push(&cmcf->amf0);
-    ngx_str_set(&h->name, "createStream");
-    h->handler = ngx_rtmp_create_stream;
 
     /* init amf0 callbacks */
     ngx_array_init(&cmcf->amf0_arrays, cf->pool, 1, sizeof(ngx_hash_key_t));

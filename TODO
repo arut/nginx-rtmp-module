@@ -1,25 +1,13 @@
-- add support of flv file writing & streaming
+- add HTTP callbacks for all cmd calls
 
-- add HTTP callbacks for all calls
 
-- implement new broadcast module with typed callbacks
-& make live/record modules register AMF0 callbacks in it
-
-publish
-play
-close
-set_data_frame
-
-(implement createStream, releaseStream, deleteStream, FC* etc)
+- add support for flv file streaming
 
 - support client chunk size change
 
 - check compilation with IPv6 enabled
 
-- remove macros hell from ngx_rtmp_send.c
-
 - fix broken data_frame(?)
 
 - fix '..greeing line..' in log
 
-- changed NGX_OK/NGX_DONE to NGX_DECLINED/NGX_OK

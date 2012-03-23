@@ -6,31 +6,19 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include "ngx_rtmp.h"
+#include "ngx_rtmp_cmd_module.h"
 
 
 #define NGX_RTMP_ACCESS_PUBLISH     0x01
 #define NGX_RTMP_ACCESS_PLAY        0x02
 
 
-static ngx_int_t ngx_rtmp_access_connect(ngx_rtmp_session_t *s, 
-        ngx_rtmp_header_t *h, ngx_chain_t *in);
-static ngx_int_t ngx_rtmp_access_publish(ngx_rtmp_session_t *s, 
-        ngx_rtmp_header_t *h, ngx_chain_t *in);
-static ngx_int_t ngx_rtmp_access_play(ngx_rtmp_session_t *s, 
-        ngx_rtmp_header_t *h, ngx_chain_t *in);
 static char * ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, 
-        void *conf);
+       void *conf);
 static ngx_int_t ngx_rtmp_access_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_access_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_access_merge_app_conf(ngx_conf_t *cf, 
-        void *parent, void *child);
-
-
-static ngx_rtmp_amf0_handler_t ngx_rtmp_access_map[] = {
-    { ngx_string("connect"),    ngx_rtmp_access_connect },
-    { ngx_string("publish"),    ngx_rtmp_access_publish },
-    { ngx_string("play"),       ngx_rtmp_access_play    },
-};
+       void *parent, void *child);
 
 
 typedef struct {
@@ -234,7 +222,7 @@ ngx_rtmp_access(ngx_rtmp_session_t *s, ngx_uint_t flag)
 
     if (ascf == NULL) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, s->connection->log, 0,
-                "access: NULL loc conf");
+                "access: NULL app conf");
         return NGX_ERROR;
     }
 
@@ -401,8 +389,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static ngx_int_t 
-ngx_rtmp_access_connect(ngx_rtmp_session_t *s, 
-        ngx_rtmp_header_t *h, ngx_chain_t *in)
+ngx_rtmp_access_connect(ngx_rtmp_session_t *s)
 {
     return ngx_rtmp_access(s, NGX_RTMP_ACCESS_PUBLISH) == NGX_OK
         || ngx_rtmp_access(s, NGX_RTMP_ACCESS_PLAY) == NGX_OK
@@ -413,7 +400,7 @@ ngx_rtmp_access_connect(ngx_rtmp_session_t *s,
 
 static ngx_int_t 
 ngx_rtmp_access_publish(ngx_rtmp_session_t *s, 
-        ngx_rtmp_header_t *h, ngx_chain_t *in)
+       ngx_str_t *name, ngx_int_t type)
 {
     return ngx_rtmp_access(s, NGX_RTMP_ACCESS_PUBLISH);
 }
@@ -421,7 +408,7 @@ ngx_rtmp_access_publish(ngx_rtmp_session_t *s,
 
 static ngx_int_t 
 ngx_rtmp_access_play(ngx_rtmp_session_t *s, 
-        ngx_rtmp_header_t *h, ngx_chain_t *in)
+       ngx_str_t *name, uint32_t start, uint32_t duration, ngx_int_t reset)
 {
     return ngx_rtmp_access(s, NGX_RTMP_ACCESS_PLAY);
 }
@@ -430,24 +417,19 @@ ngx_rtmp_access_play(ngx_rtmp_session_t *s,
 static ngx_int_t
 ngx_rtmp_access_postconfiguration(ngx_conf_t *cf)
 {
-    ngx_rtmp_core_main_conf_t          *cmcf;
-    ngx_rtmp_amf0_handler_t            *ch, *bh;
-    size_t                              n, ncalls;
+    ngx_rtmp_cmd_main_conf_t           *dmcf;
+    void                               *ch;
 
-    cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
+    dmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_cmd_module);
 
-    /* register AMF0 callbacks */
-    ncalls = sizeof(ngx_rtmp_access_map) 
-                / sizeof(ngx_rtmp_access_map[0]);
-    ch = ngx_array_push_n(&cmcf->amf0, ncalls);
-    if (ch == NULL) {
-        return NGX_ERROR;
-    }
+    ch = ngx_array_push(&dmcf->connect);
+    *(ngx_rtmp_cmd_connect_pt*)ch = ngx_rtmp_access_connect;
 
-    bh = ngx_rtmp_access_map;
-    for(n = 0; n < ncalls; ++n, ++ch, ++bh) {
-        *ch = *bh;
-    }
+    ch = ngx_array_push(&dmcf->publish);
+    *(ngx_rtmp_cmd_publish_pt*)ch = ngx_rtmp_access_publish;
+
+    ch = ngx_array_push(&dmcf->play);
+    *(ngx_rtmp_cmd_play_pt*)ch = ngx_rtmp_access_play;
 
     return NGX_OK;
 }
