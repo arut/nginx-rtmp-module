@@ -14,9 +14,14 @@ static void *ngx_rtmp_core_create_main_conf(ngx_conf_t *cf);
 static void *ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
+static void *ngx_rtmp_core_create_app_conf(ngx_conf_t *cf);
+static char *ngx_rtmp_core_merge_app_conf(ngx_conf_t *cf, void *parent,
+    void *child);
 static char *ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+static char *ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 
@@ -38,6 +43,13 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
     { ngx_string("listen"),
       NGX_RTMP_SRV_CONF|NGX_CONF_TAKE12,
       ngx_rtmp_core_listen,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("application"),
+      NGX_RTMP_SRV_CONF|NGX_CONF_BLOCK|NGX_CONF_TAKE1,
+      ngx_rtmp_core_application,
       NGX_RTMP_SRV_CONF_OFFSET,
       0,
       NULL },
@@ -91,23 +103,16 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, max_message),
       NULL },
 
-    { ngx_string("wait_key_frame"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_flag_slot,
-      NGX_RTMP_SRV_CONF_OFFSET,
-      offsetof(ngx_rtmp_core_srv_conf_t, wait_key_frame),
-      NULL },
-
     /* time fixes are needed for flash clients */
     { ngx_string("play_time_fix"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_RTMP_SRV_CONF_OFFSET,
       offsetof(ngx_rtmp_core_srv_conf_t, play_time_fix),
       NULL },
 
     { ngx_string("publish_time_fix"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_RTMP_SRV_CONF_OFFSET,
       offsetof(ngx_rtmp_core_srv_conf_t, publish_time_fix),
@@ -123,7 +128,9 @@ static ngx_rtmp_module_t  ngx_rtmp_core_module_ctx = {
     ngx_rtmp_core_create_main_conf,         /* create main configuration */
     NULL,                                   /* init main configuration */
     ngx_rtmp_core_create_srv_conf,          /* create server configuration */
-    ngx_rtmp_core_merge_srv_conf            /* merge server configuration */
+    ngx_rtmp_core_merge_srv_conf,           /* merge server configuration */
+    ngx_rtmp_core_create_app_conf,          /* create app configuration */
+    ngx_rtmp_core_merge_app_conf            /* merge app configuration */
 };
 
 
@@ -180,6 +187,13 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    if (ngx_array_init(&conf->applications, cf->pool, 4,
+                       sizeof(ngx_rtmp_core_app_conf_t *))
+        != NGX_OK)
+    {
+        return NULL;
+    }
+
     conf->timeout = NGX_CONF_UNSET_MSEC;
     conf->so_keepalive = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
@@ -187,7 +201,6 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->ack_window = NGX_CONF_UNSET;
     conf->max_buf = NGX_CONF_UNSET;
     conf->max_message = NGX_CONF_UNSET;
-    conf->wait_key_frame = NGX_CONF_UNSET;
     conf->play_time_fix = NGX_CONF_UNSET;
     conf->publish_time_fix = NGX_CONF_UNSET;
 
@@ -209,7 +222,6 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
     ngx_conf_merge_size_value(conf->max_buf, prev->max_buf, 128 * 1024);
     ngx_conf_merge_size_value(conf->max_message, prev->max_message, 1024 * 1024);
-    ngx_conf_merge_value(conf->wait_key_frame, prev->wait_key_frame, 1);
     ngx_conf_merge_value(conf->play_time_fix, prev->play_time_fix, 1);
     ngx_conf_merge_value(conf->publish_time_fix, prev->publish_time_fix, 1);
 
@@ -221,6 +233,33 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
     conf->pool = prev->pool;
+
+    return NGX_CONF_OK;
+}
+
+
+static void *
+ngx_rtmp_core_create_app_conf(ngx_conf_t *cf)
+{
+    ngx_rtmp_core_app_conf_t   *conf;
+
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_core_app_conf_t));
+    if (conf == NULL) {
+        return NULL;
+    }
+
+    return conf;
+}
+
+
+static char *
+ngx_rtmp_core_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
+{
+    ngx_rtmp_core_app_conf_t *prev = parent;
+    ngx_rtmp_core_app_conf_t *conf = child;
+
+    (void)prev;
+    (void)conf;
 
     return NGX_CONF_OK;
 }
@@ -253,6 +292,11 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    ctx->app_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_rtmp_max_module);
+    if (ctx->app_conf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
             continue;
@@ -267,6 +311,15 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
 
             ctx->srv_conf[ngx_modules[m]->ctx_index] = mconf;
+        }
+
+        if (module->create_app_conf) {
+            mconf = module->create_app_conf(cf);
+            if (mconf == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            ctx->app_conf[ngx_modules[m]->ctx_index] = mconf;
         }
     }
 
@@ -294,6 +347,75 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     rv = ngx_conf_parse(cf, NULL);
 
     *cf = pcf;
+
+    return rv;
+}
+
+
+static char *
+ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char                       *rv;
+    ngx_int_t                   i;
+    ngx_str_t                  *value;
+    ngx_conf_t                  save;
+    ngx_rtmp_module_t          *module;
+    ngx_rtmp_conf_ctx_t        *ctx, *pctx;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+    ngx_rtmp_core_app_conf_t   *cacf, **cacfp;
+
+    ctx = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_conf_ctx_t));
+    if (ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    pctx = cf->ctx;
+    ctx->main_conf = pctx->main_conf;
+    ctx->srv_conf = pctx->srv_conf;
+
+    ctx->app_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_rtmp_max_module);
+    if (ctx->app_conf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    for (i = 0; ngx_modules[i]; i++) {
+        if (ngx_modules[i]->type != NGX_RTMP_MODULE) {
+            continue;
+        }
+
+        module = ngx_modules[i]->ctx;
+
+        if (module->create_app_conf) {
+            ctx->app_conf[ngx_modules[i]->ctx_index] = 
+                                module->create_app_conf(cf);
+            if (ctx->app_conf[ngx_modules[i]->ctx_index] == NULL) {
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
+    cacf = ctx->app_conf[ngx_rtmp_core_module.ctx_index];
+    cacf->app_conf = ctx->app_conf;
+
+    value = cf->args->elts;
+
+    cacf->name = value[1];
+    cscf = pctx->srv_conf[ngx_rtmp_core_module.ctx_index];
+
+    cacfp = ngx_array_push(&cscf->applications);
+    if (cacf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    *cacfp = cacf;
+
+    save = *cf;
+    cf->ctx = ctx;
+    cf->cmd_type = NGX_RTMP_APP_CONF;
+
+    rv = ngx_conf_parse(cf, NULL);
+
+    *cf= save;
 
     return rv;
 }
@@ -543,4 +665,3 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
-

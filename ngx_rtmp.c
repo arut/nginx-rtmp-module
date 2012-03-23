@@ -24,6 +24,9 @@ static ngx_int_t ngx_rtmp_init_events(ngx_conf_t *cf,
         ngx_rtmp_core_main_conf_t *cmcf);
 static ngx_int_t ngx_rtmp_init_event_handlers(ngx_conf_t *cf, 
         ngx_rtmp_core_main_conf_t *cmcf);
+static char * ngx_rtmp_merge_applications(ngx_conf_t *cf, 
+        ngx_array_t *applications, void **app_conf, ngx_rtmp_module_t *module, 
+        ngx_uint_t ctx_index);
 
 
 ngx_uint_t  ngx_rtmp_max_module;
@@ -75,7 +78,7 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_rtmp_listen_t           *listen;
     ngx_rtmp_module_t           *module;
     ngx_rtmp_conf_ctx_t         *ctx;
-    ngx_rtmp_core_srv_conf_t   **cscfp;
+    ngx_rtmp_core_srv_conf_t    *cscf, **cscfp;
     ngx_rtmp_core_main_conf_t   *cmcf;
 
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_conf_ctx_t));
@@ -118,7 +121,18 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
     /*
-     * create the main_conf's, the null srv_conf's, and the null loc_conf's
+     * the rtmp null app_conf context, it is used to merge
+     * the server{}s' app_conf's
+     */
+
+    ctx->app_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_rtmp_max_module);
+    if (ctx->app_conf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+
+    /*
+     * create the main_conf's, the null srv_conf's, and the null app_conf's
      * of the all rtmp modules
      */
 
@@ -140,6 +154,13 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (module->create_srv_conf) {
             ctx->srv_conf[mi] = module->create_srv_conf(cf);
             if (ctx->srv_conf[mi] == NULL) {
+                return NGX_CONF_ERROR;
+            }
+        }
+
+        if (module->create_app_conf) {
+            ctx->app_conf[mi] = module->create_app_conf(cf);
+            if (ctx->app_conf[mi] == NULL) {
                 return NGX_CONF_ERROR;
             }
         }
@@ -214,8 +235,37 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                     return rv;
                 }
             }
+
+            if (module->merge_app_conf) {
+
+                /* merge the server{}'s app_conf */
+
+                /*ctx->app_conf = cscfp[s]->ctx->loc_conf;*/
+
+                rv = module->merge_app_conf(cf, 
+                                            ctx->app_conf[mi],
+                                            cscfp[s]->ctx->app_conf[mi]);
+                if (rv != NGX_CONF_OK) {
+                    *cf = pcf;
+                    return rv;
+                }
+
+                /* merge the applications{}' app_conf's */
+
+                cscf = cscfp[s]->ctx->srv_conf[ngx_rtmp_core_module.ctx_index];
+
+                rv = ngx_rtmp_merge_applications(cf, &cscf->applications,
+                                            cscfp[s]->ctx->app_conf,
+                                            module, mi);
+                if (rv != NGX_CONF_OK) {
+                    *cf = pcf;
+                    return rv;
+                }
+            }
+
         }
     }
+
 
     if (ngx_rtmp_init_events(cf, cmcf) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -259,10 +309,45 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
+static char *
+ngx_rtmp_merge_applications(ngx_conf_t *cf, ngx_array_t *applications,
+            void **app_conf, ngx_rtmp_module_t *module, ngx_uint_t ctx_index)
+{
+    char                           *rv;
+    ngx_rtmp_conf_ctx_t            *ctx, saved;
+    ngx_rtmp_core_app_conf_t      **cacfp;
+    ngx_uint_t                      n;
+
+    if (applications == NULL) {
+        return NGX_CONF_OK;
+    }
+
+    ctx = (ngx_rtmp_conf_ctx_t *) cf->ctx;
+    saved = *ctx;
+
+    cacfp = applications->elts;
+    for (n = 0; n < applications->nelts; ++n, ++cacfp) {
+
+        ctx->app_conf = (*cacfp)->app_conf;
+
+        rv = module->merge_app_conf(cf, app_conf[ctx_index],
+                (*cacfp)->app_conf[ctx_index]);
+        if (rv != NGX_CONF_OK) {
+            return rv;
+        }
+    }
+
+    *ctx = saved;
+
+    return NGX_CONF_OK;
+}
+
+
 static ngx_int_t
 ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 {
-    size_t      n;
+    size_t                      n;
+    ngx_rtmp_amf0_handler_t    *h;
 
     for(n = 0; n < NGX_RTMP_MAX_EVENT; ++n) {
         if (ngx_array_init(&cmcf->events[n], cf->pool, 1, 
@@ -277,6 +362,11 @@ ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     {
         return NGX_ERROR;
     }
+
+    /* this handler of connect should always be the first */
+    h = ngx_array_push(&cmcf->amf0);
+    ngx_str_set(&h->name, "connect");
+    h->handler = ngx_rtmp_connect;
 
     return NGX_OK;
 }
@@ -320,6 +410,11 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     /* init user protocol events */
     eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_USER]);
     *eh = ngx_rtmp_user_message_handler;
+
+    /* init several AMF0 callbacks */
+    h = ngx_array_push(&cmcf->amf0);
+    ngx_str_set(&h->name, "createStream");
+    h->handler = ngx_rtmp_create_stream;
 
     /* init amf0 callbacks */
     ngx_array_init(&cmcf->amf0_arrays, cf->pool, 1, sizeof(ngx_hash_key_t));
@@ -673,6 +768,7 @@ ngx_rtmp_cmp_conf_addrs(const void *one, const void *two)
 
     return 0;
 }
+
 
 void *
 ngx_rtmp_rmemcpy(void *dst, void* src, size_t n)

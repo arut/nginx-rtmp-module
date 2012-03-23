@@ -12,6 +12,8 @@
 #define NGX_RTMP_ACCESS_PLAY        0x02
 
 
+static ngx_int_t ngx_rtmp_access_connect(ngx_rtmp_session_t *s, 
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
 static ngx_int_t ngx_rtmp_access_publish(ngx_rtmp_session_t *s, 
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 static ngx_int_t ngx_rtmp_access_play(ngx_rtmp_session_t *s, 
@@ -19,12 +21,13 @@ static ngx_int_t ngx_rtmp_access_play(ngx_rtmp_session_t *s,
 static char * ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, 
         void *conf);
 static ngx_int_t ngx_rtmp_access_postconfiguration(ngx_conf_t *cf);
-static void * ngx_rtmp_access_create_srv_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_access_merge_srv_conf(ngx_conf_t *cf, 
+static void * ngx_rtmp_access_create_app_conf(ngx_conf_t *cf);
+static char * ngx_rtmp_access_merge_app_conf(ngx_conf_t *cf, 
         void *parent, void *child);
 
 
 static ngx_rtmp_amf0_handler_t ngx_rtmp_access_map[] = {
+    { ngx_string("connect"),    ngx_rtmp_access_connect },
     { ngx_string("publish"),    ngx_rtmp_access_publish },
     { ngx_string("play"),       ngx_rtmp_access_play    },
 };
@@ -55,22 +58,22 @@ typedef struct {
 #if (NGX_HAVE_INET6)
     ngx_array_t            *rules6;    /* array of ngx_rtmp_access_rule6_t */
 #endif
-} ngx_rtmp_access_srv_conf_t;
+} ngx_rtmp_access_app_conf_t;
 
 
 static ngx_command_t  ngx_rtmp_access_commands[] = {
 
     { ngx_string("allow"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1|NGX_CONF_TAKE2,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE12,
       ngx_rtmp_access_rule,
-      NGX_RTMP_SRV_CONF_OFFSET,
+      NGX_RTMP_APP_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("deny"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1|NGX_CONF_TAKE2,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE12,
       ngx_rtmp_access_rule,
-      NGX_RTMP_SRV_CONF_OFFSET,
+      NGX_RTMP_APP_CONF_OFFSET,
       0,
       NULL },
 
@@ -83,8 +86,10 @@ static ngx_rtmp_module_t  ngx_rtmp_access_module_ctx = {
     ngx_rtmp_access_postconfiguration,      /* postconfiguration */
     NULL,                                   /* create main configuration */
     NULL,                                   /* init main configuration */
-    ngx_rtmp_access_create_srv_conf,        /* create server configuration */
-    ngx_rtmp_access_merge_srv_conf          /* merge server configuration */
+    NULL,                                   /* create server configuration */
+    NULL,                                   /* merge server configuration */
+    ngx_rtmp_access_create_app_conf,        /* create app configuration */
+    ngx_rtmp_access_merge_app_conf,         /* merge app configuration */
 };
 
 
@@ -105,21 +110,21 @@ ngx_module_t  ngx_rtmp_access_module = {
 
 
 static void *
-ngx_rtmp_access_create_srv_conf(ngx_conf_t *cf)
+ngx_rtmp_access_create_app_conf(ngx_conf_t *cf)
 {
-    ngx_rtmp_access_srv_conf_t      *ascf;
+    ngx_rtmp_access_app_conf_t      *aacf;
 
-    ascf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_access_srv_conf_t));
-    if (ascf == NULL) {
+    aacf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_access_app_conf_t));
+    if (aacf == NULL) {
         return NULL;
     }
 
-    return ascf;
+    return aacf;
 }
 
 
 static char *
-ngx_rtmp_access_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
+ngx_rtmp_access_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     return NGX_CONF_OK;
 }
@@ -140,7 +145,7 @@ ngx_rtmp_access_found(ngx_rtmp_session_t *s, ngx_uint_t deny)
 
 static ngx_int_t
 ngx_rtmp_access_inet(ngx_rtmp_session_t *s, 
-    ngx_rtmp_access_srv_conf_t *ascf,
+    ngx_rtmp_access_app_conf_t *ascf,
     in_addr_t addr, ngx_uint_t flag)
 {
     ngx_uint_t                  i;
@@ -168,7 +173,7 @@ ngx_rtmp_access_inet(ngx_rtmp_session_t *s,
 
 static ngx_int_t
 ngx_rtmp_access_inet6(ngx_rtmp_session_t *s, 
-    ngx_rtmp_srv_conf_t *ascf,
+    ngx_rtmp_app_conf_t *ascf,
     u_char *p, ngx_uint_t flag)
 {
     ngx_uint_t                  n;
@@ -218,14 +223,20 @@ static ngx_int_t
 ngx_rtmp_access(ngx_rtmp_session_t *s, ngx_uint_t flag)
 {
     struct sockaddr_in             *sin;
-    ngx_rtmp_access_srv_conf_t     *ascf;
+    ngx_rtmp_access_app_conf_t     *ascf;
 #if (NGX_HAVE_INET6)
     u_char                         *p;
     in_addr_t                       addr;
     struct sockaddr_in6            *sin6;
 #endif
 
-    ascf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_access_module);
+    ascf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_access_module);
+
+    if (ascf == NULL) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, s->connection->log, 0,
+                "access: NULL loc conf");
+        return NGX_ERROR;
+    }
 
     switch (s->connection->sockaddr->sa_family) {
 
@@ -266,7 +277,7 @@ ngx_rtmp_access(ngx_rtmp_session_t *s, ngx_uint_t flag)
 static char *
 ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_rtmp_access_srv_conf_t         *ascf = conf;
+    ngx_rtmp_access_app_conf_t         *ascf = conf;
 
     ngx_int_t                           rc;
     ngx_uint_t                          all;
@@ -390,7 +401,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static ngx_int_t 
-ngx_rtmp_access_init(ngx_rtmp_session_t *s, 
+ngx_rtmp_access_connect(ngx_rtmp_session_t *s, 
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
     return ngx_rtmp_access(s, NGX_RTMP_ACCESS_PUBLISH) == NGX_OK
@@ -420,21 +431,16 @@ static ngx_int_t
 ngx_rtmp_access_postconfiguration(ngx_conf_t *cf)
 {
     ngx_rtmp_core_main_conf_t          *cmcf;
-    ngx_rtmp_handler_pt                *h;
     ngx_rtmp_amf0_handler_t            *ch, *bh;
     size_t                              n, ncalls;
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
-    /* register event handlers */
-    h = ngx_array_push(&cmcf->events[NGX_RTMP_CONNECT]);
-    *h = ngx_rtmp_access_init;
-
     /* register AMF0 callbacks */
     ncalls = sizeof(ngx_rtmp_access_map) 
                 / sizeof(ngx_rtmp_access_map[0]);
     ch = ngx_array_push_n(&cmcf->amf0, ncalls);
-    if (h == NULL) {
+    if (ch == NULL) {
         return NGX_ERROR;
     }
 

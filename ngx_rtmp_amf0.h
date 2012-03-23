@@ -15,6 +15,8 @@
 #define NGX_RTMP_AMF0_ARRAY     0x08
 #define NGX_RTMP_AMF0_END       0x09
 
+#define NGX_RTMP_AMF0_OPTIONAL  0x80
+
 #include <ngx_config.h>
 #include <ngx_core.h>
 

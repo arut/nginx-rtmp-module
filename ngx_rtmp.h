@@ -18,6 +18,7 @@
 typedef struct {
     void                  **main_conf;
     void                  **srv_conf;
+    void                  **app_conf;
 } ngx_rtmp_conf_ctx_t;
 
 
@@ -178,8 +179,19 @@ typedef struct {
     void                  **ctx;
     void                  **main_conf;
     void                  **srv_conf;
+    void                  **app_conf;
 
     ngx_str_t              *addr_text;
+    int                     connected;
+
+    /* connection parameters */
+    ngx_str_t               app;
+    ngx_str_t               flashver;
+    ngx_str_t               swf_url;
+    ngx_str_t               tc_url;
+    uint32_t                acodecs;
+    uint32_t                vcodecs;
+    ngx_str_t               page_url;
 
     /* TODO: allocate this bufs from shared pool */
     ngx_buf_t               hs_in_buf;
@@ -232,6 +244,8 @@ typedef struct {
 
 
 typedef struct ngx_rtmp_core_srv_conf_s {
+    ngx_array_t             applications; /* ngx_rtmp_core_app_conf_t */
+
     ngx_msec_t              timeout;
     ngx_flag_t              so_keepalive;
     ngx_int_t               max_streams;
@@ -244,12 +258,17 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_chain_t            *free_chains;
     size_t                  max_buf;
     size_t                  max_message;
-    ngx_flag_t              wait_key_frame;
     ngx_flag_t              play_time_fix;
     ngx_flag_t              publish_time_fix;
 
     ngx_rtmp_conf_ctx_t    *ctx;
 } ngx_rtmp_core_srv_conf_t;
+
+
+typedef struct {
+    ngx_str_t               name;
+    void                  **app_conf;
+} ngx_rtmp_core_app_conf_t;
 
 
 typedef struct {
@@ -266,18 +285,24 @@ typedef struct {
     char                 *(*init_main_conf)(ngx_conf_t *cf, void *conf);
 
     void                 *(*create_srv_conf)(ngx_conf_t *cf);
-    char                 *(*merge_srv_conf)(ngx_conf_t *cf, void *prev,
-                                      void *conf);
+    char                 *(*merge_srv_conf)(ngx_conf_t *cf, void *prev, 
+                                    void *conf);
+
+    void                 *(*create_app_conf)(ngx_conf_t *cf);
+    char                 *(*merge_app_conf)(ngx_conf_t *cf, void *prev,
+                                    void *conf);
 } ngx_rtmp_module_t;
 
 #define NGX_RTMP_MODULE                 0x504D5452     /* "RTMP" */
 
 #define NGX_RTMP_MAIN_CONF              0x02000000
 #define NGX_RTMP_SRV_CONF               0x04000000
+#define NGX_RTMP_APP_CONF               0x08000000
 
 
 #define NGX_RTMP_MAIN_CONF_OFFSET  offsetof(ngx_rtmp_conf_ctx_t, main_conf)
 #define NGX_RTMP_SRV_CONF_OFFSET   offsetof(ngx_rtmp_conf_ctx_t, srv_conf)
+#define NGX_RTMP_APP_CONF_OFFSET   offsetof(ngx_rtmp_conf_ctx_t, app_conf)
 
 
 #define ngx_rtmp_get_module_ctx(s, module)     (s)->ctx[module.ctx_index]
@@ -288,6 +313,8 @@ typedef struct {
 #define ngx_rtmp_get_module_main_conf(s, module)                             \
     (s)->main_conf[module.ctx_index]
 #define ngx_rtmp_get_module_srv_conf(s, module)  (s)->srv_conf[module.ctx_index]
+#define ngx_rtmp_get_module_app_conf(s, module)  ((s)->app_conf ? \
+    (s)->app_conf[module.ctx_index] : NULL)
 
 #define ngx_rtmp_conf_get_module_main_conf(cf, module)                       \
     ((ngx_rtmp_conf_ctx_t *) cf->ctx)->main_conf[module.ctx_index]
@@ -320,6 +347,14 @@ ngx_int_t ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
+
+/* Standard AMF0 handlers */
+ngx_int_t ngx_rtmp_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in);
+ngx_int_t ngx_rtmp_create_stream(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in);
+ngx_int_t ngx_rtmp_amf0_default(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in);
 
 
 /* Shared output buffers */

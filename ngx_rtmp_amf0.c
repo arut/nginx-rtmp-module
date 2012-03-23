@@ -103,7 +103,7 @@ ngx_rtmp_amf0_get(ngx_rtmp_amf0_ctx_t *ctx, void *p, size_t n)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ctx->log, 0,
             "AMF0 read eof (%d)", n);
 
-    return NGX_ERROR;
+    return NGX_DONE;
 }
 
 
@@ -243,14 +243,21 @@ ngx_rtmp_amf0_read(ngx_rtmp_amf0_ctx_t *ctx, ngx_rtmp_amf0_elt_t *elts,
 
     for(n = 0; till_end || n < nelts; ++n) {
 
-        if (ngx_rtmp_amf0_get(ctx, &type, sizeof(type)) != NGX_OK)
-            return NGX_ERROR;
+        switch (ngx_rtmp_amf0_get(ctx, &type, sizeof(type))) {
+            case NGX_DONE:
+                if (elts->type & NGX_RTMP_AMF0_OPTIONAL) {
+                    return NGX_OK;
+                }
+            case NGX_ERROR:
+                return NGX_ERROR;
+        }
 
-        data = (n >= nelts || elts == NULL || elts->type != type)
-            ? NULL
-            : elts->data;
+        data = (n >= nelts || elts == NULL 
+                || (elts->type & ~NGX_RTMP_AMF0_OPTIONAL) != type)
+                ? NULL
+                : elts->data;
 
-        switch(type) {
+        switch (type) {
             case NGX_RTMP_AMF0_NUMBER:
                 if (ngx_rtmp_amf0_get(ctx, buf, 8) != NGX_OK) {
                     return NGX_ERROR;
