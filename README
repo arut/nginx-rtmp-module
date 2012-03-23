@@ -4,7 +4,7 @@ NGINX-based RTMP server
 
 * Live streaming of video/audio
 
-* Recording published streams to FLV
+* Recording published streams in FLV file
 
 * Advanced buffering techniques
   to keep memory allocations at a minimum
