@@ -4,6 +4,8 @@ NGINX-based RTMP server
 
 * Live streaming of video/audio
 
+* Recording published streams to FLV
+
 * Advanced buffering techniques
   to keep memory allocations at a minimum
   level for faster streaming and low
@@ -23,8 +25,17 @@ make
 make install
 
 
-Example nginx.conf:
+RMTP URL format:
 
+rtmp://rtmp.example.com/<app>[/<name>]
+
+<app> -  should match one of application {}
+         blocks in config
+<path> - interpreted by each application
+         can be empty
+
+
+Example nginx.conf:
 
 rtmp {
 
@@ -32,11 +43,40 @@ rtmp {
 
         listen 1935;
 
-        wait_key_frame on;
-
         chunk_size 128;
 
         max_buf 1000000;
+
+        #timestamp_fix off;
+
+        # TV mode: one publisher, many subscribers
+        application mytv {
+
+            # enable live streaming
+            live on;
+
+            # record flvs to this dir
+            record /tmp/av;
+
+            # max flv size
+            record_size 3000000;
+
+            #wait_key_frame on;
+            
+            # publish only from localhost
+            allow publish 127.0.0.1;
+            deny publish all;
+
+            #allow play all;
+        }
+
+        # Many publishers, many subscribers
+        # no checks, no recording
+        application videochat {
+
+            live on;
+
+        }
 
     }
 }
