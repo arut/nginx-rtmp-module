@@ -1,4 +1,4 @@
-==nginx-rtmp-module==
+== nginx-rtmp-module ==
 
 NGINX-based RTMP server
 
@@ -25,7 +25,7 @@ make
 make install
 
 
-RMTP URL format:
+RTMP URL format:
 
 rtmp://rtmp.example.com/<app>[/<name>]
 
@@ -46,8 +46,6 @@ rtmp {
         chunk_size 128;
 
         max_buf 1000000;
-
-        #timestamp_fix off;
 
         # TV mode: one publisher, many subscribers
         application mytv {
@@ -80,4 +78,23 @@ rtmp {
 
     }
 }
+
+
+Compatibility:
+
+Two time fix options exist in server{} block:
+
+play_time_fix on|off;
+publish_time_fix on|off;
+
+Both are on by default.
+
+These time fixes need to be turned off
+when playing with non-Adobe software 
+(like ffmpeg) or publishing longer
+streams (>4 hours) with such software.
+
+Streams generated/expected by Adobe software
+do not satisfy the spec (written by them!).
+Third-party software does.
 
