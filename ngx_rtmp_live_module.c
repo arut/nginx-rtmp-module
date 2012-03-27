@@ -9,6 +9,11 @@
 #include "ngx_rtmp_cmd_module.h"
 
 
+static ngx_rtmp_publish_pt          next_publish;
+static ngx_rtmp_play_pt             next_play;
+static ngx_rtmp_delete_stream_pt    next_delete_stream;
+
+
 /* Chunk stream ids for output */
 #define NGX_RTMP_LIVE_CSID_AUDIO   6
 #define NGX_RTMP_LIVE_CSID_VIDEO   7
@@ -159,7 +164,7 @@ ngx_rtmp_live_get_head(ngx_rtmp_session_t *s)
 
 
 static void
-ngx_rtmp_live_join(ngx_rtmp_session_t *s, ngx_str_t *stream, 
+ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name,
         ngx_uint_t flags)
 {
     ngx_connection_t               *c;
@@ -180,9 +185,13 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, ngx_str_t *stream,
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                   "live: join '%V'", stream);
+                   "live: join '%s'", name);
 
-    ctx->stream = *stream;
+    ctx->stream.len = ngx_strlen(name);
+    ctx->stream.data = ngx_palloc(s->connection->pool,
+            ctx->stream.len);
+    ngx_memcpy(ctx->stream.data, name, ctx->stream.len);
+
     hctx = ngx_rtmp_live_get_head(s);
     if (hctx == NULL) {
         return;
@@ -194,7 +203,7 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, ngx_str_t *stream,
 
 
 static ngx_int_t
-ngx_rtmp_live_close(ngx_rtmp_session_t *s)
+ngx_rtmp_live_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 {
     ngx_connection_t               *c;
     ngx_rtmp_live_ctx_t            *ctx, **hctx;
@@ -203,7 +212,7 @@ ngx_rtmp_live_close(ngx_rtmp_session_t *s)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
     if (ctx == NULL) {
-        return NGX_OK;
+        goto next;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
@@ -222,7 +231,8 @@ ngx_rtmp_live_close(ngx_rtmp_session_t *s)
         }
     }
 
-    return NGX_OK;
+next:
+    return next_delete_stream(s, v);
 }
 
 
@@ -353,48 +363,49 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
 
 static ngx_int_t
-ngx_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_str_t *name, 
-        ngx_int_t type) 
+ngx_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     ngx_rtmp_live_app_conf_t       *lacf;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
 
     if (lacf == NULL || !lacf->live) {
-        return NGX_OK;
+        goto next;
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "live: publish: name='%V' type=%d",
-            name, type);
+            "live: publish: name='%s' type='%s'",
+            v->name, v->type);
 
     /* join stream as publisher */
-    ngx_rtmp_live_join(s, name, NGX_RTMP_LIVE_PUBLISHING);
+    ngx_rtmp_live_join(s, v->name, NGX_RTMP_LIVE_PUBLISHING);
 
-    return NGX_OK;
+next:
+    return next_publish(s, v);
 }
 
 
 static ngx_int_t
-ngx_rtmp_live_play(ngx_rtmp_session_t *s, ngx_str_t *name,
-        uint32_t start, uint32_t duration, ngx_int_t reset)
+ngx_rtmp_live_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 {
     ngx_rtmp_live_app_conf_t       *lacf;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
 
     if (lacf == NULL || !lacf->live) {
-        return NGX_OK;
+        goto next;
     }
 
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "live: play: name='%V' start=%uD duration=%uD reset=%d",
-            name, start, duration, reset);
+            "live: play: name='%s' start=%uD duration=%uD reset=%d",
+            v->name, (uint32_t)v->start, 
+            (uint32_t)v->duration, (uint32_t)v->reset);
 
     /* join stream as player */
-    ngx_rtmp_live_join(s, name, NGX_RTMP_LIVE_PLAYING);
+    ngx_rtmp_live_join(s, v->name, NGX_RTMP_LIVE_PLAYING);
 
-    return NGX_OK;
+next:
+    return next_play(s, v);
 }
 
 
@@ -402,9 +413,7 @@ static ngx_int_t
 ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 {
     ngx_rtmp_core_main_conf_t          *cmcf;
-    ngx_rtmp_cmd_main_conf_t           *dmcf;
     ngx_rtmp_handler_pt                *h;
-    void                               *ch;
 
     /* register raw event handlers */
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
@@ -415,17 +424,15 @@ ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_VIDEO]);
     *h = ngx_rtmp_live_av;
 
-    /* register command handlers */
-    dmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_cmd_module);
+    /* chain handlers */
+    next_publish = ngx_rtmp_publish;
+    ngx_rtmp_publish = ngx_rtmp_live_publish;
 
-    ch = ngx_array_push(&dmcf->publish);
-    *(ngx_rtmp_cmd_publish_pt*)ch = ngx_rtmp_live_publish;
+    next_play = ngx_rtmp_play;
+    ngx_rtmp_play = ngx_rtmp_live_play;
 
-    ch = ngx_array_push(&dmcf->play);
-    *(ngx_rtmp_cmd_play_pt*)ch = ngx_rtmp_live_play;
-
-    ch = ngx_array_push(&dmcf->close);
-    *(ngx_rtmp_cmd_close_pt*)ch = ngx_rtmp_live_close;
+    next_delete_stream = ngx_rtmp_delete_stream;
+    ngx_rtmp_delete_stream = ngx_rtmp_live_delete_stream;
 
     return NGX_OK;
 }

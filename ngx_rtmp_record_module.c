@@ -9,6 +9,10 @@
 #include "ngx_rtmp_cmd_module.h"
 
 
+static ngx_rtmp_publish_pt          next_publish;
+static ngx_rtmp_delete_stream_pt    next_delete_stream;
+
+
 static ngx_int_t ngx_rtmp_record_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_record_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, 
@@ -134,8 +138,7 @@ ngx_rtmp_record_write_header(ngx_file_t *file)
 
 
 static ngx_int_t
-ngx_rtmp_record_publish(ngx_rtmp_session_t *s,
-        ngx_str_t *name, ngx_int_t type)
+ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     ngx_rtmp_record_app_conf_t     *racf;
     ngx_rtmp_record_ctx_t          *ctx;
@@ -145,7 +148,7 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s,
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
 
     if (racf == NULL || racf->root.len == 0) {
-        return NGX_OK;
+        goto next;
     }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
@@ -208,7 +211,12 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s,
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
             "record: opened '%V'", &ctx->path);
 
-    return ngx_rtmp_record_write_header(&ctx->file);
+    if (ngx_rtmp_record_write_header(&ctx->file) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+next:
+    return next_publish(s, v);
 }
 
 
@@ -236,6 +244,18 @@ ngx_rtmp_record_close(ngx_rtmp_session_t *s)
             "record: closed");
 
     return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_record_delete_stream(ngx_rtmp_session_t *s, 
+        ngx_rtmp_delete_stream_t *v)
+{
+    if (ngx_rtmp_record_close(s) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return next_delete_stream(s, v);
 }
 
 
@@ -342,9 +362,7 @@ static ngx_int_t
 ngx_rtmp_record_postconfiguration(ngx_conf_t *cf)
 {
     ngx_rtmp_core_main_conf_t          *cmcf;
-    ngx_rtmp_cmd_main_conf_t           *dmcf;
     ngx_rtmp_handler_pt                *h;
-    void                               *ch;
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
@@ -355,14 +373,12 @@ ngx_rtmp_record_postconfiguration(ngx_conf_t *cf)
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_VIDEO]);
     *h = ngx_rtmp_record_av;
 
-    /* register command handlers */
-    dmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_cmd_module);
+    /* chain handlers */
+    next_publish = ngx_rtmp_publish;
+    ngx_rtmp_publish = ngx_rtmp_record_publish;
 
-    ch = ngx_array_push(&dmcf->publish);
-    *(ngx_rtmp_cmd_publish_pt*)ch = ngx_rtmp_record_publish;
-
-    ch = ngx_array_push(&dmcf->close);
-    *(ngx_rtmp_cmd_close_pt*)ch = ngx_rtmp_record_close;
+    next_delete_stream = ngx_rtmp_delete_stream;
+    ngx_rtmp_delete_stream = ngx_rtmp_record_delete_stream;
 
     return NGX_OK;
 }

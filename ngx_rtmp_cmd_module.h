@@ -2,8 +2,10 @@
  * Copyright (c) 2012 Roman Arutyunyan
  */
 
+
 #ifndef _NGX_RTMP_CMD_H_INCLUDED_
 #define _NGX_RTMP_CMD_H_INCLUDED_
+
 
 #include <ngx_config.h>
 #include <ngx_core.h>
@@ -11,29 +13,89 @@
 #include "ngx_rtmp.h"
 
 
-/* publish types */
-#define NGX_RTMP_CMD_PUBLISH_RECORD   1
-#define NGX_RTMP_CMD_PUBLISH_APPEND   2
-#define NGX_RTMP_CMD_PUBLISH_LIVE     3
+/* Basic RTMP call support */
 
+/* TODO: improve string sizes */
 
-typedef ngx_int_t (*ngx_rtmp_cmd_connect_pt)(ngx_rtmp_session_t *s);
-typedef ngx_int_t (*ngx_rtmp_cmd_publish_pt)(ngx_rtmp_session_t *s,
-        ngx_str_t *name, ngx_int_t type);
-typedef ngx_int_t (*ngx_rtmp_cmd_play_pt)(ngx_rtmp_session_t *s,
-        ngx_str_t *name, uint32_t start, uint32_t duration, ngx_int_t reset);
-typedef ngx_int_t (*ngx_rtmp_cmd_close_pt)(ngx_rtmp_session_t *s);
+typedef struct {
+    u_char                          app[1024];
+    u_char                          flashver[1024];
+    u_char                          swf_url[1024];
+    u_char                          tc_url[1024];
+    double                          acodecs;
+    double                          vcodecs;
+    u_char                          page_url[1024];
+} ngx_rtmp_connect_t;
 
 
 typedef struct {
-    ngx_array_t         connect;
-    ngx_array_t         publish;
-    ngx_array_t         play;
-    ngx_array_t         close;
-} ngx_rtmp_cmd_main_conf_t;
+    double                          trans;
+    double                          stream;
+} ngx_rtmp_create_stream_t;
 
 
-extern ngx_module_t ngx_rtmp_cmd_module;
+typedef struct {
+    double                          stream;
+} ngx_rtmp_delete_stream_t;
+
+
+typedef struct {
+    u_char                          name[1024];
+    u_char                          type[1024];
+} ngx_rtmp_publish_t;
+
+
+typedef struct {
+    u_char                          name[1024];
+} ngx_rtmp_fcpublish_t;
+
+
+typedef ngx_rtmp_fcpublish_t ngx_rtmp_fcunpublish_t;
+typedef ngx_rtmp_fcpublish_t ngx_rtmp_fcsubscribe_t;
+typedef ngx_rtmp_fcpublish_t ngx_rtmp_fcunsubscribe_t;
+
+
+typedef struct {
+    u_char                          name[1024];
+    double                          start;
+    double                          duration;
+    int                             reset;
+} ngx_rtmp_play_t;
+
+
+typedef ngx_int_t (*ngx_rtmp_connect_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_connect_t *v);
+typedef ngx_int_t (*ngx_rtmp_create_stream_pt)(ngx_rtmp_session_t *s,
+        ngx_rtmp_create_stream_t *v);
+typedef ngx_int_t (*ngx_rtmp_delete_stream_pt)(ngx_rtmp_session_t *s,
+        ngx_rtmp_delete_stream_t *v);
+
+typedef ngx_int_t (*ngx_rtmp_publish_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_publish_t *v);
+typedef ngx_int_t (*ngx_rtmp_fcpublish_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_fcpublish_t *v);
+typedef ngx_int_t (*ngx_rtmp_fcunpublish_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_fcunpublish_t *v);
+
+typedef ngx_int_t (*ngx_rtmp_play_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_play_t *v);
+typedef ngx_int_t (*ngx_rtmp_fcsubscribe_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_fcsubscribe_t *v);
+typedef ngx_int_t (*ngx_rtmp_fcunsubscribe_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_fcunsubscribe_t *v);
+
+
+extern ngx_rtmp_connect_pt          ngx_rtmp_connect;
+extern ngx_rtmp_create_stream_pt    ngx_rtmp_create_stream;
+extern ngx_rtmp_delete_stream_pt    ngx_rtmp_delete_stream;
+
+extern ngx_rtmp_publish_pt          ngx_rtmp_publish;
+extern ngx_rtmp_fcpublish_pt        ngx_rtmp_fcpublish;
+extern ngx_rtmp_fcunpublish_pt      ngx_rtmp_fcunpublish;
+
+extern ngx_rtmp_play_pt             ngx_rtmp_play;
+extern ngx_rtmp_fcsubscribe_pt      ngx_rtmp_fcsubscribe;
+extern ngx_rtmp_fcunsubscribe_pt    ngx_rtmp_fcunsubscribe;
 
 
 #endif /*_NGX_RTMP_CMD_H_INCLUDED_ */

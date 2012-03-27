@@ -9,6 +9,10 @@
 #include "ngx_rtmp_cmd_module.h"
 
 
+static ngx_rtmp_publish_pt          next_publish;
+static ngx_rtmp_play_pt             next_play;
+
+
 #define NGX_RTMP_ACCESS_PUBLISH     0x01
 #define NGX_RTMP_ACCESS_PLAY        0x02
 
@@ -389,47 +393,36 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static ngx_int_t 
-ngx_rtmp_access_connect(ngx_rtmp_session_t *s)
+ngx_rtmp_access_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
-    return ngx_rtmp_access(s, NGX_RTMP_ACCESS_PUBLISH) == NGX_OK
-        || ngx_rtmp_access(s, NGX_RTMP_ACCESS_PLAY) == NGX_OK
-        ? NGX_OK
-        : NGX_ERROR;
+    if (ngx_rtmp_access(s, NGX_RTMP_ACCESS_PUBLISH) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return next_publish(s, v);
 }
 
 
 static ngx_int_t 
-ngx_rtmp_access_publish(ngx_rtmp_session_t *s, 
-       ngx_str_t *name, ngx_int_t type)
+ngx_rtmp_access_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 {
-    return ngx_rtmp_access(s, NGX_RTMP_ACCESS_PUBLISH);
-}
+    if (ngx_rtmp_access(s, NGX_RTMP_ACCESS_PLAY) != NGX_OK) {
+        return NGX_ERROR;
+    }
 
-
-static ngx_int_t 
-ngx_rtmp_access_play(ngx_rtmp_session_t *s, 
-       ngx_str_t *name, uint32_t start, uint32_t duration, ngx_int_t reset)
-{
-    return ngx_rtmp_access(s, NGX_RTMP_ACCESS_PLAY);
+    return next_play(s, v);
 }
 
 
 static ngx_int_t
 ngx_rtmp_access_postconfiguration(ngx_conf_t *cf)
 {
-    ngx_rtmp_cmd_main_conf_t           *dmcf;
-    void                               *ch;
+    /* chain handlers */
+    next_publish = ngx_rtmp_publish;
+    ngx_rtmp_publish = ngx_rtmp_access_publish;
 
-    dmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_cmd_module);
-
-    ch = ngx_array_push(&dmcf->connect);
-    *(ngx_rtmp_cmd_connect_pt*)ch = ngx_rtmp_access_connect;
-
-    ch = ngx_array_push(&dmcf->publish);
-    *(ngx_rtmp_cmd_publish_pt*)ch = ngx_rtmp_access_publish;
-
-    ch = ngx_array_push(&dmcf->play);
-    *(ngx_rtmp_cmd_play_pt*)ch = ngx_rtmp_access_play;
+    next_play = ngx_rtmp_play;
+    ngx_rtmp_play = ngx_rtmp_access_play;
 
     return NGX_OK;
 }
