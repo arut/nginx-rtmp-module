@@ -6,6 +6,8 @@ NGINX-based RTMP server
 
 * Recording published streams in FLV file
 
+* HTTP callbacks for publish/play/record
+
 * Advanced buffering techniques
   to keep memory allocations at a minimum
   level for faster streaming and low
@@ -59,8 +61,6 @@ rtmp {
             # max flv size
             record_size 3000000;
 
-            #wait_key_frame on;
-            
             # publish only from localhost
             allow publish 127.0.0.1;
             deny publish all;
@@ -73,6 +73,22 @@ rtmp {
         application videochat {
 
             live on;
+
+            # The following notifications receive all 
+            # the session variables as well as 
+            # particular call arguments in HTTP POST
+            # request
+
+            # Make HTTP request & use HTTP retcode
+            # to decide whether to allow publishing
+            # from this connection or not
+            on_publish http://localhost:8080/publish;
+
+            # Same with playing
+            on_play http://localhost:8080/play;
+
+            # Async notify about an flv recorded
+            on_record_done http://localhost:8080/record_done;
 
         }
 
