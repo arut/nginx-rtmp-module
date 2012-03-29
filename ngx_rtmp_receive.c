@@ -170,7 +170,10 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
     static u_char               func[128];
 
     static ngx_rtmp_amf_elt_t  elts[] = {
-        { NGX_RTMP_AMF_STRING, 0,  func,   sizeof(func)    },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,  
+          func,   sizeof(func) },
     };
 
     c = s->connection;

@@ -26,7 +26,7 @@
 
 typedef struct {
     ngx_int_t                           type;
-    char                               *name;
+    ngx_str_t                           name;
     void                               *data;
     size_t                              len;
 } ngx_rtmp_amf_elt_t;

@@ -66,41 +66,43 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static ngx_rtmp_amf_elt_t  in_cmd[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          "app",         
+          ngx_string("app"),
           v.app, sizeof(v.app) },
 
         { NGX_RTMP_AMF_STRING, 
-          "flashver",
+          ngx_string("flashver"),
           v.flashver, sizeof(v.flashver) },
 
         { NGX_RTMP_AMF_STRING,
-          "swfUrl",      
+          ngx_string("swfUrl"),
           v.swf_url, sizeof(v.swf_url) },
 
         { NGX_RTMP_AMF_STRING,
-          "tcUrl",
+          ngx_string("tcUrl"),
           v.tc_url, sizeof(v.tc_url) },
 
         { NGX_RTMP_AMF_NUMBER,
-          "audioCodecs",
+          ngx_string("audioCodecs"),
           &v.acodecs, sizeof(v.acodecs) },
 
         { NGX_RTMP_AMF_NUMBER,
-          "videoCodecs",
+          ngx_string("videoCodecs"),
           &v.vcodecs, sizeof(v.vcodecs) },
 
         { NGX_RTMP_AMF_STRING,
-          "pageUrl",     
+          ngx_string("pageUrl"),
           v.page_url, sizeof(v.page_url) },
     };
 
     static ngx_rtmp_amf_elt_t  in_elts[] = {
 
         /* transaction in always 1 */
-        { NGX_RTMP_AMF_NUMBER, NULL,             
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
           NULL, 0 },
 
-        { NGX_RTMP_AMF_OBJECT, NULL,          
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
           in_cmd, sizeof(in_cmd) },
     };
 
@@ -132,45 +134,45 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     static ngx_rtmp_amf_elt_t  out_obj[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          "fmsVer",
+          ngx_string("fmsVer"),
           NGX_RTMP_FMS_VERSION, 0 },
         
         { NGX_RTMP_AMF_NUMBER,
-          "capabilities",
+          ngx_string("capabilities"),
           &capabilities, 0 },
     };
 
     static ngx_rtmp_amf_elt_t  out_inf[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          "level",                          
+          ngx_string("level"),
           "status", 0 },
 
         { NGX_RTMP_AMF_STRING, 
-          "code",
+          ngx_string("code"),
           "NetConnection.Connect.Success", 0 }, 
 
         { NGX_RTMP_AMF_STRING,
-          "description",
+          ngx_string("description"),
           "Connection succeeded.", 0 }
     };
 
     static ngx_rtmp_amf_elt_t  out_elts[] = {
 
         { NGX_RTMP_AMF_STRING,
-          NULL,       
+          ngx_null_string,       
           "_result", 0 },
 
         { NGX_RTMP_AMF_NUMBER,
-          NULL,   
+          ngx_null_string,
           &trans, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          NULL,   
+          ngx_null_string,
           out_obj, sizeof(out_obj) },
 
         { NGX_RTMP_AMF_OBJECT,
-          NULL,   
+          ngx_null_string,
           out_inf, sizeof(out_inf) },
     };
 
@@ -254,7 +256,7 @@ ngx_rtmp_cmd_create_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static ngx_rtmp_amf_elt_t  in_elts[] = {
 
         { NGX_RTMP_AMF_NUMBER, 
-          0,      
+          ngx_null_string,      
           &v.trans, sizeof(v.trans) },
     };
 
@@ -281,19 +283,19 @@ ngx_rtmp_cmd_create_stream(ngx_rtmp_session_t *s, ngx_rtmp_create_stream_t *v)
     static ngx_rtmp_amf_elt_t  out_elts[] = {
 
         { NGX_RTMP_AMF_STRING,
-          NULL,   
+          ngx_null_string,
           "_result", 0 },
 
         { NGX_RTMP_AMF_NUMBER,
-          NULL,   
+          ngx_null_string,
           &trans, 0 },
 
         { NGX_RTMP_AMF_NULL, 
-          NULL,   
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_NUMBER,
-          NULL,   
+          ngx_null_string,
           &stream, sizeof(stream) },
     };
 
@@ -324,15 +326,15 @@ ngx_rtmp_cmd_delete_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static ngx_rtmp_amf_elt_t  in_elts[] = {
 
         { NGX_RTMP_AMF_NUMBER, 
-          0,
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_NULL,
-          0,
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_NUMBER,
-          0,
+          ngx_null_string,
           &v.stream, 0 },
     };
 
@@ -366,19 +368,19 @@ ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         /* transaction is always 0 */
         { NGX_RTMP_AMF_NUMBER,
-          0,      
+          ngx_null_string,      
           NULL, 0 },
 
         { NGX_RTMP_AMF_NULL,
-          0,
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_STRING,
-          0,      
+          ngx_null_string,
           &v.name, sizeof(v.name) },
 
         { NGX_RTMP_AMF_STRING,
-          0,      
+          ngx_null_string,
           &v.type, sizeof(v.type) },
     };
 
@@ -407,34 +409,34 @@ ngx_rtmp_cmd_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     static ngx_rtmp_amf_elt_t      out_inf[] = {
 
         { NGX_RTMP_AMF_STRING,
-          "code",
+          ngx_string("code"),
           "NetStream.Publish.Start", 0 },
 
         { NGX_RTMP_AMF_STRING,
-          "level",
+          ngx_string("level"),
           "status", 0 },
 
         { NGX_RTMP_AMF_STRING,
-          "description",
+          ngx_string("description"),
           "Publish succeeded.", 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out_elts[] = {
 
         { NGX_RTMP_AMF_STRING,
-          NULL,   
+          ngx_null_string,
           "onStatus", 0 },
 
         { NGX_RTMP_AMF_NUMBER,
-          NULL,   
+          ngx_null_string,
           &trans, 0 },
 
         { NGX_RTMP_AMF_NULL,
-          NULL,   
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          NULL,   
+          ngx_null_string,
           out_inf, sizeof(out_inf) },
     };
 
@@ -473,11 +475,11 @@ ngx_rtmp_cmd_fcpublish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         /* transaction is always 0 */
         { NGX_RTMP_AMF_NUMBER,
-          0,      
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_STRING,
-          0,      
+          ngx_null_string,
           &v.name, sizeof(v.name) },
     };
 
@@ -506,34 +508,34 @@ ngx_rtmp_cmd_fcpublish(ngx_rtmp_session_t *s, ngx_rtmp_fcpublish_t *v)
     static ngx_rtmp_amf_elt_t      out_inf[] = {
 
         { NGX_RTMP_AMF_STRING,
-          "code",
+          ngx_string("code"),
           "NetStream.Publish.Start", 0 },
 
         { NGX_RTMP_AMF_STRING,
-          "level",
+          ngx_string("level"),
           "status", 0 },
 
         { NGX_RTMP_AMF_STRING,
-          "description",
+          ngx_string("description"),
           "FCPublish succeeded.", 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out_elts[] = {
 
         { NGX_RTMP_AMF_STRING,
-          NULL,   
+          ngx_null_string,
           "onFCPublish", 0 },
 
         { NGX_RTMP_AMF_NUMBER,
-          NULL,   
+          ngx_null_string,
           &trans, 0 },
 
         { NGX_RTMP_AMF_NULL,
-          NULL,   
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          NULL,   
+          ngx_null_string,
           out_inf, sizeof(out_inf) },
     };
 
@@ -566,27 +568,27 @@ ngx_rtmp_cmd_play_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         /* transaction is always 0 */
         { NGX_RTMP_AMF_NUMBER, 
-          0,      
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_NULL,
-          0,      
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_STRING,
-          0,      
+          ngx_null_string,
           &v.name, sizeof(v.name) },
 
         { NGX_RTMP_AMF_OPTIONAL | NGX_RTMP_AMF_NUMBER,
-          0,      
+          ngx_null_string,
           &v.start, 0 },
 
         { NGX_RTMP_AMF_OPTIONAL | NGX_RTMP_AMF_NUMBER,
-          0,      
+          ngx_null_string,
           &v.duration, 0 },
 
         { NGX_RTMP_AMF_OPTIONAL | NGX_RTMP_AMF_BOOLEAN,
-          0,
+          ngx_null_string,
           &v.reset, 0 }
     };
 
@@ -616,68 +618,68 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     static ngx_rtmp_amf_elt_t      out_inf[] = {
 
         { NGX_RTMP_AMF_STRING,
-          "code",             
+          ngx_string("code"),
           "NetStream.Play.Reset", 0 },
 
         { NGX_RTMP_AMF_STRING,
-          "level",        
+          ngx_string("level"),
           "status", 0 },
 
         { NGX_RTMP_AMF_STRING,
-          "description",  
+          ngx_string("description"),
           "Playing and resetting.", 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out_elts[] = {
 
         { NGX_RTMP_AMF_STRING,
-          NULL,   
+          ngx_null_string,
           "onStatus", 0 },
 
         { NGX_RTMP_AMF_NUMBER, 
-          NULL,
+          ngx_null_string,
           &trans, 0 },
 
         { NGX_RTMP_AMF_NULL, 
-          NULL,
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT, 
-          NULL,
+          ngx_null_string,
           out_inf, sizeof(out_inf) },
     };
 
     static ngx_rtmp_amf_elt_t      out2_inf[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          "code",         
+          ngx_string("code"),
           "NetStream.Play.Start", 0 },
 
         { NGX_RTMP_AMF_STRING, 
-          "level",
+          ngx_string("level"),
           "status", 0 },
 
         { NGX_RTMP_AMF_STRING, 
-          "description",
+          ngx_string("description"),
           "Started playing.", 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out2_elts[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          NULL,
+          ngx_null_string,
           "onStatus", 0 },
 
         { NGX_RTMP_AMF_NUMBER, 
-          NULL,
+          ngx_null_string,
           &trans, 0 },
 
         { NGX_RTMP_AMF_NULL,
-          NULL,
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          NULL,
+          ngx_null_string,
           out2_inf,
           sizeof(out2_inf) },
     };
@@ -685,33 +687,33 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     static ngx_rtmp_amf_elt_t      out3_elts[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          NULL,
+          ngx_null_string,
           "|RtmpSampleAccess", 0 },
 
         { NGX_RTMP_AMF_BOOLEAN,
-          NULL,   
+          ngx_null_string,
           &bfalse, 0 },
 
         { NGX_RTMP_AMF_BOOLEAN,
-          NULL,
+          ngx_null_string,
           &bfalse, 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out4_inf[] = {
 
         { NGX_RTMP_AMF_STRING,
-          "code",
+          ngx_string("code"),
           "NetStream.Data.Start", 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out4_elts[] = {
 
         { NGX_RTMP_AMF_STRING,
-          NULL,
+          ngx_null_string,
           "onStatus", 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          NULL,
+          ngx_null_string,
           out4_inf, sizeof(out4_inf) },
     };
 
@@ -772,11 +774,11 @@ ngx_rtmp_cmd_fcsubscribe_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         /* transaction is always 0 */
         { NGX_RTMP_AMF_NUMBER, 
-          0,      
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_STRING,
-          0,      
+          ngx_null_string,
           &v.name, sizeof(v.name) },
 
     };
@@ -806,34 +808,34 @@ ngx_rtmp_cmd_fcsubscribe(ngx_rtmp_session_t *s, ngx_rtmp_fcsubscribe_t *v)
     static ngx_rtmp_amf_elt_t      out_inf[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          "code",         
+          ngx_string("code"),
           "NetStream.Play.Start", 0 },
 
         { NGX_RTMP_AMF_STRING, 
-          "level",
+          ngx_string("level"),
           "status", 0 },
 
         { NGX_RTMP_AMF_STRING, 
-          "description",
+          ngx_string("description"),
           "Started playing.", 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out_elts[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          NULL,
+          ngx_null_string,
           "onFCSubscribe", 0 },
 
         { NGX_RTMP_AMF_NUMBER, 
-          NULL,
+          ngx_null_string,
           &trans, 0 },
 
         { NGX_RTMP_AMF_NULL,
-          NULL,
+          ngx_null_string,
           NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          NULL,
+          ngx_null_string,
           out_inf,
           sizeof(out_inf) },
     };

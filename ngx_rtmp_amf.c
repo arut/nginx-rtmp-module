@@ -170,14 +170,14 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 
     maxlen = 0;
     for(n = 0; n < nelts; ++n) {
-        namelen = strlen(elts[n].name);
+        namelen = elts[n].name.len;
         if (namelen > maxlen)
             maxlen = namelen;
     }
 
     for(;;) {
 
-        char    name[maxlen + 1];
+        char    name[maxlen];
 
         /* read key */
         if (ngx_rtmp_amf_get(ctx, buf, 2) != NGX_OK)
@@ -190,13 +190,11 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 
         if (len <= maxlen) {
             rc = ngx_rtmp_amf_get(ctx, name, len);
-            name[len] = 0;
 
         } else {
             rc = ngx_rtmp_amf_get(ctx, name, maxlen);
             if (rc != NGX_OK)
                 return NGX_ERROR;
-            name[maxlen] = 0;
             rc = ngx_rtmp_amf_get(ctx, 0, len - maxlen);
         }
 
@@ -205,7 +203,10 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 
         /* TODO: if we require array to be sorted on name
          * then we could be able to use binary search */
-        for(n = 0; n < nelts && strcmp(name, elts[n].name); ++n);
+        for(n = 0; n < nelts 
+                && (len != elts[n].name.len
+                    || ngx_strncmp(name, elts[n].name.data, len));
+                ++n);
 
         if (ngx_rtmp_amf_read(ctx, n < nelts ? &elts[n] : NULL, 1) != NGX_OK)
             return NGX_ERROR;
@@ -353,15 +354,13 @@ static ngx_int_t
 ngx_rtmp_amf_write_object(ngx_rtmp_amf_ctx_t *ctx,
         ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
-    uint16_t                len, len_sb;
+    uint16_t                len;
     size_t                  n;
-    char                   *name;
     u_char                  buf[2];
 
     for(n = 0; n < nelts; ++n) {
 
-        name = elts[n].name;
-        len_sb = len = strlen(name);
+        len = elts[n].name.len;
 
         if (ngx_rtmp_amf_put(ctx, 
                     ngx_rtmp_amf_reverse_copy(buf, 
@@ -370,7 +369,7 @@ ngx_rtmp_amf_write_object(ngx_rtmp_amf_ctx_t *ctx,
             return NGX_ERROR;
         }
 
-        if (ngx_rtmp_amf_put(ctx, name, len) != NGX_OK) {
+        if (ngx_rtmp_amf_put(ctx, elts[n].name.data, len) != NGX_OK) {
             return NGX_ERROR;
         }
 
@@ -379,9 +378,7 @@ ngx_rtmp_amf_write_object(ngx_rtmp_amf_ctx_t *ctx,
         }
     }
 
-    len = 0;
-
-    if (ngx_rtmp_amf_put(ctx, "\00\00", 2) != NGX_OK) {
+    if (ngx_rtmp_amf_put(ctx, "\0\0", 2) != NGX_OK) {
         return NGX_ERROR;
     }
 
