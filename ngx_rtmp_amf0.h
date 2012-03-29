@@ -6,16 +6,19 @@
 #ifndef _NGX_RTMP_AMF0_H_INCLUDED_
 #define _NGX_RTMP_AMF0_H_INCLUDED_
 
-#define NGX_RTMP_AMF0_NUMBER    0x00
-#define NGX_RTMP_AMF0_BOOLEAN   0x01
-#define NGX_RTMP_AMF0_STRING    0x02
+#define NGX_RTMP_AMF0_NUMBER            0x00
+#define NGX_RTMP_AMF0_BOOLEAN           0x01
+#define NGX_RTMP_AMF0_STRING            0x02
 
-#define NGX_RTMP_AMF0_OBJECT    0x03
-#define NGX_RTMP_AMF0_NULL      0x05
-#define NGX_RTMP_AMF0_ARRAY     0x08
-#define NGX_RTMP_AMF0_END       0x09
+#define NGX_RTMP_AMF0_OBJECT            0x03
+#define NGX_RTMP_AMF0_NULL              0x05
+#define NGX_RTMP_AMF0_ARRAY_NULL        0x06
+#define NGX_RTMP_AMF0_MIXED_ARRAY       0x08
+#define NGX_RTMP_AMF0_END               0x09
 
-#define NGX_RTMP_AMF0_OPTIONAL  0x80
+#define NGX_RTMP_AMF0_ARRAY             0x0a
+
+#define NGX_RTMP_AMF0_OPTIONAL          0x80
 
 #include <ngx_config.h>
 #include <ngx_core.h>
