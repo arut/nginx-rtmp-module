@@ -13,7 +13,7 @@ CORE_MODULES="$CORE_MODULES
 
 NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp.c                   \
-                $ngx_addon_dir/ngx_rtmp_amf0.c              \
+                $ngx_addon_dir/ngx_rtmp_amf.c               \
                 $ngx_addon_dir/ngx_rtmp_send.c              \
                 $ngx_addon_dir/ngx_rtmp_shared.c            \
                 $ngx_addon_dir/ngx_rtmp_handler.c           \

@@ -4,7 +4,7 @@
 
 
 #include "ngx_rtmp.h"
-#include "ngx_rtmp_amf0.h"
+#include "ngx_rtmp_amf.h"
 #include <string.h>
 
 
@@ -157,10 +157,10 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
 
 
 ngx_int_t 
-ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
+ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
-    ngx_rtmp_amf0_ctx_t         act;
+    ngx_rtmp_amf_ctx_t         act;
     ngx_connection_t           *c;
     ngx_rtmp_core_main_conf_t  *cmcf;
     ngx_array_t                *ch;
@@ -169,36 +169,36 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
 
     static u_char               func[128];
 
-    static ngx_rtmp_amf0_elt_t  elts[] = {
-        { NGX_RTMP_AMF0_STRING, 0,  func,   sizeof(func)    },
+    static ngx_rtmp_amf_elt_t  elts[] = {
+        { NGX_RTMP_AMF_STRING, 0,  func,   sizeof(func)    },
     };
 
     c = s->connection;
     cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
 
-    /* read AMF0 func name & transaction id */
+    /* read AMF func name & transaction id */
     act.link = in;
     act.log = s->connection->log;
     memset(func, 0, sizeof(func));
 
-    if (ngx_rtmp_amf0_read(&act, elts, 
+    if (ngx_rtmp_amf_read(&act, elts, 
                 sizeof(elts) / sizeof(elts[0])) != NGX_OK) 
     {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                "AMF0 cmd failed");
+                "AMF cmd failed");
         return NGX_ERROR;
     }
 
     len = ngx_strlen(func);
 
-    ch = ngx_hash_find(&cmcf->amf0_hash, 
+    ch = ngx_hash_find(&cmcf->amf_hash, 
             ngx_hash_strlow(func, func, len), func, len);
 
     if (ch && ch->nelts) {
         ph = ch->elts;
         for (n = 0; n < ch->nelts; ++n, ++ph) {
             ngx_log_debug3(NGX_LOG_DEBUG_RTMP, c->log, 0,
-                "AMF0 func '%s' passed to handler %d/%d", 
+                "AMF func '%s' passed to handler %d/%d", 
                 func, n, ch->nelts);
             switch ((*ph)(s, h, in)) {
                 case NGX_ERROR:
@@ -209,7 +209,7 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
         }
     } else {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
-            "AMF0 cmd '%s' no handler", func);
+            "AMF cmd '%s' no handler", func);
     }
 
     return NGX_OK;
@@ -217,14 +217,14 @@ ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
 
 
 ngx_int_t
-ngx_rtmp_receive_amf0(ngx_rtmp_session_t *s, ngx_chain_t *in,
-        ngx_rtmp_amf0_elt_t *elts, size_t nelts)
+ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in,
+        ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
-    ngx_rtmp_amf0_ctx_t     act;
+    ngx_rtmp_amf_ctx_t     act;
 
     act.link = in;
     act.log = s->connection->log;
 
-    return ngx_rtmp_amf0_read(&act, elts, nelts);
+    return ngx_rtmp_amf_read(&act, elts, nelts);
 }
 

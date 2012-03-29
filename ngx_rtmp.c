@@ -356,8 +356,8 @@ ngx_rtmp_init_events(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
         }
     }
 
-    if (ngx_array_init(&cmcf->amf0, cf->pool, 1, 
-                sizeof(ngx_rtmp_amf0_handler_t)) != NGX_OK)
+    if (ngx_array_init(&cmcf->amf, cf->pool, 1, 
+                sizeof(ngx_rtmp_amf_handler_t)) != NGX_OK)
     {
         return NGX_ERROR;
     }
@@ -371,7 +371,7 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 {
     ngx_hash_init_t             calls_hash;
     ngx_rtmp_handler_pt        *eh;
-    ngx_rtmp_amf0_handler_t    *h;
+    ngx_rtmp_amf_handler_t     *h;
     ngx_hash_key_t             *ha;
     size_t                      n, m;
 
@@ -383,10 +383,10 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
         NGX_RTMP_MSG_BANDWIDTH
     };
 
-    static size_t               amf0_events[] = {
-        NGX_RTMP_MSG_AMF0_META,
-        NGX_RTMP_MSG_AMF0_SHARED,
-        NGX_RTMP_MSG_AMF0_CMD
+    static size_t               amf_events[] = {
+        NGX_RTMP_MSG_AMF_META,
+        NGX_RTMP_MSG_AMF_SHARED,
+        NGX_RTMP_MSG_AMF_CMD
     };
 
     /* init standard protocol events */
@@ -395,31 +395,31 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
         *eh = ngx_rtmp_protocol_message_handler;
     }
 
-    /* init amf0 events */
-    for(n = 0; n < sizeof(amf0_events) / sizeof(amf0_events[0]); ++n) {
-        eh = ngx_array_push(&cmcf->events[amf0_events[n]]);
-        *eh = ngx_rtmp_amf0_message_handler;
+    /* init amf events */
+    for(n = 0; n < sizeof(amf_events) / sizeof(amf_events[0]); ++n) {
+        eh = ngx_array_push(&cmcf->events[amf_events[n]]);
+        *eh = ngx_rtmp_amf_message_handler;
     }
 
     /* init user protocol events */
     eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_USER]);
     *eh = ngx_rtmp_user_message_handler;
 
-    /* init amf0 callbacks */
-    ngx_array_init(&cmcf->amf0_arrays, cf->pool, 1, sizeof(ngx_hash_key_t));
+    /* init amf callbacks */
+    ngx_array_init(&cmcf->amf_arrays, cf->pool, 1, sizeof(ngx_hash_key_t));
 
-    h = cmcf->amf0.elts;
-    for(n = 0; n < cmcf->amf0.nelts; ++n, ++h) {
-        ha = cmcf->amf0_arrays.elts;
-        for(m = 0; m < cmcf->amf0_arrays.nelts; ++m, ++ha) {
+    h = cmcf->amf.elts;
+    for(n = 0; n < cmcf->amf.nelts; ++n, ++h) {
+        ha = cmcf->amf_arrays.elts;
+        for(m = 0; m < cmcf->amf_arrays.nelts; ++m, ++ha) {
             if (h->name.len == ha->key.len 
                     && !ngx_strncmp(h->name.data, ha->key.data, ha->key.len))
             {
                 break;
             }
         }
-        if (m == cmcf->amf0_arrays.nelts) {
-            ha = ngx_array_push(&cmcf->amf0_arrays);
+        if (m == cmcf->amf_arrays.nelts) {
+            ha = ngx_array_push(&cmcf->amf_arrays);
             ha->key = h->name;
             ha->key_hash = ngx_hash_key_lc(ha->key.data, ha->key.len);
             ha->value = ngx_array_create(cf->pool, 1, 
@@ -433,15 +433,15 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
         *eh = h->handler;
     }
 
-    calls_hash.hash = &cmcf->amf0_hash;
+    calls_hash.hash = &cmcf->amf_hash;
     calls_hash.key = ngx_hash_key_lc;
     calls_hash.max_size = 512;
     calls_hash.bucket_size = ngx_cacheline_size;
-    calls_hash.name = "amf0_hash";
+    calls_hash.name = "amf_hash";
     calls_hash.pool = cf->pool;
     calls_hash.temp_pool = NULL;
 
-    if (ngx_hash_init(&calls_hash, cmcf->amf0_arrays.elts, cmcf->amf0_arrays.nelts)
+    if (ngx_hash_init(&calls_hash, cmcf->amf_arrays.elts, cmcf->amf_arrays.nelts)
             != NGX_OK)
     {
         return NGX_ERROR;

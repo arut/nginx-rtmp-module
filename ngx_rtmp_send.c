@@ -4,7 +4,7 @@
 
 
 #include "ngx_rtmp.h"
-#include "ngx_rtmp_amf0.h"
+#include "ngx_rtmp_amf.h"
 
 
 #define NGX_RTMP_USER_START(s, tp)              \
@@ -19,9 +19,6 @@
     __h.type = tp;                              \
     __h.csid = 2;                               \
     __l = ngx_rtmp_alloc_shared_buf(__cscf);    \
-        if (__l->buf->in_file) {                                            \
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, "send in file buf!!");         \
-        }                                                                           \
     if (__l == NULL) {                          \
         return NGX_ERROR;                       \
     }                                           \
@@ -202,12 +199,12 @@ ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s, uint32_t timestamp)
 }
 
 
-/* AMF0 sender */
+/* AMF sender */
 ngx_int_t
-ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_rtmp_amf0_elt_t *elts, size_t nelts)
+ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
-    ngx_rtmp_amf0_ctx_t         act;
+    ngx_rtmp_amf_ctx_t          act;
     ngx_rtmp_core_srv_conf_t   *cscf;
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
@@ -217,7 +214,7 @@ ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     act.alloc = ngx_rtmp_alloc_shared_buf;
     act.log = s->connection->log;
 
-    if (ngx_rtmp_amf0_write(&act, elts, nelts) != NGX_OK) {
+    if (ngx_rtmp_amf_write(&act, elts, nelts) != NGX_OK) {
         if (act.first) {
             ngx_rtmp_free_shared_bufs(cscf, act.first);
         }

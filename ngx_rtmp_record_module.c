@@ -287,6 +287,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
 
     hl->next = cl;
     cl->next = pl;
+    pl->next = NULL;
 
     return hl;
 }

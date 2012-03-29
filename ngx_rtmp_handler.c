@@ -10,7 +10,7 @@
 #include <strings.h>
 
 #include "ngx_rtmp.h"
-#include "ngx_rtmp_amf0.h"
+#include "ngx_rtmp_amf.h"
 
 
 static void ngx_rtmp_init_session(ngx_connection_t *c);

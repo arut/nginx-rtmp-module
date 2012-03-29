@@ -164,6 +164,7 @@ ngx_rtmp_notify_publish_create(ngx_rtmp_session_t *s, void *arg,
 
     hl->next = cl;
     cl->next = pl;
+    pl->next = NULL;
 
     return hl;
 }
@@ -229,6 +230,7 @@ ngx_rtmp_notify_play_create(ngx_rtmp_session_t *s, void *arg,
 
     hl->next = cl;
     cl->next = pl;
+    pl->next = NULL;
 
     return hl;
 }

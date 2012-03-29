@@ -12,7 +12,7 @@
 #include <ngx_event.h>
 #include <ngx_event_connect.h>
 
-#include "ngx_rtmp_amf0.h"
+#include "ngx_rtmp_amf.h"
 
 
 typedef struct {
@@ -126,9 +126,9 @@ typedef struct {
 #define NGX_RTMP_MSG_AMF3_META          15
 #define NGX_RTMP_MSG_AMF3_SHARED        16
 #define NGX_RTMP_MSG_AMF3_CMD           17
-#define NGX_RTMP_MSG_AMF0_META          18
-#define NGX_RTMP_MSG_AMF0_SHARED        19
-#define NGX_RTMP_MSG_AMF0_CMD           20
+#define NGX_RTMP_MSG_AMF_META          18
+#define NGX_RTMP_MSG_AMF_SHARED        19
+#define NGX_RTMP_MSG_AMF_CMD           20
 #define NGX_RTMP_MSG_AGGREGATE          22
 #define NGX_RTMP_MSG_MAX                22
 
@@ -229,7 +229,7 @@ typedef ngx_int_t (*ngx_rtmp_handler_pt)(ngx_rtmp_session_t *s,
 typedef struct {
     ngx_str_t               name;
     ngx_rtmp_handler_pt     handler;
-} ngx_rtmp_amf0_handler_t;
+} ngx_rtmp_amf_handler_t;
 
 
 typedef struct {
@@ -238,9 +238,9 @@ typedef struct {
 
     ngx_array_t             events[NGX_RTMP_MAX_EVENT];
 
-    ngx_hash_t              amf0_hash;
-    ngx_array_t             amf0_arrays;
-    ngx_array_t             amf0;
+    ngx_hash_t              amf_hash;
+    ngx_array_t             amf_arrays;
+    ngx_array_t             amf;
 } ngx_rtmp_core_main_conf_t;
 
 
@@ -348,7 +348,7 @@ ngx_int_t ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-ngx_int_t ngx_rtmp_amf0_message_handler(ngx_rtmp_session_t *s,
+ngx_int_t ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 
@@ -407,11 +407,11 @@ ngx_int_t ngx_rtmp_send_user_ping_response(ngx_rtmp_session_t *s,
 ngx_int_t ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s, 
         uint32_t timestamp);
 
-/* AMF0 sender/receiver */
-ngx_int_t ngx_rtmp_send_amf0(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_rtmp_amf0_elt_t *elts, size_t nelts);
-ngx_int_t ngx_rtmp_receive_amf0(ngx_rtmp_session_t *s, ngx_chain_t *in, 
-        ngx_rtmp_amf0_elt_t *elts, size_t nelts);
+/* AMF sender/receiver */
+ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_rtmp_amf_elt_t *elts, size_t nelts);
+ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in, 
+        ngx_rtmp_amf_elt_t *elts, size_t nelts);
 
 
 extern ngx_uint_t    ngx_rtmp_max_module;
