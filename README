@@ -6,7 +6,7 @@ NGINX-based RTMP server
 
 * Recording published streams in FLV file
 
-* HTTP callbacks for publish/play/record
+* HTTP callbacks on publish/play/record
 
 * Advanced buffering techniques
   to keep memory allocations at a minimum
