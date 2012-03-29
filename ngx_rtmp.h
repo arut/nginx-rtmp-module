@@ -321,6 +321,8 @@ typedef struct {
     ((ngx_rtmp_conf_ctx_t *) cf->ctx)->main_conf[module.ctx_index]
 #define ngx_rtmp_conf_get_module_srv_conf(cf, module)                        \
     ((ngx_rtmp_conf_ctx_t *) cf->ctx)->srv_conf[module.ctx_index]
+#define ngx_rtmp_conf_get_module_app_conf(cf, module)                        \
+    ((ngx_rtmp_conf_ctx_t *) cf->ctx)->app_conf[module.ctx_index]
 
 
 #ifdef NGX_DEBUG

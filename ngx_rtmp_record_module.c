@@ -7,12 +7,15 @@
 #include <ngx_core.h>
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_netcall_module.h"
 
 
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
 
 
+static char * ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, 
+        ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_rtmp_record_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_record_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, 
@@ -22,6 +25,7 @@ static char * ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf,
 typedef struct {
     ngx_str_t                           root;
     size_t                              max_size;
+    ngx_url_t                          *url;
 } ngx_rtmp_record_app_conf_t;
 
 
@@ -39,6 +43,13 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       ngx_conf_set_size_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, max_size),
+      NULL },
+
+    { ngx_string("on_record_done"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_rtmp_notify_on_record_done,
+      NGX_RTMP_APP_CONF_OFFSET,
+      0,
       NULL },
 
       ngx_null_command
@@ -220,11 +231,94 @@ next:
 }
 
 
+static ngx_chain_t *
+ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg, 
+        ngx_pool_t *pool)
+{
+    ngx_str_t                      *path = arg;
+
+    ngx_rtmp_record_app_conf_t     *racf;
+    ngx_chain_t                    *hl, *cl, *pl;
+    ngx_buf_t                      *b;
+
+    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
+
+    if (path == NULL) {
+        return NGX_OK;
+    }
+
+    /* common variables */
+    cl = ngx_rtmp_netcall_http_format_session(s, pool);
+
+    if (cl == NULL) {
+        return NULL;
+    }
+
+    /* publish variables */
+    pl = ngx_alloc_chain_link(pool);
+
+    if (pl == NULL) {
+        return NULL;
+    }
+
+    b = ngx_create_temp_buf(pool,
+            sizeof("&call=record_done") +
+            sizeof("&path=") + path->len * 3);
+    if (b == NULL) {
+        return NULL;
+    }
+
+    pl->buf = b;
+
+    b->last = ngx_cpymem(b->last, (u_char*)"&call=record_done", 
+            sizeof("&call=record_done") - 1);
+
+    b->last = ngx_cpymem(b->last, (u_char*)"&path=", sizeof("&path=") - 1);
+    b->last = (u_char*)ngx_escape_uri(b->last, path->data, path->len, 0);
+
+    /* HTTP header */
+    hl = ngx_rtmp_netcall_http_format_header(racf->url, pool,
+               cl->buf->last - cl->buf->pos
+            + (pl->buf->last - pl->buf->pos));
+
+    if (hl == NULL) {
+        return NULL;
+    }
+
+    hl->next = cl;
+    cl->next = pl;
+
+    return hl;
+}
+
+
+static ngx_int_t
+ngx_rtmp_record_notify(ngx_rtmp_session_t *s, ngx_str_t *path)
+{
+    ngx_rtmp_record_app_conf_t     *racf;
+    ngx_rtmp_netcall_init_t         ci;
+
+    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
+    if (racf == NULL || racf->url == NULL) {
+        return NGX_OK;
+    }
+
+    ngx_memzero(&ci, sizeof(ci));
+
+    ci.url = racf->url;
+    ci.create = ngx_rtmp_record_notify_create;
+    ci.arg = path;
+
+    return ngx_rtmp_netcall_create(s, &ci);
+}
+
+
 static ngx_int_t
 ngx_rtmp_record_close(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_err_t                       err;
+    ngx_str_t                       path;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
 
@@ -232,6 +326,7 @@ ngx_rtmp_record_close(ngx_rtmp_session_t *s)
         return NGX_OK;
     }
 
+    path = ctx->path;
     ngx_str_null(&ctx->path);
 
     if (ngx_close_file(ctx->file.fd) == NGX_FILE_ERROR) {
@@ -243,7 +338,7 @@ ngx_rtmp_record_close(ngx_rtmp_session_t *s)
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
             "record: closed");
 
-    return NGX_OK;
+    return ngx_rtmp_record_notify(s, &path);
 }
 
 
@@ -355,6 +450,50 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     return NGX_OK;
+}
+
+
+static char *
+ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_rtmp_record_app_conf_t     *racf;
+    ngx_str_t                      *url;
+    ngx_url_t                      *u;
+    size_t                          add;
+    ngx_str_t                      *value;
+
+    value = cf->args->elts;
+    url = &value[1];
+
+    add = 0;
+
+    u = ngx_pcalloc(cf->pool, sizeof(ngx_url_t));
+    if (u == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (ngx_strncasecmp(url->data, (u_char *) "http://", 7) == 0) {
+        add = 7;
+    }
+
+    u->url.len = url->len - add;
+    u->url.data = url->data + add;
+    u->default_port = 80;
+    u->uri_part = 1;
+    
+    if (ngx_parse_url(cf->pool, u) != NGX_OK) {
+        if (u->err) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                    "%s in url \"%V\"", u->err, &u->url);
+        }
+        return NGX_CONF_ERROR;
+    }
+
+    racf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_record_module);
+
+    racf->url = u;
+
+    return NGX_CONF_OK;
 }
 
 
