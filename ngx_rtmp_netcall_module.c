@@ -19,6 +19,10 @@ static void ngx_rtmp_netcall_recv(ngx_event_t *rev);
 static void ngx_rtmp_netcall_send(ngx_event_t *wev);
 
 
+ngx_str_t   ngx_rtmp_netcall_content_type_urlencoded = 
+    ngx_string("application/x-www-form-urlencoded");
+
+
 typedef struct {
     ngx_msec_t                                  timeout;
 } ngx_rtmp_netcall_app_conf_t;
@@ -322,6 +326,7 @@ ngx_rtmp_netcall_recv(ngx_event_t *rev)
                 return;
             }
 
+            cs->inlast->next = NULL;
             cs->inlast->buf = ngx_create_temp_buf(cc->pool, 1024);
             if (cs->inlast->buf == NULL) {
                 ngx_rtmp_netcall_close(cc);
@@ -414,7 +419,7 @@ ngx_rtmp_netcall_send(ngx_event_t *wev)
 
 ngx_chain_t *
 ngx_rtmp_netcall_http_format_header(ngx_url_t *url, ngx_pool_t *pool, 
-        size_t content_length)
+        size_t content_length, ngx_str_t *content_type)
 {
     ngx_chain_t                    *cl;
     ngx_buf_t                      *b;
@@ -422,7 +427,7 @@ ngx_rtmp_netcall_http_format_header(ngx_url_t *url, ngx_pool_t *pool,
     static char rq_tmpl[] = 
         "POST %V HTTP/1.0\r\n"
         "Host: %V\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\n"
+        "Content-Type: %V\r\n"
         "Connection: Close\r\n"
         "Content-Length: %uz\r\n"
         "\r\n"
@@ -436,6 +441,7 @@ ngx_rtmp_netcall_http_format_header(ngx_url_t *url, ngx_pool_t *pool,
     b = ngx_create_temp_buf(pool, sizeof(rq_tmpl) 
             + url->uri.len
             + url->host.len
+            + content_type->len
             + 5);
 
     if (b == NULL) {
@@ -445,7 +451,7 @@ ngx_rtmp_netcall_http_format_header(ngx_url_t *url, ngx_pool_t *pool,
     cl->buf = b;
 
     b->last = ngx_snprintf(b->last, b->end - b->last, rq_tmpl,
-            &url->uri, &url->host, content_length);
+            &url->uri, &url->host, content_type, content_length);
 
     return cl;
 }
@@ -500,6 +506,55 @@ ngx_rtmp_netcall_http_format_session(ngx_rtmp_session_t *s, ngx_pool_t *pool)
             s->page_url.len, 0);
 
     return cl;
+}
+
+
+ngx_chain_t * 
+ngx_rtmp_netcall_http_skip_header(ngx_chain_t *in)
+{
+    ngx_buf_t       *b;
+
+    /* find \n[\r]\n */
+    enum {
+        normal,
+        lf,
+        lfcr
+    } state = normal;
+
+    if (in == NULL) {
+        return NULL;
+    }
+
+    b = in->buf;
+
+    for ( ;; ) {
+
+        while (b->pos == b->last) {
+            in = in->next;
+            if (in == NULL) {
+                break;
+            }
+            b = in->buf;
+        }
+        
+        switch (*b->pos++) {
+            case '\r':
+                state = (state == lf) ? lfcr : normal;
+                break;
+
+            case '\n':
+                if (state != normal) {
+                    return in;
+                }
+                state = lf;
+                break;
+
+           default:
+                state = normal;
+        }
+    }
+
+    return NULL;
 }
 
 

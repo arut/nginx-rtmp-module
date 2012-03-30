@@ -278,8 +278,8 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
 
     /* HTTP header */
     hl = ngx_rtmp_netcall_http_format_header(racf->url, pool,
-               cl->buf->last - cl->buf->pos
-            + (pl->buf->last - pl->buf->pos));
+            cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
+            &ngx_rtmp_netcall_content_type_urlencoded);
 
     if (hl == NULL) {
         return NULL;

@@ -40,8 +40,8 @@ typedef struct {
 
 
 typedef struct {
-    u_char                          name[1024];
-    u_char                          type[1024];
+    u_char                          name[256];
+    u_char                          type[16];
 } ngx_rtmp_publish_t;
 
 

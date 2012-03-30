@@ -199,6 +199,13 @@ ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s, uint32_t timestamp)
 }
 
 
+static ngx_chain_t * 
+ngx_rtmp_alloc_amf_buf(void *arg)
+{
+    return ngx_rtmp_alloc_shared_buf((ngx_rtmp_core_srv_conf_t *)arg);
+}
+
+
 /* AMF sender */
 ngx_int_t
 ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
@@ -210,8 +217,8 @@ ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     memset(&act, 0, sizeof(act));
-    act.cscf = cscf;
-    act.alloc = ngx_rtmp_alloc_shared_buf;
+    act.arg = cscf;
+    act.alloc = ngx_rtmp_alloc_amf_buf;
     act.log = s->connection->log;
 
     if (ngx_rtmp_amf_write(&act, elts, nelts) != NGX_OK) {
