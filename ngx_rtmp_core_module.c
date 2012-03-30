@@ -431,7 +431,6 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                  i, m;
     struct sockaddr            *sa;
     ngx_rtmp_listen_t          *ls;
-    ngx_rtmp_module_t          *module;
     struct sockaddr_in         *sin;
     ngx_rtmp_core_main_conf_t  *cmcf;
 #if (NGX_HAVE_INET6)
@@ -516,8 +515,6 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
             continue;
         }
-
-        module = ngx_modules[m]->ctx;
     }
 
     for (i = 2; i < cf->args->nelts; i++) {
