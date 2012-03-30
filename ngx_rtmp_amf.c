@@ -320,6 +320,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                 break;
 
             case NGX_RTMP_AMF_NULL:
+            case NGX_RTMP_AMF_ARRAY_NULL:
                 break;
 
             case NGX_RTMP_AMF_OBJECT:
@@ -497,6 +498,7 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
                 break;
 
             case NGX_RTMP_AMF_NULL:
+            case NGX_RTMP_AMF_ARRAY_NULL:
                 break;
 
             case NGX_RTMP_AMF_OBJECT:
