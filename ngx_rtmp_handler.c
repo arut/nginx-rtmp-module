@@ -611,7 +611,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     "RTMP bheader fmt=%d csid=%D",
                     (int)fmt, csid);
 
-            if (csid >= cscf->max_streams) {
+            if (csid >= (uint32_t)cscf->max_streams) {
                 ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR,
                     "RTMP in chunk stream too big: %D >= %D",
                     csid, cscf->max_streams);
@@ -885,7 +885,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     c = s->connection;
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
-    if (h->csid >= cscf->max_streams) {
+    if (h->csid >= (uint32_t)cscf->max_streams) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR,
                 "RTMP out chunk stream too big: %D >= %D",
                 h->csid, cscf->max_streams);
