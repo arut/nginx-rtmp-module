@@ -123,8 +123,10 @@ ngx_rtmp_netcall_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_netcall_module);
 
-    while (ctx->cs) {
-        ngx_rtmp_netcall_close(ctx->cs->pc->connection);
+    if (ctx) {
+        while (ctx->cs) {
+            ngx_rtmp_netcall_close(ctx->cs->pc->connection);
+        }
     }
 
     return NGX_OK;
