@@ -1,5 +1,4 @@
-- add HTTP callbacks for all cmd calls
-
+- adjust AMF field sizes to reasonable values
 
 - add support for flv file streaming
 
@@ -12,4 +11,6 @@
 - fix '..greeing line..' in log
 
 - play only streams being published
+
+- try recv_chain instead of recv in ngx_rtmp_handler
 

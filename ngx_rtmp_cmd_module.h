@@ -18,13 +18,13 @@
 /* TODO: improve string sizes */
 
 typedef struct {
-    u_char                          app[1024];
-    u_char                          flashver[1024];
-    u_char                          swf_url[1024];
-    u_char                          tc_url[1024];
+    u_char                          app[128];
+    u_char                          flashver[32];
+    u_char                          swf_url[256];
+    u_char                          tc_url[256];
     double                          acodecs;
     double                          vcodecs;
-    u_char                          page_url[1024];
+    u_char                          page_url[256];
 } ngx_rtmp_connect_t;
 
 
@@ -46,7 +46,7 @@ typedef struct {
 
 
 typedef struct {
-    u_char                          name[1024];
+    u_char                          name[256];
 } ngx_rtmp_fcpublish_t;
 
 
@@ -56,7 +56,7 @@ typedef ngx_rtmp_fcpublish_t ngx_rtmp_fcunsubscribe_t;
 
 
 typedef struct {
-    u_char                          name[1024];
+    u_char                          name[256];
     double                          start;
     double                          duration;
     int                             reset;
