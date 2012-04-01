@@ -534,7 +534,7 @@ ngx_rtmp_netcall_http_skip_header(ngx_chain_t *in)
         while (b->pos == b->last) {
             in = in->next;
             if (in == NULL) {
-                break;
+                return NULL;
             }
             b = in->buf;
         }
@@ -555,8 +555,6 @@ ngx_rtmp_netcall_http_skip_header(ngx_chain_t *in)
                 state = normal;
         }
     }
-
-    return NULL;
 }
 
 
