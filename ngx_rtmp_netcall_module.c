@@ -193,11 +193,13 @@ ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, ngx_rtmp_netcall_init_t *ci)
     }
 
     /* copy arg to connection pool */
-    cs->arg = ngx_pcalloc(pool, ci->argsize);
-    if (cs->arg == NULL) {
-        goto error;
+    if (ci->argsize) {
+        cs->arg = ngx_pcalloc(pool, ci->argsize);
+        if (cs->arg == NULL) {
+            goto error;
+        }
+        ngx_memcpy(cs->arg, ci->arg, ci->argsize);
     }
-    ngx_memcpy(cs->arg, ci->arg, ci->argsize);
 
     cs->url = ci->url;
     cs->session = s;
