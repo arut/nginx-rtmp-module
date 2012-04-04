@@ -129,7 +129,7 @@ ngx_rtmp_netcall_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     if (ctx) {
         for (cs = ctx->cs; cs; cs = cs->next) {
-            ngx_rtmp_netcall_detach(ctx->cs->pc->connection);
+            ngx_rtmp_netcall_detach(cs->pc->connection);
         }
     }
 
