@@ -1165,6 +1165,8 @@ ngx_rtmp_close_connection(ngx_connection_t *c)
         return;
     }
 
+    c->destroyed = 1;
+
     s = c->data;
     cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
@@ -1192,7 +1194,6 @@ ngx_rtmp_close_connection(ngx_connection_t *c)
         ngx_rtmp_free_shared_buf(cscf, s->out->buf);
     }
 
-    c->destroyed = 1;
     pool = c->pool;
     ngx_close_connection(c);
     ngx_destroy_pool(pool);
