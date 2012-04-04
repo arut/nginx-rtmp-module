@@ -309,7 +309,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
                 "live: received audio/video from non-publisher");
-        return NGX_ERROR;
+        return NGX_OK;
     }
 
     if (in == NULL || in->buf == NULL) {
