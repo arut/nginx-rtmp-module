@@ -123,11 +123,12 @@ ngx_rtmp_netcall_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
     ngx_rtmp_netcall_ctx_t         *ctx;
+    ngx_rtmp_netcall_session_t     *cs;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_netcall_module);
 
     if (ctx) {
-        while (ctx->cs) {
+        for (cs = ctx->cs; cs; cs = cs->next) {
             ngx_rtmp_netcall_detach(ctx->cs->pc->connection);
         }
     }
