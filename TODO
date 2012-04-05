@@ -1,16 +1,12 @@
-- adjust AMF field sizes to reasonable values
+- find abstime/4hr problem solution
+
+- implement live stats as http/json module
+
+- fix '..greeing line..' in log
 
 - add support for flv file streaming
-
-- support client chunk size change
 
 - check compilation with IPv6 enabled
 
 - fix broken data_frame(?)
-
-- fix '..greeing line..' in log
-
-- play only streams being published
-
-- try recv_chain instead of recv in ngx_rtmp_handler
 
