@@ -126,9 +126,9 @@ typedef struct {
 #define NGX_RTMP_MSG_AMF3_META          15
 #define NGX_RTMP_MSG_AMF3_SHARED        16
 #define NGX_RTMP_MSG_AMF3_CMD           17
-#define NGX_RTMP_MSG_AMF_META          18
-#define NGX_RTMP_MSG_AMF_SHARED        19
-#define NGX_RTMP_MSG_AMF_CMD           20
+#define NGX_RTMP_MSG_AMF_META           18
+#define NGX_RTMP_MSG_AMF_SHARED         19
+#define NGX_RTMP_MSG_AMF_CMD            20
 #define NGX_RTMP_MSG_AGGREGATE          22
 #define NGX_RTMP_MSG_MAX                22
 
