@@ -33,6 +33,7 @@ typedef struct {
     ngx_rtmp_live_ctx_t               **contexts;
     ngx_flag_t                          live;
     ngx_flag_t                          wait_key_frame;
+    ngx_flag_t                          abstime;
 } ngx_rtmp_live_app_conf_t;
 
 
@@ -53,12 +54,18 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       NULL },
 
     { ngx_string("wait_key_frame"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_live_app_conf_t, wait_key_frame),
       NULL },
 
+    { ngx_string("abstime"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, abstime),
+      NULL },
 
       ngx_null_command
 };
@@ -105,6 +112,8 @@ struct ngx_rtmp_live_ctx_s {
     ngx_uint_t                          flags;
     uint32_t                            csid;
     ngx_chain_t                        *data_frame;
+    ngx_rtmp_header_t                   last_audio;
+    ngx_rtmp_header_t                   last_video;
 };
 
 
@@ -121,6 +130,7 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->live = NGX_CONF_UNSET;
     lacf->nbuckets = NGX_CONF_UNSET;
     lacf->wait_key_frame = NGX_CONF_UNSET;
+    lacf->abstime = NGX_CONF_UNSET;
 
     return lacf;
 }
@@ -135,6 +145,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->live, prev->live, 0);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_value(conf->wait_key_frame, prev->wait_key_frame, 1);
+    ngx_conf_merge_value(conf->abstime, prev->abstime, 1);
 
     conf->contexts = ngx_pcalloc(cf->pool, 
             sizeof(ngx_rtmp_live_ctx_t *) * conf->nbuckets);
@@ -259,7 +270,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
-    ngx_rtmp_header_t               sh;
+    ngx_rtmp_header_t               sh, *lh;
     ngx_uint_t                      priority;
     int                             keyframe;
 
@@ -280,7 +291,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     memset(&sh, 0, sizeof(sh));
-    sh.timestamp = (h->timestamp + s->epoch);
+    sh.timestamp = h->timestamp;
+    if (lacf->abstime) {
+        sh.timestamp += s->epoch;
+    }
     sh.msid = 1;
     sh.type = h->type;
 
@@ -290,6 +304,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     keyframe = 0;
     if (h->type == NGX_RTMP_MSG_VIDEO) {
+        lh = &ctx->last_video;
         sh.csid = NGX_RTMP_LIVE_CSID_VIDEO;
         priority = ngx_rtmp_get_video_frame_type(in);
         if (priority == NGX_RTMP_VIDEO_KEY_FRAME) {
@@ -297,11 +312,17 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
 
     } else if (h->type == NGX_RTMP_MSG_AUDIO) {
+        lh = &ctx->last_audio;
         sh.csid = NGX_RTMP_LIVE_CSID_AUDIO;
         priority = NGX_RTMP_AUDIO_FRAME;
         
     } else {
         return NGX_OK;
+    }
+    
+    if (lacf->abstime == 0 && lh) {
+        /* don't use fmt=2 */
+        lh->type = 0;
     }
 
     if (ctx == NULL 
@@ -318,7 +339,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     out = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
 
-    ngx_rtmp_prepare_message(s, &sh, NULL, out);
+    ngx_rtmp_prepare_message(s, &sh, lacf->abstime ? NULL : lh, out);
 
     /* live to all subscribers */
     for (cctx = *ngx_rtmp_live_get_head(s); cctx; cctx = cnext) {
