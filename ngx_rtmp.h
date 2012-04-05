@@ -212,6 +212,9 @@ typedef struct {
     uint32_t                in_bytes;
     uint32_t                in_last_ack;
 
+    ngx_pool_t             *in_old_pool;
+    ngx_int_t               in_chunk_size_changing;
+
     ngx_chain_t            *out;
     ngx_chain_t            *out_free_chains;
 } ngx_rtmp_session_t;
@@ -334,6 +337,7 @@ void ngx_rtmp_init_connection(ngx_connection_t *c);
 void ngx_rtmp_close_connection(ngx_connection_t *c);
 u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
 uint32_t ngx_rtmp_get_timestamp();
+ngx_int_t ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size);
 
 
 /* Bit reverse: we need big-endians in many places  */
