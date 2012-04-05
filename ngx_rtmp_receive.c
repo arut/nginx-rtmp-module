@@ -156,11 +156,11 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
 }
 
 
-ngx_int_t 
-ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
-        ngx_rtmp_header_t *h, ngx_chain_t *in)
+static ngx_int_t 
+ngx_rtmp_amf_message_basic_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in, ngx_int_t name_typeless)
 {
-    ngx_rtmp_amf_ctx_t         act;
+    ngx_rtmp_amf_ctx_t          act;
     ngx_connection_t           *c;
     ngx_rtmp_core_main_conf_t  *cmcf;
     ngx_array_t                *ch;
@@ -169,12 +169,20 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
 
     static u_char               func[128];
 
-    static ngx_rtmp_amf_elt_t  elts[] = {
+    static ngx_rtmp_amf_elt_t   elts[] = {
 
         { NGX_RTMP_AMF_STRING,
           ngx_null_string,  
           func,   sizeof(func) },
     };
+
+    /* AMF command names come with string type, but shared object names
+     * come without type */
+    if (name_typeless) {
+        elts[0].type |= NGX_RTMP_AMF_TYPELESS;
+    } else {
+        elts[0].type &= ~NGX_RTMP_AMF_TYPELESS;
+    }
 
     c = s->connection;
     cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
@@ -216,6 +224,22 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
     }
 
     return NGX_OK;
+}
+
+
+ngx_int_t 
+ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in)
+{
+    return ngx_rtmp_amf_message_basic_handler(s, h, in, 0);
+}
+
+
+ngx_int_t 
+ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in)
+{
+    return ngx_rtmp_amf_message_basic_handler(s, h, in, 1);
 }
 
 
