@@ -350,6 +350,8 @@ ngx_int_t ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
+ngx_int_t ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 
 /* Shared output buffers */
@@ -408,6 +410,8 @@ ngx_int_t ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s,
         uint32_t timestamp);
 
 /* AMF sender/receiver */
+ngx_chain_t * ngx_rtmp_create_amf_message(ngx_rtmp_session_t *s, 
+        ngx_rtmp_header_t *h, ngx_rtmp_amf_elt_t *elts, size_t nelts);
 ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
 ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in, 
