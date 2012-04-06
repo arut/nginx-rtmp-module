@@ -130,14 +130,15 @@ ngx_rtmp_amf_put(ngx_rtmp_amf_ctx_t *ctx, void *p, size_t n)
                 return NGX_ERROR;
             }
 
-            if (l == NULL) {
-                l = ln;
-                ctx->first = l;
-            } else {
-                l->next = ln;
-                l = ln;
+            if (ctx->first == NULL) {
+                ctx->first = ln;
             }
 
+            if (l) {
+                l->next = ln;
+            }
+
+            l = ln;
             ctx->link = l;
             b = l->buf;
         }
