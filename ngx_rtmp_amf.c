@@ -120,6 +120,10 @@ ngx_rtmp_amf_put(ngx_rtmp_amf_ctx_t *ctx, void *p, size_t n)
 
     l = ctx->link;
 
+    if (ctx->link && ctx->first == NULL) {
+        ctx->first = ctx->link;
+    }
+
     while(n) {
         b = l ? l->buf : NULL;
 
