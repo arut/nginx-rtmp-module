@@ -209,7 +209,7 @@ ngx_rtmp_alloc_amf_buf(void *arg)
 /* AMF sender */
 ngx_chain_t *
 ngx_rtmp_create_amf_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_rtmp_amf_elt_t *elts, size_t nelts)
+        ngx_chain_t **last, ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
     ngx_rtmp_amf_ctx_t          act;
     ngx_rtmp_core_srv_conf_t   *cscf;
@@ -218,6 +218,9 @@ ngx_rtmp_create_amf_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     memset(&act, 0, sizeof(act));
     act.arg = cscf;
+    if (last) {
+        act.link = *last;
+    }
     act.alloc = ngx_rtmp_alloc_amf_buf;
     act.log = s->connection->log;
 
@@ -232,6 +235,10 @@ ngx_rtmp_create_amf_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_prepare_message(s, h, NULL, act.first);
     }
 
+    if (last) {
+        *last = act.link;
+    }
+
     return act.first;
 }
 
@@ -244,7 +251,7 @@ ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
-    cl = ngx_rtmp_create_amf_message(s, h, elts, nelts);
+    cl = ngx_rtmp_create_amf_message(s, h, NULL, elts, nelts);
 
     if (cl == NULL) {
         return NGX_ERROR;
