@@ -175,6 +175,7 @@ typedef struct {
     uint32_t                signature;  /* "RTMP" */ /* <-- FIXME wtf */
 
     ngx_connection_t       *connection;
+    ngx_event_t             close;
 
     void                  **ctx;
     void                  **main_conf;
@@ -334,7 +335,7 @@ char* ngx_rtmp_user_message_type(uint16_t evt);
 #endif
 
 void ngx_rtmp_init_connection(ngx_connection_t *c);    
-void ngx_rtmp_close_connection(ngx_connection_t *c);
+void ngx_rtmp_finalize_session(ngx_rtmp_session_t *s);
 u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
 uint32_t ngx_rtmp_get_timestamp();
 ngx_int_t ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size);

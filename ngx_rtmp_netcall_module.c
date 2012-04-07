@@ -293,7 +293,7 @@ ngx_rtmp_netcall_close(ngx_connection_t *cc)
         if (cs->handle &&
                 cs->handle(s, cs->arg, cs->in) != NGX_OK)
         {
-            ngx_rtmp_close_connection(c);
+            ngx_rtmp_finalize_session(s);
         }
     }
 
