@@ -18,6 +18,8 @@ static ngx_rtmp_delete_stream_pt    next_delete_stream;
 #define NGX_RTMP_LIVE_CSID_AUDIO   6
 #define NGX_RTMP_LIVE_CSID_VIDEO   7
 
+#define NGX_RTMP_LIVE_MSID          1
+
 
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_live_create_app_conf(ngx_conf_t *cf);
@@ -103,6 +105,8 @@ ngx_module_t  ngx_rtmp_live_module = {
 #define NGX_RTMP_LIVE_PUBLISHING       0x01
 #define NGX_RTMP_LIVE_PLAYING          0x02
 #define NGX_RTMP_LIVE_KEYFRAME         0x04
+#define NGX_RTMP_LIVE_AUDIO_STARTED    0x08
+#define NGX_RTMP_LIVE_VIDEO_STARTED    0x10
 
 
 struct ngx_rtmp_live_ctx_s {
@@ -145,7 +149,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->live, prev->live, 0);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_value(conf->wait_key_frame, prev->wait_key_frame, 1);
-    ngx_conf_merge_value(conf->abstime, prev->abstime, 1);
+    ngx_conf_merge_value(conf->abstime, prev->abstime, 0);
 
     conf->contexts = ngx_pcalloc(cf->pool, 
             sizeof(ngx_rtmp_live_ctx_t *) * conf->nbuckets);
@@ -261,11 +265,44 @@ ngx_rtmp_get_video_frame_type(ngx_chain_t *in)
 
 
 static ngx_int_t
+ngx_rtmp_live_send_abs_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+        ngx_chain_t *in)
+{
+    ngx_rtmp_header_t               sh;
+    ngx_chain_t                    *out;
+    ngx_rtmp_core_srv_conf_t       *cscf;
+    ngx_int_t                       rc;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "live: sending abs message");
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+    sh = *h;
+    sh.timestamp = ngx_rtmp_get_timestamp() - s->epoch;
+
+    /* send empty message only for timestamp */
+
+    out = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
+    if (out == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_rtmp_prepare_message(s, &sh, NULL, out);
+
+    rc = ngx_rtmp_send_message(s, out, 0);
+
+    ngx_rtmp_free_shared_bufs(cscf, out);
+
+    return rc;
+}
+
+
+static ngx_int_t
 ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *in)
 {
     ngx_connection_t               *c;
-    ngx_rtmp_live_ctx_t            *ctx, *cctx, *cnext;
+    ngx_rtmp_live_ctx_t            *ctx, *pctx, *cnext;
     ngx_chain_t                    *out;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
@@ -290,12 +327,16 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
     memset(&sh, 0, sizeof(sh));
     sh.timestamp = h->timestamp;
     if (lacf->abstime) {
         sh.timestamp += s->epoch;
     }
-    sh.msid = 1;
+    sh.msid = NGX_RTMP_LIVE_MSID;
     sh.type = h->type;
 
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, c->log, 0,
@@ -319,10 +360,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     } else {
         return NGX_OK;
     }
-    
-    if (lacf->abstime == 0 && lh) {
-        /* don't use fmt=2 */
-        lh->type = 0;
+
+    /* we don't want absolute (fmt=0) frames in output;
+     * force type 1 message */
+    if (lh && lh->csid == 0) {
+        *lh = sh;
+        lh->mlen = 0;
     }
 
     if (ctx == NULL 
@@ -342,38 +385,58 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_prepare_message(s, &sh, lacf->abstime ? NULL : lh, out);
 
     /* live to all subscribers */
-    for (cctx = *ngx_rtmp_live_get_head(s); cctx; cctx = cnext) {
+    for (pctx = *ngx_rtmp_live_get_head(s); pctx; pctx = cnext) {
         /* session can die further in loop
          * so save next ptr while it's not too late */
-        cnext = cctx->next;
+        cnext = pctx->next;
 
-        if (cctx == ctx
-                || !(cctx->flags & NGX_RTMP_LIVE_PLAYING)
-                || cctx->stream.len != ctx->stream.len
-                || ngx_strncmp(cctx->stream.data, ctx->stream.data, 
+        if (pctx == ctx
+                || !(pctx->flags & NGX_RTMP_LIVE_PLAYING)
+                || pctx->stream.len != ctx->stream.len
+                || ngx_strncmp(pctx->stream.data, ctx->stream.data, 
                     ctx->stream.len))
         {
             continue;
         }
 
-        ss = cctx->session;
+        ss = pctx->session;
 
         /* waiting for a keyframe? */
         if (lacf->wait_key_frame
             && sh.type == NGX_RTMP_MSG_VIDEO 
-            && !(cctx->flags & NGX_RTMP_LIVE_KEYFRAME)
+            && !(pctx->flags & NGX_RTMP_LIVE_KEYFRAME)
             && !keyframe)
         {
             continue;
         }
 
+        /* send initial frame with abs time */
+        if (lacf->abstime == 0
+            && ((h->type == NGX_RTMP_MSG_AUDIO
+                && (pctx->flags & NGX_RTMP_LIVE_AUDIO_STARTED) == 0)
+            || (h->type == NGX_RTMP_MSG_VIDEO
+                && (pctx->flags & NGX_RTMP_LIVE_VIDEO_STARTED) == 0)))
+        {
+            if (ngx_rtmp_live_send_abs_message(ss, &sh, in) != NGX_OK) {
+                continue;
+            }
+            if (h->type == NGX_RTMP_MSG_AUDIO) {
+                pctx->flags |= NGX_RTMP_LIVE_AUDIO_STARTED;
+            } else {
+                pctx->flags |= NGX_RTMP_LIVE_VIDEO_STARTED;
+            }
+
+            continue;
+        }
+
+
         if (ngx_rtmp_send_message(ss, out, priority) == NGX_OK
             && keyframe 
-            && !(cctx->flags & NGX_RTMP_LIVE_KEYFRAME)) 
+            && !(pctx->flags & NGX_RTMP_LIVE_KEYFRAME)) 
         {
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                     "live: keyframe sent");
-            cctx->flags |= NGX_RTMP_LIVE_KEYFRAME;
+            pctx->flags |= NGX_RTMP_LIVE_KEYFRAME;
         }
     }
 
