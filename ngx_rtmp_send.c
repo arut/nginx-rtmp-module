@@ -7,40 +7,43 @@
 #include "ngx_rtmp_amf.h"
 
 
-#define NGX_RTMP_USER_START(s, tp)              \
-    ngx_rtmp_header_t         __h;              \
-    ngx_chain_t              *__l;              \
-    ngx_buf_t                *__b;              \
-    ngx_rtmp_core_srv_conf_t *__cscf;           \
-                                                \
-    __cscf = ngx_rtmp_get_module_srv_conf(      \
-            s, ngx_rtmp_core_module);           \
-    memset(&__h, 0, sizeof(__h));               \
-    __h.type = tp;                              \
-    __h.csid = 2;                               \
-    __l = ngx_rtmp_alloc_shared_buf(__cscf);    \
-    if (__l == NULL) {                          \
-        return NGX_ERROR;                       \
-    }                                           \
+#define NGX_RTMP_USER_START(s, tp)                                          \
+    ngx_rtmp_header_t               __h;                                    \
+    ngx_chain_t                    *__l;                                    \
+    ngx_buf_t                      *__b;                                    \
+    ngx_rtmp_core_srv_conf_t       *__cscf;                                 \
+    ngx_int_t                       rc;                                     \
+                                                                            \
+    __cscf = ngx_rtmp_get_module_srv_conf(                                  \
+            s, ngx_rtmp_core_module);                                       \
+    memset(&__h, 0, sizeof(__h));                                           \
+    __h.type = tp;                                                          \
+    __h.csid = 2;                                                           \
+    __l = ngx_rtmp_alloc_shared_buf(__cscf);                                \
+    if (__l == NULL) {                                                      \
+        return NGX_ERROR;                                                   \
+    }                                                                       \
     __b = __l->buf;     
 
-#define NGX_RTMP_UCTL_START(s, type, utype)     \
-    NGX_RTMP_USER_START(s, type);               \
-    *(__b->last++) = (u_char)((utype) >> 8);    \
+#define NGX_RTMP_UCTL_START(s, type, utype)                                 \
+    NGX_RTMP_USER_START(s, type);                                           \
+    *(__b->last++) = (u_char)((utype) >> 8);                                \
     *(__b->last++) = (u_char)(utype);
 
-#define NGX_RTMP_USER_OUT1(v)                   \
+#define NGX_RTMP_USER_OUT1(v)                                               \
     *(__b->last++) = ((u_char*)&v)[0];
 
-#define NGX_RTMP_USER_OUT4(v)                   \
-    *(__b->last++) = ((u_char*)&v)[3];          \
-    *(__b->last++) = ((u_char*)&v)[2];          \
-    *(__b->last++) = ((u_char*)&v)[1];          \
+#define NGX_RTMP_USER_OUT4(v)                                               \
+    *(__b->last++) = ((u_char*)&v)[3];                                      \
+    *(__b->last++) = ((u_char*)&v)[2];                                      \
+    *(__b->last++) = ((u_char*)&v)[1];                                      \
     *(__b->last++) = ((u_char*)&v)[0];
 
-#define NGX_RTMP_USER_END(s)                    \
-    ngx_rtmp_prepare_message(s, &__h, NULL, __l);  \
-    return ngx_rtmp_send_message(s, __l, 0);    \
+#define NGX_RTMP_USER_END(s)                                                \
+    ngx_rtmp_prepare_message(s, &__h, NULL, __l);                           \
+    rc = ngx_rtmp_send_message(s, __l, 0);                                  \
+    ngx_rtmp_free_shared_bufs(__cscf, __l);                                 \
+    return rc;
 
 
 /* Protocol control messages */
