@@ -1,12 +1,12 @@
-- find abstime/4hr problem solution
+- do we really need fmt=0 frame as the first a/v frame/
 
 - implement live stats as http/json module
 
 - fix '..greeing line..' in log
 
-- add support for flv file streaming
+- add support for flv file streaming 
+  (NGINX supports streaming flvs via HTTP
+   out-of-the-box with nginx-http-flv-module module)
 
 - check compilation with IPv6 enabled
-
-- fix broken data_frame(?)
 
