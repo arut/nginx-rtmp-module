@@ -489,11 +489,11 @@ ngx_rtmp_netcall_http_format_session(ngx_rtmp_session_t *s, ngx_pool_t *pool)
     }
 
     b = ngx_create_temp_buf(pool,
-            sizeof("app=") + s->app.len * 3 +
-            sizeof("&flashver=") + s->flashver.len * 3 +
-            sizeof("&swfurl=") + s->swf_url.len * 3 +
-            sizeof("&tcurl=") + s->tc_url.len * 3 + 
-            sizeof("&pageurl=") + s->page_url.len * 3
+            sizeof("app=") - 1 + s->app.len * 3 +
+            sizeof("&flashver=") - 1 + s->flashver.len * 3 +
+            sizeof("&swfurl=") - 1 + s->swf_url.len * 3 +
+            sizeof("&tcurl=") - 1 + s->tc_url.len * 3 + 
+            sizeof("&pageurl=") - 1 + s->page_url.len * 3
         );
 
     if (b == NULL) {
@@ -573,6 +573,39 @@ ngx_rtmp_netcall_http_skip_header(ngx_chain_t *in)
                 state = normal;
         }
     }
+}
+
+
+ngx_chain_t *
+ngx_rtmp_netcall_memcache_set(ngx_rtmp_session_t *s, ngx_pool_t *pool,
+        ngx_str_t *key, ngx_str_t *value, ngx_uint_t flags, ngx_uint_t sec)
+{
+    ngx_chain_t                    *cl;
+    ngx_buf_t                      *b;
+
+    cl = ngx_alloc_chain_link(pool);
+    if (cl == NULL) {
+        return NULL;
+    }
+
+    b = ngx_create_temp_buf(pool,
+            sizeof("set ") - 1 + key->len +
+            (sizeof(" ") - 1 + NGX_OFF_T_LEN) * 3 +
+            (sizeof("\r\n") - 1) * 2 
+            + value->len
+        );
+
+    if (b == NULL) {
+        return NULL;
+    }
+
+    cl->buf = b;
+
+    b->last = ngx_snprintf(b->pos, b->end - b->start,
+            "set %V %ui %ui %ui\r\n%V\r\n",
+            key, flags, sec, (ngx_uint_t)value->len, value);
+
+    return cl;
 }
 
 

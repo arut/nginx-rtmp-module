@@ -32,12 +32,19 @@ ngx_int_t ngx_rtmp_netcall_create(ngx_rtmp_session_t *s,
 
 extern ngx_str_t    ngx_rtmp_netcall_content_type_urlencoded;
 
+
 /* HTTP handling */
 ngx_chain_t * ngx_rtmp_netcall_http_format_session(ngx_rtmp_session_t *s, 
         ngx_pool_t *pool);
 ngx_chain_t * ngx_rtmp_netcall_http_format_header(ngx_url_t *url, 
         ngx_pool_t *pool, size_t content_length, ngx_str_t *content_type);
 ngx_chain_t * ngx_rtmp_netcall_http_skip_header(ngx_chain_t *in);
+
+
+/* Memcache handling */
+ngx_chain_t * ngx_rtmp_netcall_memcache_set(ngx_rtmp_session_t *s, 
+        ngx_pool_t *pool, ngx_str_t *key, ngx_str_t *value, 
+        ngx_uint_t flags, ngx_uint_t sec);
 
 
 #endif /* _NGX_RTMP_NETCALL_H_INCLUDED_ */
