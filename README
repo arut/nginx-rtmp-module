@@ -27,6 +27,10 @@ make
 make install
 
 
+Note the module does not share data between workers
+and only works in one-worker mode. 
+
+
 RTMP URL format:
 
 rtmp://rtmp.example.com/<app>[/<name>]
