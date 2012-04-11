@@ -31,6 +31,7 @@ typedef struct {
     size_t                              max_size;
     size_t                              max_frames;
     ngx_msec_t                          interval;
+    ngx_str_t                           suffix;
     ngx_url_t                          *url;
 } ngx_rtmp_record_app_conf_t;
 
@@ -75,6 +76,13 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, path),
+      NULL },
+
+    { ngx_string("record_suffix"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, suffix),
       NULL },
 
     { ngx_string("record_max_size"),
@@ -164,6 +172,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_bitmask_value(conf->flags, prev->flags, 
             (NGX_CONF_BITMASK_SET|NGX_RTMP_RECORD_OFF));
     ngx_conf_merge_str_value(conf->path, prev->path, "");
+    ngx_conf_merge_str_value(conf->suffix, prev->suffix, ".flv");
     ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
     ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
     ngx_conf_merge_msec_value(conf->interval, prev->interval, 0);
@@ -268,15 +277,10 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     p = ngx_cpymem(p, racf->path.data, 
                 ngx_min(racf->path.len, (size_t)(l - p - 1)));
     *p++ = '/';
-    if (l - p <= 4) {
-        return NGX_ERROR;
-    }
     p = (u_char *)ngx_escape_uri(p, v->name, ngx_min(ngx_strlen(v->name), 
-                (size_t)(l - p - 4)), NGX_ESCAPE_URI_COMPONENT);
-    *p++ = '.';
-    *p++ = 'f';
-    *p++ = 'l';
-    *p++ = 'v';
+                (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
+    p = ngx_cpymem(p, racf->suffix.data, 
+            ngx_min(racf->suffix.len, (size_t)(l - p)));
     *p = 0;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
