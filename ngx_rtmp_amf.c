@@ -330,7 +330,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 
             case NGX_RTMP_AMF_OBJECT:
                 if (ngx_rtmp_amf_read_object(ctx, data, 
-                        elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
+                    data && elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
                     ) != NGX_OK) 
                 {
                     return NGX_ERROR;
@@ -339,7 +339,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 
             case NGX_RTMP_AMF_ARRAY:
                 if (ngx_rtmp_amf_read_array(ctx, data, 
-                        elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
+                    data && elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
                     ) != NGX_OK) 
                 {
                     return NGX_ERROR;
