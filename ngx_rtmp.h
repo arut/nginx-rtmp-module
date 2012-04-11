@@ -424,6 +424,19 @@ ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in,
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
 
 
+/* Frame types */
+#define NGX_RTMP_VIDEO_KEY_FRAME            1
+#define NGX_RTMP_VIDEO_INTER_FRAME          2
+#define NGX_RTMP_VIDEO_DISPOSABLE_FRAME     3
+
+
+static inline ngx_int_t
+ngx_rtmp_get_video_frame_type(ngx_chain_t *in)
+{
+    return (in->buf->pos[0] & 0xf0) >> 4;
+}
+
+
 extern ngx_uint_t    ngx_rtmp_max_module;
 extern ngx_module_t  ngx_rtmp_core_module;
 

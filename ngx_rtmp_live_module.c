@@ -251,17 +251,7 @@ next:
 }
 
 
-#define NGX_RTMP_VIDEO_KEY_FRAME            1
-#define NGX_RTMP_VIDEO_INTER_FRAME          2
-#define NGX_RTMP_VIDEO_DISPOSABLE_FRAME     3
 #define NGX_RTMP_AUDIO_FRAME                NGX_RTMP_VIDEO_KEY_FRAME
-
-
-static ngx_int_t
-ngx_rtmp_get_video_frame_type(ngx_chain_t *in)
-{
-    return (in->buf->pos[0] & 0xf0) >> 4;
-}
 
 
 static ngx_int_t
