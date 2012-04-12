@@ -601,7 +601,7 @@ ngx_rtmp_netcall_memcache_set(ngx_rtmp_session_t *s, ngx_pool_t *pool,
 
     cl->buf = b;
 
-    b->last = ngx_snprintf(b->pos, b->end - b->start,
+    b->last = ngx_snprintf(b->last, b->end - b->last,
             "set %V %ui %ui %ui\r\n%V\r\n",
             key, flags, sec, (ngx_uint_t)value->len, value);
 

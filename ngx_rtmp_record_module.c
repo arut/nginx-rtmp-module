@@ -53,8 +53,8 @@ typedef struct {
 
 static ngx_conf_bitmask_t  ngx_rtmp_record_mask[] = {
     { ngx_string("off"),                NGX_RTMP_RECORD_OFF         },
-    { ngx_string("all"),                NGX_RTMP_RECORD_AUDIO
-                                       |NGX_RTMP_RECORD_VIDEO       },
+    { ngx_string("all"),                NGX_RTMP_RECORD_AUDIO       |
+                                        NGX_RTMP_RECORD_VIDEO       },
     { ngx_string("audio"),              NGX_RTMP_RECORD_AUDIO       },
     { ngx_string("video"),              NGX_RTMP_RECORD_VIDEO       },
     { ngx_string("keyframes"),          NGX_RTMP_RECORD_KEYFRAMES   },
