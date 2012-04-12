@@ -599,6 +599,7 @@ ngx_rtmp_netcall_memcache_set(ngx_rtmp_session_t *s, ngx_pool_t *pool,
         return NULL;
     }
 
+    cl->next = NULL;
     cl->buf = b;
 
     b->last = ngx_snprintf(b->last, b->end - b->last,
