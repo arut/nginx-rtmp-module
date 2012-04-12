@@ -49,9 +49,9 @@ rtmp {
 
         listen 1935;
 
-        chunk_size 128;
+        chunk_size 4000;
 
-        max_buf 1000000;
+        max_buf 1M;
 
         # TV mode: one publisher, many subscribers
         application mytv {
@@ -59,11 +59,10 @@ rtmp {
             # enable live streaming
             live on;
 
-            # record flvs to this dir
-            record /tmp/av;
-
-            # max flv size
-            record_size 3000000;
+            # record first 1K of stream
+            record all;
+            record_path /tmp/av;
+            record_max_size 1K;
 
             # publish only from localhost
             allow publish 127.0.0.1;
@@ -90,6 +89,12 @@ rtmp {
 
             # Same with playing
             on_play http://localhost:8080/play;
+
+            # record 10 video keyframes (no audio) every 2 minutes
+            record keyframes;
+            record_path /tmp/vc;
+            record_max_frames 10;
+            record_interval 2m;
 
             # Async notify about an flv recorded
             on_record_done http://localhost:8080/record_done;
