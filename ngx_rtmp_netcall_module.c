@@ -36,6 +36,7 @@ typedef struct ngx_rtmp_netcall_session_s {
     struct ngx_rtmp_netcall_session_s          *next;
     void                                       *arg;
     ngx_rtmp_netcall_handle_pt                  handle;
+    ngx_rtmp_netcall_filter_pt                  filter;
     ngx_chain_t                                *in;
     ngx_chain_t                                *inlast;
     ngx_chain_t                                *out;
@@ -208,13 +209,17 @@ ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, ngx_rtmp_netcall_init_t *ci)
 
     cacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_netcall_module);
     if (cacf == NULL) {
-        return NGX_ERROR;
+        goto error;
     }
 
     cs->timeout = cacf->timeout;
     cs->url = ci->url;
     cs->session = s;
+    cs->filter = ci->filter;
     cs->handle = ci->handle;
+    if (cs->handle == NULL) {
+        cs->detached = 1;
+    }
 
     pc->log = s->connection->log;
     pc->get = ngx_rtmp_netcall_get_peer;
@@ -245,8 +250,10 @@ ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, ngx_rtmp_netcall_init_t *ci)
     cc->write->handler = ngx_rtmp_netcall_send;
     cc->read->handler = ngx_rtmp_netcall_recv;
 
-    cs->next = ctx->cs;
-    ctx->cs = cs;
+    if (!cs->detached) {
+        cs->next = ctx->cs;
+        ctx->cs = cs;
+    }
 
     ngx_rtmp_netcall_send(cc->write);
 
@@ -318,6 +325,7 @@ ngx_rtmp_netcall_recv(ngx_event_t *rev)
 {
     ngx_rtmp_netcall_session_t         *cs;
     ngx_connection_t                   *cc;
+    ngx_chain_t                        *cl;
     ngx_int_t                           n;
     ngx_buf_t                          *b;
 
@@ -329,8 +337,6 @@ ngx_rtmp_netcall_recv(ngx_event_t *rev)
     }
 
     if (rev->timedout) {
-        ngx_log_error(NGX_LOG_INFO, cc->log, NGX_ETIMEDOUT, 
-                "netcall: client recv timed out");
         cc->timedout = 1;
         ngx_rtmp_netcall_close(cc);
         return;
@@ -345,22 +351,26 @@ ngx_rtmp_netcall_recv(ngx_event_t *rev)
         if (cs->inlast == NULL
                 || cs->inlast->buf->last == cs->inlast->buf->end)
         {
-            cs->inlast = ngx_alloc_chain_link(cc->pool);
-            if (cs->inlast == NULL) {
+            cl = ngx_alloc_chain_link(cc->pool);
+            if (cl == NULL) {
                 ngx_rtmp_netcall_close(cc);
                 return;
             }
+            cl->next = NULL;
 
-            cs->inlast->next = NULL;
-            cs->inlast->buf = ngx_create_temp_buf(cc->pool, 1024);
-            if (cs->inlast->buf == NULL) {
+            cl->buf = ngx_create_temp_buf(cc->pool, 1024);
+            if (cl->buf == NULL) {
                 ngx_rtmp_netcall_close(cc);
                 return;
             }
 
             if (cs->in == NULL) {
-                cs->in = cs->inlast;
+                cs->in = cl;
+            } else {
+                cs->inlast->next = cl;
             }
+
+            cs->inlast = cl;
         }
 
         b = cs->inlast->buf;
@@ -373,8 +383,15 @@ ngx_rtmp_netcall_recv(ngx_event_t *rev)
         }
 
         if (n == NGX_AGAIN) {
-            ngx_add_timer(cc->read, cs->timeout);
-            if (ngx_handle_write_event(cc->read, 0) != NGX_OK) {
+            if (cs->filter && cs->in
+                && cs->filter(cs->in) != NGX_AGAIN)
+            {
+                ngx_rtmp_netcall_close(cc);
+                return;
+            }
+
+            ngx_add_timer(rev, cs->timeout);
+            if (ngx_handle_read_event(rev, 0) != NGX_OK) {
                 ngx_rtmp_netcall_close(cc);
             }
             return;
@@ -422,8 +439,8 @@ ngx_rtmp_netcall_send(ngx_event_t *wev)
 
     /* more data to send? */
     if (cl) {
-        ngx_add_timer(cc->write, cs->timeout);
-        if (ngx_handle_write_event(cc->write, 0) != NGX_OK) {
+        ngx_add_timer(wev, cs->timeout);
+        if (ngx_handle_write_event(wev, 0) != NGX_OK) {
             ngx_rtmp_netcall_close(cc);
         }
         return;
@@ -602,7 +619,7 @@ ngx_rtmp_netcall_memcache_set(ngx_rtmp_session_t *s, ngx_pool_t *pool,
     cl->next = NULL;
     cl->buf = b;
 
-    b->last = ngx_snprintf(b->last, b->end - b->last,
+    b->last = ngx_sprintf(b->pos,
             "set %V %ui %ui %ui\r\n%V\r\n",
             key, flags, sec, (ngx_uint_t)value->len, value);
 

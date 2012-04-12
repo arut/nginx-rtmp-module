@@ -14,13 +14,24 @@
 
 typedef ngx_chain_t * (*ngx_rtmp_netcall_create_pt)(ngx_rtmp_session_t *s,
         void *arg, ngx_pool_t *pool);
+typedef ngx_int_t (*ngx_rtmp_netcall_filter_pt)(ngx_chain_t *in);
 typedef ngx_int_t (*ngx_rtmp_netcall_handle_pt)(ngx_rtmp_session_t *s, 
         void *arg, ngx_chain_t *in);
 
 
+/* If handle is NULL then netcall is created detached
+ * which means it's completely independent of RTMP
+ * session and its result is never visible to anyone.
+ *
+ * WARNING: It's not recommended to create non-detached
+ * netcalls from disconect handlers. Netcall disconnect
+ * handler which detaches active netcalls is executed
+ * BEFORE your handler. It leads to a crash
+ * after netcall connection is closed */
 typedef struct {
     ngx_url_t                      *url;
     ngx_rtmp_netcall_create_pt      create;
+    ngx_rtmp_netcall_filter_pt      filter;
     ngx_rtmp_netcall_handle_pt      handle;
     void                           *arg;
     size_t                          argsize;

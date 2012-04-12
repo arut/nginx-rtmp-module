@@ -308,6 +308,7 @@ ngx_rtmp_notify_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         return next_publish(s, v);
     }
 
+    ngx_memzero(&ci, sizeof(ci));
     ci.url = nacf->publish_url;
     ci.create = ngx_rtmp_notify_publish_create;
     ci.handle = ngx_rtmp_notify_publish_handle;
@@ -329,6 +330,7 @@ ngx_rtmp_notify_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         return next_play(s, v);
     }
 
+    ngx_memzero(&ci, sizeof(ci));
     ci.url = nacf->play_url;
     ci.create = ngx_rtmp_notify_play_create;
     ci.handle = ngx_rtmp_notify_play_handle;
