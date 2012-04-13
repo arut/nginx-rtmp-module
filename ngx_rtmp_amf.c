@@ -250,6 +250,15 @@ ngx_rtmp_amf_read_array(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 }
 
 
+static ngx_int_t
+ngx_rtmp_amf_is_compatible_type(uint8_t t1, uint8_t t2)
+{
+    return t1 == t2
+        || (t1 == NGX_RTMP_AMF_OBJECT && t2 == NGX_RTMP_AMF_MIXED_ARRAY)
+        || (t2 == NGX_RTMP_AMF_OBJECT && t1 == NGX_RTMP_AMF_MIXED_ARRAY);
+}
+
+
 ngx_int_t 
 ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts, 
         size_t nelts)
@@ -279,7 +288,8 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                     return NGX_ERROR;
             }
             type = type8;
-            data = (elts && (elts->type & 0xff) == type)
+            data = (elts && 
+                    ngx_rtmp_amf_is_compatible_type(elts->type & 0xff, type))
                 ? elts->data
                 : NULL;
         }
