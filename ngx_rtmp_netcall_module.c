@@ -26,6 +26,7 @@ ngx_str_t   ngx_rtmp_netcall_content_type_urlencoded =
 
 typedef struct {
     ngx_msec_t                                  timeout;
+    ngx_log_t                                  *log;
 } ngx_rtmp_netcall_app_conf_t;
 
 
@@ -102,6 +103,7 @@ ngx_rtmp_netcall_create_app_conf(ngx_conf_t *cf)
     }
 
     nacf->timeout = NGX_CONF_UNSET_MSEC;
+    nacf->log = &cf->cycle->new_log;
 
     return nacf;
 }
@@ -171,6 +173,11 @@ ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, ngx_rtmp_netcall_init_t *ci)
     pool = NULL;
     c = s->connection;
 
+    cacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_netcall_module);
+    if (cacf == NULL) {
+        goto error;
+    }
+
     /* get module context */
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_netcall_module);
     if (ctx == NULL) {
@@ -182,8 +189,11 @@ ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, ngx_rtmp_netcall_init_t *ci)
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_netcall_module);
     }
 
-    /* create netcall pool, connection, session */
-    pool = ngx_create_pool(4096, s->connection->log);
+    /* Create netcall pool, connection, session.
+     * Note we use shared (app-wide) log because
+     * s->connection->log might be unavailable
+     * in detached netcall when it's being closed */
+    pool = ngx_create_pool(4096, cacf->log);
     if (pool == NULL) {
         goto error;
     }
@@ -207,11 +217,6 @@ ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, ngx_rtmp_netcall_init_t *ci)
         ngx_memcpy(cs->arg, ci->arg, ci->argsize);
     }
 
-    cacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_netcall_module);
-    if (cacf == NULL) {
-        goto error;
-    }
-
     cs->timeout = cacf->timeout;
     cs->url = ci->url;
     cs->session = s;
@@ -221,7 +226,7 @@ ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, ngx_rtmp_netcall_init_t *ci)
         cs->detached = 1;
     }
 
-    pc->log = s->connection->log;
+    pc->log = cacf->log;
     pc->get = ngx_rtmp_netcall_get_peer;
     pc->free = ngx_rtmp_netcall_free_peer;
     pc->data = cs;
