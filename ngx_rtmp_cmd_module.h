@@ -18,6 +18,7 @@
 /* TODO: improve string sizes */
 
 typedef struct {
+    double                          trans;
     u_char                          app[128];
     u_char                          flashver[32];
     u_char                          swf_url[256];

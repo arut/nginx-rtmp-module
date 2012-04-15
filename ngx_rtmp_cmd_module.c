@@ -96,10 +96,9 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     static ngx_rtmp_amf_elt_t  in_elts[] = {
 
-        /* transaction in always 1 */
         { NGX_RTMP_AMF_NUMBER,
           ngx_null_string,
-          NULL, 0 },
+          &v.trans, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
           ngx_null_string,
@@ -128,7 +127,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     size_t                      len;
     ngx_rtmp_header_t           h;
 
-    static double               trans = 1;
+    static double               trans;
     static double               capabilities = NGX_RTMP_CAPABILITIES;
 
     static ngx_rtmp_amf_elt_t  out_obj[] = {
@@ -189,6 +188,8 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
             "tc_url='%s' page_url='%s' acodecs=%uD vcodecs=%uD", 
             v->app, v->flashver, v->swf_url, v->tc_url, v->page_url,
             (uint32_t)v->acodecs, (uint32_t)v->vcodecs);
+
+    trans = v->trans;
 
     /* fill session parameters */
     s->connected = 1;
