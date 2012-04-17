@@ -10,25 +10,8 @@
                 src: "/jwplayer/player.swf",
                 config: {
                     bufferlength: 1,
-                    file: "webcam",
-                    streamer: "rtmp://192.168.0.100/helo",
-                    provider: "rtmp",
-                }
-            }
-        ]
-});
-</script>
-
-<div id="container2">Loading the player ...</div>
-    <script type="text/javascript">
-        jwplayer("container2").setup({
-        modes: [
-            {   type: "flash",
-                src: "/jwplayer/player.swf",
-                config: {
-                    bufferlength: 1,
-                    file: "movie",
-                    streamer: "rtmp://127.0.0.1/helo",
+                    file: "mystream",
+                    streamer: "rtmp://localhost/myapp",
                     provider: "rtmp",
                 }
             }

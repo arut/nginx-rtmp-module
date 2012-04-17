@@ -1,1 +1,1 @@
-rtmpdump -v -r "rtmp://localhost/helo/pd"
+rtmpdump -v -r "rtmp://localhost/myapp/mystream"

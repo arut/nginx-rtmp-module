@@ -1,1 +1,1 @@
-ffplay -loglevel verbose "rtmp://localhost/helo/pd"
+ffplay -loglevel verbose "rtmp://localhost/myapp/mystream"
