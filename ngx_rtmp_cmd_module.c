@@ -239,7 +239,6 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     return ngx_rtmp_send_ack_size(s, cscf->ack_window) != NGX_OK
         || ngx_rtmp_send_bandwidth(s, cscf->ack_window, 
                 NGX_RTMP_LIMIT_DYNAMIC) != NGX_OK
-        || ngx_rtmp_send_user_stream_begin(s, 0) != NGX_OK
         || ngx_rtmp_send_chunk_size(s, cscf->chunk_size) != NGX_OK
         || ngx_rtmp_send_amf(s, &h, out_elts,
                 sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK
@@ -444,11 +443,6 @@ ngx_rtmp_cmd_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "publish: name='%s' type=%s",
             v->name, v->type);
-
-    /* start stream */
-    if (ngx_rtmp_send_user_stream_begin(s, 1) != NGX_OK) {
-        return NGX_ERROR;
-    }
 
     /* send onStatus reply */
     memset(&h, 0, sizeof(h));
@@ -722,11 +716,6 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
             "play: name='%s' start=%uD duration=%uD reset=%d",
             v->name, (uint32_t)v->start, 
             (uint32_t)v->duration, v->reset);
-
-    /* start stream */
-    if (ngx_rtmp_send_user_stream_begin(s, 1) != NGX_OK) {
-        return NGX_ERROR;
-    }
 
     /* send onStatus reply */
     memset(&h, 0, sizeof(h));
