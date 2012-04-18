@@ -37,21 +37,14 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
 
     } else {
 
-        if (cscf->free_chains) {
-            out = cscf->free_chains;
-            cscf->free_chains = out->next;
+        out = ngx_alloc_chain_link(cscf->pool);
+        if (out == NULL) {
+            return NULL;
+        }
 
-        } else {
-            out = ngx_alloc_chain_link(cscf->pool);
-            if (out == NULL) {
-                return NULL;
-            }
-
-            out->buf = ngx_calloc_buf(cscf->pool);
-            if (out->buf == NULL) {
-                ngx_free_chain(cscf->pool, out);
-                return NULL;
-            }
+        out->buf = ngx_calloc_buf(cscf->pool);
+        if (out->buf == NULL) {
+            return NULL;
         }
 
         size = cscf->chunk_size + NGX_RTMP_MAX_CHUNK_HEADER 
@@ -60,8 +53,6 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
         b = out->buf;
         b->start = ngx_palloc(cscf->pool, size);
         if (b->start == NULL) {
-            out->next = cscf->free_chains;
-            cscf->free_chains = out;
             return NULL;
         }
 
@@ -82,68 +73,28 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
 
 
 void
-ngx_rtmp_free_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, ngx_chain_t *out)
+ngx_rtmp_acquire_shared_chain(ngx_chain_t *in)
 {
-    ngx_chain_t                *cl;
-
-    while (out) {
-        cl = out;
-        out = out->next;
-
-        if (ngx_rtmp_ref_put(cl->buf->start) == 0) {
-            /* both chain & buf are free;
-             * put the whole chain in free list */
-            cl->next = cscf->free;
-            cscf->free = cl;
-            continue;
-        }
-
-        /* only chain is free;
-         * buf is still used by somebody & will
-         * be freed in ngx_rtmp_free_shared_buf */
-         cl->next = cscf->free_chains;
-         cscf->free_chains = cl;
-    }
+    ngx_rtmp_ref_get(in->buf->start);
 }
 
 
-void
-ngx_rtmp_acquire_shared_buf(ngx_buf_t *b) 
+void 
+ngx_rtmp_free_shared_chain(ngx_rtmp_core_srv_conf_t *cscf, ngx_chain_t *in)
 {
-    ngx_rtmp_ref_get(b->start);
-}
+    ngx_chain_t        *cl;
 
-
-void
-ngx_rtmp_free_shared_buf(ngx_rtmp_core_srv_conf_t *cscf, ngx_buf_t *b) 
-{
-    ngx_chain_t                *cl;
-
-    if (ngx_rtmp_ref_put(b->start)) {
+    if (ngx_rtmp_ref_put(in->buf->start)) {
         return;
     }
 
-    if (cscf->free_chains) {
-        cl = cscf->free_chains;
-        cscf->free_chains = cl->next;
-
-    } else {
-        cl = ngx_alloc_chain_link(cscf->pool);
-        if (cl == NULL) {
-            return;
-        }
-
-        cl->buf = ngx_calloc_buf(cscf->pool);
-        if (cl->buf == NULL) {
-            ngx_free_chain(cscf->pool, cl);
+    for (cl = in; ; cl = cl->next) {
+        if (cl->next == NULL) {
+            cl->next = cscf->free;
+            cscf->free = in;
             return;
         }
     }
-
-    cl->buf->start = b->start;
-    cl->buf->end = b->end;
-    cl->next = cscf->free;
-    cscf->free = cl;
 }
 
 

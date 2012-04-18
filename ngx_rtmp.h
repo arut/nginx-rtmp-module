@@ -216,8 +216,11 @@ typedef struct {
     ngx_pool_t             *in_old_pool;
     ngx_int_t               in_chunk_size_changing;
 
-    ngx_chain_t            *out;
-    ngx_chain_t            *out_free_chains;
+    /* circular buffer of RTMP message pointers */
+    ngx_chain_t           **out_start, **out_end;
+    ngx_chain_t           **out_pos, **out_last;
+    ngx_chain_t            *out_chain;
+    u_char                 *out_bpos;
 } ngx_rtmp_session_t;
 
 
@@ -260,8 +263,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_int_t               chunk_size;
     ngx_pool_t             *pool;
     ngx_chain_t            *free;
-    ngx_chain_t            *free_chains;
-    size_t                  max_buf;
+    size_t                  max_queue;
     size_t                  max_message;
     ngx_flag_t              play_time_fix;
     ngx_flag_t              publish_time_fix;
@@ -361,11 +363,9 @@ ngx_int_t ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
 
 /* Shared output buffers */
 ngx_chain_t * ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf);
-void ngx_rtmp_free_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, 
-        ngx_chain_t *out);
-void ngx_rtmp_free_shared_buf(ngx_rtmp_core_srv_conf_t *cscf,
-        ngx_buf_t *b);
-void ngx_rtmp_acquire_shared_buf(ngx_buf_t *b);
+void ngx_rtmp_acquire_shared_chain(ngx_chain_t *in);
+void ngx_rtmp_free_shared_chain(ngx_rtmp_core_srv_conf_t *cscf, 
+        ngx_chain_t *in);
 ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, 
         ngx_chain_t *head, ngx_chain_t *in);
 
@@ -379,6 +379,7 @@ ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 /* Note on priorities:
  * the bigger value the lower the priority.
  * priority=0 is the highest */
+
 
 #define NGX_RTMP_LIMIT_SOFT         0
 #define NGX_RTMP_LIMIT_HARD         1

@@ -281,7 +281,7 @@ ngx_rtmp_live_send_abs_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     rc = ngx_rtmp_send_message(s, out, 0);
 
-    ngx_rtmp_free_shared_bufs(cscf, out);
+    ngx_rtmp_free_shared_chain(cscf, out);
 
     return rc;
 }
@@ -430,7 +430,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
     }
 
-    ngx_rtmp_free_shared_bufs(cscf, out);
+    ngx_rtmp_free_shared_chain(cscf, out);
 
     return NGX_OK;
 }

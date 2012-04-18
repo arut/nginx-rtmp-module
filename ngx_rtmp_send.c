@@ -42,7 +42,7 @@
 #define NGX_RTMP_USER_END(s)                                                \
     ngx_rtmp_prepare_message(s, &__h, NULL, __l);                           \
     rc = ngx_rtmp_send_message(s, __l, 0);                                  \
-    ngx_rtmp_free_shared_bufs(__cscf, __l);                                 \
+    ngx_rtmp_free_shared_chain(__cscf, __l);                                \
     return rc;
 
 
@@ -269,7 +269,7 @@ ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     rc = ngx_rtmp_send_message(s, first, 0);
 
 done:
-    ngx_rtmp_free_shared_bufs(cscf, first);
+    ngx_rtmp_free_shared_chain(cscf, first);
 
     return rc;
 }
