@@ -242,16 +242,7 @@ ngx_rtmp_init_session(ngx_connection_t *c)
     }
     size = NGX_RTMP_HANDSHAKE_SIZE + 1;
 
-
-    /*s->out_start = s->out;ngx_palloc(c->pool, sizeof(ngx_chain_t *) * cscf->max_queue);
-    if (s->out_start == NULL) {
-        ngx_rtmp_close_connection(c);
-        return;
-    }*/
-    /*s->out_pos = s->last = s->out;s->out_last = s->out_start;*/
-    /*s->out_end = s->out_start + sizeof(s->out) / sizeof(s->out[0]);cscf->max_queue*/;
-
-
+    s->timeout = cscf->timeout;
     ngx_rtmp_set_chunk_size(s, NGX_RTMP_DEFAULT_CHUNK_SIZE);
 
 
@@ -305,13 +296,11 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
     ssize_t                     n;
     ngx_connection_t           *c;
     ngx_rtmp_session_t         *s;
-    ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_buf_t                  *b;
     u_char                     *p;
 
     c = rev->data;
     s = c->data;
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (c->destroyed) {
         return;
@@ -342,7 +331,7 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
         }
 
         if (n == NGX_AGAIN) {
-            ngx_add_timer(rev, cscf->timeout);
+            ngx_add_timer(rev, s->timeout);
             if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
             }
@@ -423,12 +412,10 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
     ngx_int_t                   n;
     ngx_connection_t           *c;
     ngx_rtmp_session_t         *s;
-    ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_buf_t                  *b;
 
     c = wev->data;
     s = c->data;
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (c->destroyed) {
         return;
@@ -462,7 +449,7 @@ restart:
         }
 
         if (n == NGX_AGAIN || n == 0) {
-            ngx_add_timer(c->write, cscf->timeout);
+            ngx_add_timer(c->write, s->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
                 return;
@@ -801,12 +788,11 @@ ngx_rtmp_send(ngx_event_t *wev)
 {
     ngx_connection_t           *c;
     ngx_rtmp_session_t         *s;
-    ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_int_t                   n;
+    ngx_rtmp_core_srv_conf_t   *cscf;
 
     c = wev->data;
     s = c->data;
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (c->destroyed) {
         return;
@@ -838,7 +824,7 @@ ngx_rtmp_send(ngx_event_t *wev)
         }
 
         if (n == NGX_AGAIN || n == 0) {
-            ngx_add_timer(c->write, cscf->timeout);
+            ngx_add_timer(c->write, s->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
                 return;
@@ -849,6 +835,7 @@ ngx_rtmp_send(ngx_event_t *wev)
         if (s->out_bpos == s->out_chain->buf->last) {
             s->out_chain = s->out_chain->next;
             if (s->out_chain == NULL) {
+                cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
                 ngx_rtmp_free_shared_chain(cscf, s->out[s->out_pos]);
                 ++s->out_pos;
                 s->out_pos %= NGX_RTMP_OUT_QUEUE;

@@ -177,7 +177,6 @@ typedef struct {
 typedef struct {
     uint32_t                signature;  /* "RTMP" */ /* <-- FIXME wtf */
 
-    ngx_connection_t       *connection;
     ngx_event_t             close;
 
     void                  **ctx;
@@ -219,11 +218,14 @@ typedef struct {
     ngx_pool_t             *in_old_pool;
     ngx_int_t               in_chunk_size_changing;
 
+    ngx_connection_t       *connection;
+
     /* circular buffer of RTMP message pointers */
+    ngx_msec_t              timeout;
     size_t                  out_pos, out_last;
-    ngx_chain_t            *out[NGX_RTMP_OUT_QUEUE];
     ngx_chain_t            *out_chain;
     u_char                 *out_bpos;
+    ngx_chain_t            *out[NGX_RTMP_OUT_QUEUE];
 } ngx_rtmp_session_t;
 
 
