@@ -243,13 +243,13 @@ ngx_rtmp_init_session(ngx_connection_t *c)
     size = NGX_RTMP_HANDSHAKE_SIZE + 1;
 
 
-    s->out_start = ngx_palloc(c->pool, sizeof(ngx_chain_t *) * cscf->max_queue);
+    /*s->out_start = s->out;ngx_palloc(c->pool, sizeof(ngx_chain_t *) * cscf->max_queue);
     if (s->out_start == NULL) {
         ngx_rtmp_close_connection(c);
         return;
-    }
-    s->out_pos = s->out_last = s->out_start;
-    s->out_end = s->out_start + cscf->max_queue;
+    }*/
+    /*s->out_pos = s->last = s->out;s->out_last = s->out_start;*/
+    /*s->out_end = s->out_start + sizeof(s->out) / sizeof(s->out[0]);cscf->max_queue*/;
 
 
     ngx_rtmp_set_chunk_size(s, NGX_RTMP_DEFAULT_CHUNK_SIZE);
@@ -824,6 +824,11 @@ ngx_rtmp_send(ngx_event_t *wev)
         ngx_del_timer(wev);
     }
 
+    if (s->out_chain == NULL && s->out_pos != s->out_last) {
+        s->out_chain = s->out[s->out_pos];
+        s->out_bpos = s->out_chain->buf->pos;
+    }
+
     while (s->out_chain) {
         n = c->send(c, s->out_bpos, s->out_chain->buf->last - s->out_bpos);
 
@@ -844,15 +849,13 @@ ngx_rtmp_send(ngx_event_t *wev)
         if (s->out_bpos == s->out_chain->buf->last) {
             s->out_chain = s->out_chain->next;
             if (s->out_chain == NULL) {
-                ngx_rtmp_free_shared_chain(cscf, *s->out_pos);
+                ngx_rtmp_free_shared_chain(cscf, s->out[s->out_pos]);
                 ++s->out_pos;
-                if (s->out_pos == s->out_end) {
-                    s->out_pos = s->out_start;
-                }
+                s->out_pos %= NGX_RTMP_OUT_QUEUE;
                 if (s->out_pos == s->out_last) {
                     break;
                 }
-                s->out_chain = *s->out_pos;
+                s->out_chain = s->out[s->out_pos];
             }
             s->out_bpos = s->out_chain->buf->pos;
         }
@@ -1012,48 +1015,34 @@ ngx_int_t
 ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out, 
         ngx_uint_t priority)
 {
-    ngx_connection_t               *c;
-    ngx_rtmp_core_srv_conf_t       *cscf;
-    size_t                          nmsg;
+    ngx_int_t                       nmsg;
 
-    c = s->connection;
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
-
-    nmsg = (s->out_pos <= s->out_last)
-        ? s->out_last - s->out_pos
-        : (s->out_end - s->out_pos) + (s->out_last - s->out_start);
-    ++nmsg;
+    nmsg = (s->out_last - s->out_pos) % NGX_RTMP_OUT_QUEUE + 1;
 
     /* drop packet? 
      * Note we always leave 1 slot free */
-    if (nmsg >= (s->out_end - s->out_start) / (priority + 1)) {
-        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+    if (nmsg * (priority + 1) >= NGX_RTMP_OUT_QUEUE) {
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "RTMP drop message bufs=%ui, priority=%ui",
                 nmsg, priority);
         return NGX_AGAIN;
     }
 
+    s->out[s->out_last++] = out;
+    s->out_last %= NGX_RTMP_OUT_QUEUE;
+
     ngx_rtmp_acquire_shared_chain(out);
 
-    *s->out_last++ = out;
-    if (s->out_last >= s->out_end) {
-        s->out_last = s->out_start;
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "RTMP send nmsg=%ui, priority=%ui",
+            nmsg, priority);
+
+    if (!s->connection->write->active) {
+        ngx_rtmp_send(s->connection->write);
+        /*return ngx_add_event(s->connection->write, NGX_WRITE_EVENT, NGX_CLEAR_EVENT);*/
     }
 
-    if (s->out_chain == NULL) {
-        s->out_chain = out;
-        s->out_bpos = out->buf->pos;
-    }
-
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, c->log, 0,
-            "RTMP send nmsg=%ui, priority=%ui, ready=%d, active=%d",
-            nmsg, priority, c->write->ready, c->write->active);
-
-    if (!c->write->active) {
-        ngx_rtmp_send(c->write);
-    }
-
-    return c->destroyed ? NGX_ERROR : NGX_OK;
+    return NGX_OK;
 }
 
 
@@ -1255,11 +1244,8 @@ ngx_rtmp_close_session_handler(ngx_event_t *e)
     }
 
     while (s->out_pos != s->out_last) {
-        ngx_rtmp_free_shared_chain(cscf, *s->out_pos);
-        ++s->out_pos;
-        if (s->out_pos == s->out_end) {
-            s->out_pos = s->out_start;
-        }
+        ngx_rtmp_free_shared_chain(cscf, s->out[s->out_pos++]);
+        s->out_pos %= NGX_RTMP_OUT_QUEUE;
     }
 
     ngx_rtmp_close_connection(c);

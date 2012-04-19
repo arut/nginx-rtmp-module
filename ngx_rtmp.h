@@ -171,6 +171,9 @@ typedef struct {
 } ngx_rtmp_stream_t;
 
 
+#define NGX_RTMP_OUT_QUEUE  256
+
+
 typedef struct {
     uint32_t                signature;  /* "RTMP" */ /* <-- FIXME wtf */
 
@@ -217,8 +220,8 @@ typedef struct {
     ngx_int_t               in_chunk_size_changing;
 
     /* circular buffer of RTMP message pointers */
-    ngx_chain_t           **out_start, **out_end;
-    ngx_chain_t           **out_pos, **out_last;
+    size_t                  out_pos, out_last;
+    ngx_chain_t            *out[NGX_RTMP_OUT_QUEUE];
     ngx_chain_t            *out_chain;
     u_char                 *out_bpos;
 } ngx_rtmp_session_t;
@@ -362,12 +365,32 @@ ngx_int_t ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
 
 
 /* Shared output buffers */
+
+/* Store refcount in negative bytes of shared buffer */
+
+#define NGX_RTMP_REFCOUNT_TYPE              uint32_t
+#define NGX_RTMP_REFCOUNT_BYTES             sizeof(NGX_RTMP_REFCOUNT_TYPE)
+
+#define ngx_rtmp_ref(b)                     \
+    *((NGX_RTMP_REFCOUNT_TYPE*)(b) - 1)
+
+#define ngx_rtmp_ref_set(b, v)              \
+    ngx_rtmp_ref(b) = v
+
+#define ngx_rtmp_ref_get(b)                 \
+    ++ngx_rtmp_ref(b)
+
+#define ngx_rtmp_ref_put(b)                 \
+    --ngx_rtmp_ref(b)
+
 ngx_chain_t * ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf);
-void ngx_rtmp_acquire_shared_chain(ngx_chain_t *in);
 void ngx_rtmp_free_shared_chain(ngx_rtmp_core_srv_conf_t *cscf, 
         ngx_chain_t *in);
 ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, 
         ngx_chain_t *head, ngx_chain_t *in);
+
+#define ngx_rtmp_acquire_shared_chain(in)   \
+    ngx_rtmp_ref_get(in);                   \
 
 
 /* Sending messages */
