@@ -373,7 +373,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ch.type = h->type;
     lh.msid = ch.msid;
     if (h->type == NGX_RTMP_MSG_VIDEO) {
-        prio = 1;/*ngx_rtmp_get_video_frame_type(in);*/
+        prio = ngx_rtmp_get_video_frame_type(in);
         ch.csid = NGX_RTMP_LIVE_CSID_VIDEO;
         lh.timestamp = ctx->last_video;
         ctx->last_video = h->timestamp;
