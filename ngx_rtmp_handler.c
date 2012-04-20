@@ -818,17 +818,17 @@ ngx_rtmp_send(ngx_event_t *wev)
     while (s->out_chain) {
         n = c->send(c, s->out_bpos, s->out_chain->buf->last - s->out_bpos);
 
-        if (n == NGX_ERROR) {
-            ngx_rtmp_finalize_session(s);
-            return;
-        }
-
         if (n == NGX_AGAIN || n == 0) {
             ngx_add_timer(c->write, s->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
-                return;
             }
+            return;
+        }
+
+        if (n < 0) {
+            ngx_rtmp_finalize_session(s);
+            return;
         }
 
         s->out_bpos += n;
@@ -1020,9 +1020,13 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 
     ngx_rtmp_acquire_shared_chain(out);
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "RTMP send nmsg=%ui, priority=%ui",
-            nmsg, priority);
+    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "RTMP send nmsg=%ui, priority=%ui (1stbuf=%ui) #%ui",
+            nmsg, priority, (ngx_uint_t)(out->buf->last - out->buf->pos), s->out_last);
+
+    if (priority && nmsg < NGX_RTMP_OUT_QUEUE_PUSH_LIMIT) {
+        return NGX_OK;
+    }
 
     if (!s->connection->write->active) {
         ngx_rtmp_send(s->connection->write);

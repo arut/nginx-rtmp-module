@@ -155,6 +155,12 @@ typedef struct {
 #define NGX_RTMP_MAX_CHUNK_HEADER       18
 
 
+/* Output buffer queue */
+#define NGX_RTMP_OUT_QUEUE              256
+#define NGX_RTMP_OUT_QUEUE_PUSH_LIMIT   64
+
+
+
 typedef struct {
     uint32_t                csid;       /* chunk stream id */
     uint32_t                timestamp;  /* timestamp (delta) */
@@ -169,9 +175,6 @@ typedef struct {
     uint32_t                len;        /* current fragment length */
     ngx_chain_t            *in;
 } ngx_rtmp_stream_t;
-
-
-#define NGX_RTMP_OUT_QUEUE  256
 
 
 typedef struct {
