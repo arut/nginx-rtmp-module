@@ -341,7 +341,9 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
         b->last += n;
     }
 
-    ngx_del_event(c->read, NGX_READ_EVENT, 0);
+    if (rev->active) {
+        ngx_del_event(c->read, NGX_READ_EVENT, 0);
+    }
 
     ++s->hs_stage;
 
@@ -465,7 +467,9 @@ restart:
         goto restart;
     }
 
-    ngx_del_event(wev, NGX_WRITE_EVENT, 0);
+    if (wev->active) {
+        ngx_del_event(wev, NGX_WRITE_EVENT, 0);
+    }
 
     b = &s->hs_out_buf;
     b->pos = b->last = b->start + 1;
