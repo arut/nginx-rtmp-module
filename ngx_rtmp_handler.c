@@ -1008,7 +1008,7 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 
     /* drop packet? 
      * Note we always leave 1 slot free */
-    if (nmsg * (priority + 1) >= NGX_RTMP_OUT_QUEUE) {
+    if (nmsg + priority * 8 >= NGX_RTMP_OUT_QUEUE) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "RTMP drop message bufs=%ui, priority=%ui",
                 nmsg, priority);

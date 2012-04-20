@@ -66,13 +66,11 @@ typedef struct {
 
 #define NGX_RTMP_LIVE_TIME_ABSOLUTE     0x01
 #define NGX_RTMP_LIVE_TIME_RELATIVE     0x02
-#define NGX_RTMP_LIVE_TIME_MIXED        0x04
 
 
 static ngx_conf_bitmask_t  ngx_rtmp_live_time_mask[] = {
     { ngx_string("absolute"),           NGX_RTMP_LIVE_TIME_ABSOLUTE     },
     { ngx_string("relative"),           NGX_RTMP_LIVE_TIME_RELATIVE     },
-    { ngx_string("mixed"),              NGX_RTMP_LIVE_TIME_MIXED        },
     { ngx_null_string,                  0                               }
 };
 
@@ -166,7 +164,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->live, prev->live, 0);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_bitmask_value(conf->time_flags, prev->time_flags,
-            NGX_RTMP_LIVE_TIME_MIXED); 
+            NGX_RTMP_LIVE_TIME_RELATIVE); 
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
 
     conf->pool = ngx_create_pool(4096, &cf->cycle->new_log);
@@ -335,7 +333,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_session_t             *ss;
     ngx_rtmp_header_t               ch, lh;
     ngx_uint_t                      prio, peer_prio;
-    ngx_int_t                       mixed_time;
+    ngx_int_t                       relative;
 
     c = s->connection;
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
@@ -394,7 +392,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             out);
     out_abs = NULL;
     ch.timestamp = 0;
-    mixed_time = lacf->time_flags & NGX_RTMP_LIVE_TIME_MIXED;
+    relative = lacf->time_flags & NGX_RTMP_LIVE_TIME_RELATIVE;
 
     /* broadcast to all subscribers */
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
@@ -404,7 +402,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ss = pctx->session;
 
         /* send absolute frame */
-        if (mixed_time && (pctx->msg_mask & (1 << h->type)) == 0) {
+        if (relative && (pctx->msg_mask & (1 << h->type)) == 0) {
             if (out_abs == NULL) {
                 out_abs = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
                 ngx_rtmp_prepare_message(s, &ch, NULL, out_abs);
