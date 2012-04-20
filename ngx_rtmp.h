@@ -157,7 +157,7 @@ typedef struct {
 
 /* Output buffer queue */
 #define NGX_RTMP_OUT_QUEUE              256
-#define NGX_RTMP_OUT_QUEUE_PUSH_LIMIT   64
+#define NGX_RTMP_OUT_QUEUE_LOWAT        32
 
 
 
@@ -228,6 +228,7 @@ typedef struct {
     size_t                  out_pos, out_last;
     ngx_chain_t            *out_chain;
     u_char                 *out_bpos;
+    unsigned                out_buffer:1;
     ngx_chain_t            *out[NGX_RTMP_OUT_QUEUE];
 } ngx_rtmp_session_t;
 

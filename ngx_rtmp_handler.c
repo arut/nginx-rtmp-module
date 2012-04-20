@@ -912,7 +912,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             "RTMP prep %s (%d) fmt=%d csid=%uD timestamp=%uD "
             "mlen=%uD msid=%uD nbufs=%d",
             ngx_rtmp_message_type(h->type), (int)h->type, (int)fmt,
-            h->csid, h->timestamp, mlen, h->msid, nbufs);
+            h->csid, timestamp, mlen, h->msid, nbufs);
 
     ext_timestamp = 0;
     if (timestamp >= 0x00ffffff) {
@@ -1020,11 +1020,13 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 
     ngx_rtmp_acquire_shared_chain(out);
 
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "RTMP send nmsg=%ui, priority=%ui (1stbuf=%ui) #%ui",
-            nmsg, priority, (ngx_uint_t)(out->buf->last - out->buf->pos), s->out_last);
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "RTMP send nmsg=%ui, priority=%ui #%ui",
+            nmsg, priority, s->out_last);
 
-    if (priority && nmsg < NGX_RTMP_OUT_QUEUE_PUSH_LIMIT) {
+    if (priority && s->out_buffer 
+            && nmsg < NGX_RTMP_OUT_QUEUE_LOWAT) 
+    {
         return NGX_OK;
     }
 
