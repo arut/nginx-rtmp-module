@@ -129,6 +129,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
     static double               trans;
     static double               capabilities = NGX_RTMP_CAPABILITIES;
+    static double               object_encoding = 0;
 
     static ngx_rtmp_amf_elt_t  out_obj[] = {
 
@@ -153,7 +154,11 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("description"),
-          "Connection succeeded.", 0 }
+          "Connection succeeded.", 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("objectEncoding"),
+          &object_encoding, 0 }
     };
 
     static ngx_rtmp_amf_elt_t  out_elts[] = {
