@@ -278,18 +278,6 @@ ngx_rtmp_init_session(ngx_connection_t *c)
 }
 
 
-uint32_t 
-ngx_rtmp_get_timestamp()
-{
-    ngx_time_t     *tod;
-
-    tod = ngx_timeofday();
-
-    /* FIXME: divisor */
-    return (uint32_t)(tod->sec * 1000 + tod->msec) /*& 0x00ffffff*/;
-}
-
-
 void
 ngx_rtmp_handshake_recv(ngx_event_t *rev)
 {
@@ -360,7 +348,7 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
         ++b->pos;
 
         /* store current time as our epoch */
-        s->epoch = ngx_rtmp_get_timestamp();
+        s->epoch = ngx_current_msec;
 
         /* read client epoch */
         p = (u_char*)&s->peer_epoch;
