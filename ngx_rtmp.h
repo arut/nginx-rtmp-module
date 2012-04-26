@@ -172,6 +172,7 @@ typedef struct {
 
 typedef struct {
     ngx_rtmp_header_t       hdr;
+    uint32_t                dtime;
     uint32_t                len;        /* current fragment length */
     ngx_chain_t            *in;
 } ngx_rtmp_stream_t;

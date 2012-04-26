@@ -656,9 +656,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 h->csid = csid;
             }
 
-            /* get previous header to inherit data from */
-            timestamp = h->timestamp;
-
+            timestamp = st->dtime;
             if (fmt <= 2 ) {
                 if (b->last - p < 3)
                     continue;
@@ -716,17 +714,20 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 }
             }
 
-            if (fmt == 1 || fmt == 2) {
-                h->timestamp += timestamp;
-            } else {
-                h->timestamp = timestamp;
+            if (st->len == 0) {
+                if (fmt) {
+                    st->dtime = timestamp;
+                } else {
+                    h->timestamp = timestamp;
+                    st->dtime = 0;
+                }
             }
 
             ngx_log_debug8(NGX_LOG_DEBUG_RTMP, c->log, 0,
                     "RTMP mheader fmt=%d %s (%d) "
-                    "time=%uD/%uD mlen=%D len=%D msid=%D",
+                    "time=%uD+%uD mlen=%D len=%D msid=%D",
                     (int)fmt, ngx_rtmp_message_type(h->type), (int)h->type,
-                    timestamp, h->timestamp, h->mlen, st->len, h->msid);
+                    h->timestamp, st->dtime, h->mlen, st->len, h->msid);
 
             /* header done */
             b->pos = p;
@@ -762,6 +763,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             old_pos = b->last;
             old_size = size - fsize;
             st->len = 0;
+            h->timestamp += st->dtime;
 
             if (ngx_rtmp_receive_message(s, h, head) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
