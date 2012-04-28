@@ -1,12 +1,17 @@
-- do we really need fmt=0 frame as the first a/v frame/
+- implement json http module for accessing stats
+  * memory stats (shared bufs num/bytes, private pools
+  * global (connections, IO bytes, bw)
+  * live (stream name, flags, clients, bytes, bw, drops)
 
-- implement live stats as http/json module
+- add global & per-room in/out byte counters
 
-- fix '..greeing line..' in log
+- add per-client audio/video bias
+
+- write complete WIKI docs
+
+- rename netcall to upstream
 
 - add support for flv file streaming 
   (NGINX supports streaming flvs via HTTP
-   out-of-the-box with nginx-http-flv-module module)
-
-- check compilation with IPv6 enabled
+  out-of-the-box with nginx-http-flv-module module)
 
