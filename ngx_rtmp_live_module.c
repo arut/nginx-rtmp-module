@@ -50,6 +50,7 @@ struct ngx_rtmp_live_stream_s {
     u_char                              name[256];
     ngx_rtmp_live_stream_t             *next;
     ngx_rtmp_live_ctx_t                *ctx;
+    ngx_uint_t                          flags;
 };
 
 
@@ -237,6 +238,14 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name,
     if (stream == NULL) {
         return;
     }
+    if (flags & NGX_RTMP_LIVE_PUBLISHING) {
+        if ((*stream)->flags & NGX_RTMP_LIVE_PUBLISHING) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "live: already publishing");
+            return;
+        }
+        (*stream)->flags |= NGX_RTMP_LIVE_PUBLISHING;
+    }
     ctx->stream = *stream;
     ctx->flags = flags;
     ctx->next = (*stream)->ctx;
@@ -273,6 +282,12 @@ ngx_rtmp_live_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "live: leave '%s'", ctx->stream->name);
+
+    if (ctx->stream->flags & NGX_RTMP_LIVE_PUBLISHING
+            && ctx->flags & NGX_RTMP_LIVE_PUBLISHING)
+    {
+        ctx->stream->flags &= ~NGX_RTMP_LIVE_PUBLISHING;
+    }
 
     for (cctx = &ctx->stream->ctx; *cctx; cctx = &(*cctx)->next) {
         if (*cctx == ctx) {
