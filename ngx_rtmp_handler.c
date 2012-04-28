@@ -204,7 +204,7 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
     c->log->connection = c->number;
     c->log->handler = ngx_rtmp_log_error;
     c->log->data = ctx;
-    c->log->action = "sending client greeting line";
+    c->log->action = NULL;
 
     c->log_error = NGX_ERROR_INFO;
 
@@ -1138,6 +1138,7 @@ ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size)
             for ( ;; ) {
                 bi = li->buf;
                 bo = lo->buf;
+
                 if (bo->end - bo->last >= bi->last - bi->pos) {
                     bo->last = ngx_cpymem(bo->last, bi->pos, 
                             bi->last - bi->pos);
@@ -1147,17 +1148,15 @@ ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size)
                         s->in_streams[n].in = lo;
                         break;
                     }
-                } else {
-                    bo->last = ngx_cpymem(bo->last, bi->pos, 
-                            bo->end - bo->last);
-                    bi->pos += (bo->end - bo->last);
+                    continue;
                 }
-                if (bo->last == bo->end) {
-                    lo->next = ngx_rtmp_alloc_in_buf(s);
-                    if (lo->next == NULL) {
-                        return NGX_ERROR;
-                    }
-                    lo = lo->next;
+
+                bi->pos += (ngx_cpymem(bo->last, bi->pos, 
+                            bo->end - bo->last) - bo->last);
+                lo->next = ngx_rtmp_alloc_in_buf(s);
+                lo = lo->next;
+                if (lo == NULL) {
+                    return NGX_ERROR;
                 }
             }
         }
