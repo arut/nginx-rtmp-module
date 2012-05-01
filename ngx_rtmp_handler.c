@@ -242,6 +242,7 @@ ngx_rtmp_init_session(ngx_connection_t *c)
     }
     size = NGX_RTMP_HANDSHAKE_SIZE + 1;
 
+    s->epoch = ngx_current_msec;
     s->timeout = cscf->timeout;
     ngx_rtmp_set_chunk_size(s, NGX_RTMP_DEFAULT_CHUNK_SIZE);
 

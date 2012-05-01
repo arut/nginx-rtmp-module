@@ -273,6 +273,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_int_t               chunk_size;
     ngx_pool_t             *pool;
     ngx_chain_t            *free;
+    ngx_chain_t            *free_hs;
     size_t                  max_queue;
     size_t                  max_message;
     ngx_flag_t              play_time_fix;
