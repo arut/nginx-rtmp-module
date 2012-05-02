@@ -101,16 +101,7 @@ typedef struct {
 
 #define NGX_LOG_DEBUG_RTMP              NGX_LOG_DEBUG_CORE
 
-#define NGX_RTMP_HANDSHAKE_SIZE         1536
-
 #define NGX_RTMP_DEFAULT_CHUNK_SIZE     128
-
-
-/* RTMP handshake stages */
-#define NGX_RTMP_HS_READ_DATA           0
-#define NGX_RTMP_HS_WRITE_DATA          1
-#define NGX_RTMP_HS_WRITE_ECHO          2
-#define NGX_RTMP_HS_READ_ECHO           3
 
 
 /* RTMP message types */
@@ -200,9 +191,9 @@ typedef struct {
     uint32_t                vcodecs;
     ngx_str_t               page_url;
 
-    /* TODO: allocate this bufs from shared pool */
-    ngx_buf_t               hs_in_buf;
-    ngx_buf_t               hs_out_buf;
+    /* handshake data */
+    ngx_buf_t              *hs_in;
+    ngx_buf_t              *hs_out1, *hs_out2;
     ngx_uint_t              hs_stage;
 
     /* connection timestamps */
@@ -347,9 +338,14 @@ char* ngx_rtmp_message_type(uint8_t type);
 char* ngx_rtmp_user_message_type(uint16_t evt);
 #endif
 
-void ngx_rtmp_init_connection(ngx_connection_t *c);    
+
+void ngx_rtmp_init_connection(ngx_connection_t *c);
 void ngx_rtmp_finalize_session(ngx_rtmp_session_t *s);
-u_char * ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len);
+void ngx_rtmp_handshake(ngx_rtmp_session_t *s);
+void ngx_rtmp_free_handshake_buffers(ngx_rtmp_session_t *s);
+void ngx_rtmp_cycle(ngx_rtmp_session_t *s);
+
+
 ngx_int_t ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size);
 
 
