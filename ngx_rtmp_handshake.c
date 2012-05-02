@@ -42,7 +42,7 @@ ngx_rtmp_client_key[] = {
 
 static const u_char
 ngx_rtmp_server_version[4] = {
-    0x0A, 0x00, 0x00, 0x00  /* TODO */
+    0x0D, 0x0E, 0x0A, 0x0D  /* TODO */
 };
 
 
@@ -312,6 +312,13 @@ ngx_rtmp_handshake_response(ngx_rtmp_session_t *s)
                 "RTMP digest not found");
         return NGX_ERROR;
     }
+    b->pos += offs;
+    b->last = b->pos + NGX_RTMP_KEYLEN;
+    if (ngx_rtmp_make_digest(&ngx_rtmp_server_full_key, b,
+            NULL, digest, s->connection->log) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "RTMP digest found at pos=%i", offs);
 
@@ -330,11 +337,6 @@ ngx_rtmp_handshake_response(ngx_rtmp_session_t *s)
     /* create second output buffer */
     b = s->hs_out2;
     ngx_rtmp_fill_random_buffer(b);
-    if (ngx_rtmp_make_digest(&ngx_rtmp_server_full_key, b,
-            NULL, digest, s->connection->log) != NGX_OK)
-    {
-        return NGX_ERROR;
-    }
     key.data = digest;
     key.len = sizeof(digest);
     p = b->last - key.len;
