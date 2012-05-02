@@ -42,7 +42,7 @@ ngx_rtmp_client_key[] = {
 
 static const u_char
 ngx_rtmp_server_version[4] = {
-    0x0D, 0x0E, 0x0A, 0x0D  /* TODO */
+    0x0D, 0x0E, 0x0A, 0x0D
 };
 
 
@@ -64,7 +64,7 @@ ngx_rtmp_make_digest(ngx_str_t *key, ngx_buf_t *src,
         u_char *skip, u_char *dst, ngx_log_t *log)
 {
     HMAC_CTX                hmac;
-    unsigned int            len; /* TODO */
+    unsigned int            len;
     ngx_int_t               rc;
 
     rc = NGX_ERROR;
