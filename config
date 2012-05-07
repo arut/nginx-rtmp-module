@@ -29,3 +29,6 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_notify_module.c     \
                 "
 CFLAGS="$CFLAGS -I$ngx_addon_dir"
+
+USE_OPENSSL=YES
+
