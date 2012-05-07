@@ -70,7 +70,7 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
           v.app, sizeof(v.app) },
 
         { NGX_RTMP_AMF_STRING, 
-          ngx_string("flashver"),
+          ngx_string("flashVer"),
           v.flashver, sizeof(v.flashver) },
 
         { NGX_RTMP_AMF_STRING,

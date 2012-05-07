@@ -13,6 +13,7 @@
 #include <ngx_event_connect.h>
 
 #include "ngx_rtmp_amf.h"
+#include "ngx_rtmp_bandwidth.h"
 
 
 typedef struct {
@@ -261,6 +262,10 @@ typedef struct {
 } ngx_rtmp_core_main_conf_t;
 
 
+/* global main conf for stats */
+extern ngx_rtmp_core_main_conf_t   *ngx_rtmp_core_main_conf;
+
+
 typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_array_t             applications; /* ngx_rtmp_core_app_conf_t */
 
@@ -467,8 +472,12 @@ ngx_rtmp_get_video_frame_type(ngx_chain_t *in)
 }
 
 
-extern ngx_uint_t    ngx_rtmp_max_module;
-extern ngx_module_t  ngx_rtmp_core_module;
+extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_out;
+extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_in;
+
+
+extern ngx_uint_t                           ngx_rtmp_max_module;
+extern ngx_module_t                         ngx_rtmp_core_module;
 
 
 #endif /* _NGX_RTMP_H_INCLUDED_ */
