@@ -14,6 +14,10 @@ static ngx_int_t ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
 static ngx_int_t ngx_rtmp_finalize_set_chunk_size(ngx_rtmp_session_t *s);
 
 
+ngx_rtmp_bandwidth_t        ngx_rtmp_bw_out;
+ngx_rtmp_bandwidth_t        ngx_rtmp_bw_in;
+
+
 #ifdef NGX_DEBUG
 char*
 ngx_rtmp_message_type(uint8_t type) 
@@ -188,6 +192,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 return;
             }
 
+            ngx_rtmp_update_bandwidth(&ngx_rtmp_bw_in, n);
             b->last += n;
             s->in_bytes += n;
 
@@ -444,6 +449,7 @@ ngx_rtmp_send(ngx_event_t *wev)
             return;
         }
 
+        ngx_rtmp_update_bandwidth(&ngx_rtmp_bw_out, n);
         s->out_bpos += n;
         if (s->out_bpos == s->out_chain->buf->last) {
             s->out_chain = s->out_chain->next;

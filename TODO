@@ -1,15 +1,8 @@
-- implement json http module for accessing stats
-  * memory stats (shared bufs num/bytes, private pools
-  * global (connections, IO bytes, bw)
-  * live (stream name, flags, clients, bytes, bw, drops)
-
-- add global & per-room in/out byte counters
-
 - add per-client audio/video bias
 
 - write complete WIKI docs
 
-- rename netcall to upstream
+- global rename: get rid of '_module' suffixes in files && rename netcall to upstream
 
 - add support for flv file streaming 
   (NGINX supports streaming flvs via HTTP

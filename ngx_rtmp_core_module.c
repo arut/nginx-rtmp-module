@@ -25,6 +25,9 @@ static char *ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 
+ngx_rtmp_core_main_conf_t      *ngx_rtmp_core_main_conf;
+
+
 static ngx_conf_deprecated_t  ngx_conf_deprecated_so_keepalive = {
     ngx_conf_deprecated, "so_keepalive", 
     "so_keepalive\" parameter of the \"listen"
@@ -159,6 +162,8 @@ ngx_rtmp_core_create_main_conf(ngx_conf_t *cf)
     if (cmcf == NULL) {
         return NULL;
     }
+
+    ngx_rtmp_core_main_conf = cmcf;
 
     if (ngx_array_init(&cmcf->servers, cf->pool, 4,
                        sizeof(ngx_rtmp_core_srv_conf_t *))

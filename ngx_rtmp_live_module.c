@@ -3,9 +3,7 @@
  */
 
 
-#include <ngx_config.h>
-#include <ngx_core.h>
-#include "ngx_rtmp.h"
+#include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"
 
 
@@ -19,49 +17,11 @@ static ngx_rtmp_delete_stream_pt        next_delete_stream;
 #define NGX_RTMP_LIVE_CSID_VIDEO        7
 #define NGX_RTMP_LIVE_MSID              1
 
-/* session flags */
-#define NGX_RTMP_LIVE_PUBLISHING        0x01
-
 
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_live_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, 
         void *parent, void *child);
-
-
-typedef struct ngx_rtmp_live_ctx_s ngx_rtmp_live_ctx_t;
-typedef struct ngx_rtmp_live_stream_s ngx_rtmp_live_stream_t;
-
-
-struct ngx_rtmp_live_ctx_s {
-    ngx_rtmp_session_t                 *session;
-    ngx_rtmp_live_stream_t             *stream;
-    ngx_rtmp_live_ctx_t                *next;
-    ngx_uint_t                          flags;
-    ngx_uint_t                          msg_mask;
-    uint32_t                            csid;
-    uint32_t                            next_push;
-    uint32_t                            last_audio;
-    uint32_t                            last_video;
-};
-
-
-struct ngx_rtmp_live_stream_s {
-    u_char                              name[256];
-    ngx_rtmp_live_stream_t             *next;
-    ngx_rtmp_live_ctx_t                *ctx;
-    ngx_uint_t                          flags;
-};
-
-
-typedef struct {
-    ngx_int_t                           nbuckets;
-    ngx_rtmp_live_stream_t            **streams;
-    ngx_flag_t                          live;
-    ngx_msec_t                          buflen;
-    ngx_pool_t                         *pool;
-    ngx_rtmp_live_stream_t             *free_streams;
-} ngx_rtmp_live_app_conf_t;
 
 
 #define NGX_RTMP_LIVE_TIME_ABSOLUTE     0x01
@@ -331,6 +291,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_session_t             *ss;
     ngx_rtmp_header_t               ch, lh;
     ngx_uint_t                      prio, peer_prio;
+    ngx_uint_t                      peers, dropped_peers;
 
     c = s->connection;
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
@@ -387,11 +348,15 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     out = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
     ngx_rtmp_prepare_message(s, &ch, &lh, out);
 
+    peers = 0;
+    dropped_peers = 0;
+
     /* broadcast to all subscribers */
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
         if (pctx == ctx) {
             continue;
         }
+        ++peers;
         ss = pctx->session;
 
         /* send absolute frame */
@@ -411,13 +376,21 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         /* push buffered data */
         peer_prio = prio;
+        /*
         if (lacf->buflen && h->timestamp >= pctx->next_push) {
             peer_prio = 0;
             pctx->next_push = h->timestamp + lacf->buflen;
+        }*/
+        if (ngx_rtmp_send_message(ss, out, peer_prio) != NGX_OK) {
+            ++pctx->dropped;
+            ++dropped_peers;
         }
-        ngx_rtmp_send_message(ss, out, peer_prio);
     }
     ngx_rtmp_free_shared_chain(cscf, out);
+
+    ngx_rtmp_update_bandwidth(&ctx->stream->bw_in, h->mlen);
+    ngx_rtmp_update_bandwidth(&ctx->stream->bw_out, 
+            h->mlen * (peers - dropped_peers));
 
     return NGX_OK;
 }
