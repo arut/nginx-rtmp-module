@@ -121,8 +121,10 @@ http {
         }
 
         location /stat.xsl {
-            # XML stylesheet to view RTMP stats
-            root /home/rarutyunyan/nginx-rtmp-module/;
+            # XML stylesheet to view RTMP stats.
+            # Copy stat.xsl wherever you want
+            # and put the full directory path here
+            root /path/to/stat.xsl/;
         }
 
     }
