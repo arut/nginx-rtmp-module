@@ -66,7 +66,14 @@
 <xsl:template match="stream">
     <tr valign="top" bgcolor="#cccccc">
         <td>
-            <xsl:value-of select="name"/>
+            <a href="">
+                <xsl:attribute name="onclick">
+                    var d=document.getElementById('<xsl:value-of select="name"/>');
+                    d.style.display=d.style.display=='none'?'':'none';
+                    return false
+                </xsl:attribute>
+                <xsl:value-of select="name"/>
+            </a>
         </td>
         <td align="middle">
             <xsl:value-of select="nclients"/>
@@ -89,7 +96,10 @@
     </tr>
     <tr>
         <td colspan="7" ngcolor="#eeeeee">
-            <table cellspacing="1" cellpadding="5">
+            <table cellspacing="1" cellpadding="5" style="display:none">
+                <xsl:attribute name="id">
+                    <xsl:value-of select="name"/>
+                </xsl:attribute>
                 <tr>
                     <th>State</th>
                     <th>Address</th>
