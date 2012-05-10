@@ -104,3 +104,27 @@ rtmp {
     }
 }
 
+# HTTP can be used for accessing RTMP stats
+http {
+
+    server {
+
+        listen      8080;
+
+        # This URL provides RTMP statistics in XML
+        location /stat {
+            rtmp_stat all;
+
+            # Use this stylesheet to view XML as web page
+            # in browser
+            rtmp_stat_stylesheet stat.xsl;
+        }
+
+        location /stat.xsl {
+            # XML stylesheet to view RTMP stats
+            root /home/rarutyunyan/nginx-rtmp-module/;
+        }
+
+    }
+}
+
