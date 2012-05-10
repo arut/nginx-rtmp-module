@@ -94,12 +94,12 @@
             <xsl:apply-templates select="publishing"/>
         </td>
     </tr>
-    <tr>
+    <tr style="display:none">
+        <xsl:attribute name="id">
+            <xsl:value-of select="name"/>
+        </xsl:attribute>
         <td colspan="7" ngcolor="#eeeeee">
-            <table cellspacing="1" cellpadding="5" style="display:none">
-                <xsl:attribute name="id">
-                    <xsl:value-of select="name"/>
-                </xsl:attribute>
+            <table cellspacing="1" cellpadding="5">
                 <tr>
                     <th>State</th>
                     <th>Address</th>
