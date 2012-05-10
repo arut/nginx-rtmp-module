@@ -310,7 +310,7 @@ ngx_rtmp_handshake_response(ngx_rtmp_session_t *s)
     if (offs == NGX_ERROR) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
                 "RTMP digest not found");
-        return NGX_ERROR;
+        return ngx_rtmp_old_handshake_response(s);
     }
     b->pos += offs;
     b->last = b->pos + NGX_RTMP_KEYLEN;
