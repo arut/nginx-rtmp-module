@@ -7,6 +7,7 @@
 
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_live_module.h"
+#include "ngx_rtmp_codecs.h"
 
 
 static ngx_int_t ngx_rtmp_stat_postconfiguration(ngx_conf_t *cf);
@@ -202,6 +203,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
         ngx_rtmp_live_app_conf_t *lacf)
 {
     ngx_rtmp_live_stream_t         *stream;
+    ngx_rtmp_live_meta_t           *meta;
     ngx_rtmp_live_ctx_t            *ctx;
     ngx_rtmp_session_t             *s;
     ngx_int_t                       n;
@@ -209,6 +211,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     ngx_int_t                       publishing;
     u_char                          buf[NGX_OFF_T_LEN + 1];
     ngx_rtmp_stat_loc_conf_t       *slcf;
+    u_char                         *codec;
 
     slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
 
@@ -223,6 +226,28 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
             NGX_RTMP_STAT_L("<name>");
             NGX_RTMP_STAT_ECS(stream->name);
             NGX_RTMP_STAT_L("</name>\r\n");
+
+            meta = &stream->meta;
+            NGX_RTMP_STAT_L("<meta><width>");
+            NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                                "%ui", meta->width) - buf);
+            NGX_RTMP_STAT_L("</width><height>");
+            NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                                "%ui", meta->height) - buf);
+            NGX_RTMP_STAT_L("</height><framerate>");
+            NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                                "%ui", meta->frame_rate) - buf);
+            NGX_RTMP_STAT_L("</framerate><video>");
+            codec = ngx_rtmp_get_video_codec_name(meta->video_codec_id);
+            if (*codec) {
+                NGX_RTMP_STAT_ECS(codec);
+            }
+            NGX_RTMP_STAT_L("</video><audio>");
+            codec = ngx_rtmp_get_audio_codec_name(meta->audio_codec_id);
+            if (*codec) {
+                NGX_RTMP_STAT_ECS(codec);
+            }
+            NGX_RTMP_STAT_L("</audio></meta>\r\n");
 
             ngx_rtmp_stat_bw(r, lll, &stream->bw_in, &stream->bw_out);
 

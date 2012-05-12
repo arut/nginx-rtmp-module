@@ -24,6 +24,10 @@
             <th>Out bytes</th>
             <th>In Kbps</th>
             <th>Out Kbps</th>
+            <th>Size</th>
+            <th>Frame Rate</th>
+            <th>Video</th>
+            <th>Audio</th>
             <th>State</th>
         </tr>
         <tr>
@@ -32,7 +36,6 @@
             <td><xsl:value-of select="out"/></td>
             <td><xsl:value-of select="round(bwin div 1024)"/></td>
             <td><xsl:value-of select="round(bwout div 1024)"/></td>
-            <td><xsl:apply-templates select="publishing"/></td>
         </tr>
         <xsl:apply-templates select="server"/>
     </table>
@@ -75,24 +78,16 @@
                 <xsl:value-of select="name"/>
             </a>
         </td>
-        <td align="middle">
-            <xsl:value-of select="nclients"/>
-        </td>
-        <td>
-            <xsl:value-of select="in"/>
-        </td>
-        <td>
-            <xsl:value-of select="out"/>
-        </td>
-        <td>
-            <xsl:value-of select="round(bwin div 1024)"/>
-        </td>
-        <td>
-            <xsl:value-of select="round(bwout div 1024)"/>
-        </td>
-        <td>
-            <xsl:apply-templates select="publishing"/>
-        </td>
+        <td align="middle"> <xsl:value-of select="nclients"/> </td>
+        <td><xsl:value-of select="in"/></td>
+        <td><xsl:value-of select="out"/></td>
+        <td><xsl:value-of select="round(bwin div 1024)"/></td>
+        <td><xsl:value-of select="round(bwout div 1024)"/></td>
+        <td><xsl:value-of select="meta/width"/>x<xsl:value-of select="meta/height"/></td>
+        <td align="middle"><xsl:value-of select="meta/framerate"/></td>
+        <td><xsl:value-of select="meta/video"/></td>
+        <td><xsl:value-of select="meta/audio"/></td>
+        <td> <xsl:apply-templates select="publishing"/> </td>
     </tr>
     <tr style="display:none">
         <xsl:attribute name="id">

@@ -5,6 +5,7 @@
 
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_codecs.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
@@ -443,15 +444,138 @@ next:
 }
 
 
+static ngx_int_t 
+ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+        ngx_chain_t *in)
+{
+    ngx_rtmp_live_app_conf_t       *lacf;
+    ngx_rtmp_live_ctx_t            *ctx;
+    ngx_rtmp_live_meta_t           *meta;
+
+    static struct {
+        double                      width;
+        double                      height;
+        double                      duration;
+        double                      frame_rate;
+        double                      video_data_rate;
+        double                      video_codec_id;
+        double                      audio_data_rate;
+        double                      audio_codec_id;
+    }                               v;
+
+    static ngx_rtmp_amf_elt_t       in_inf[] = {
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("width"),
+          &v.width, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("height"),
+          &v.height, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("duration"),
+          &v.duration, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("framerate"),
+          &v.frame_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("videodatarate"),
+          &v.video_data_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("videocodecid"),
+          &v.video_codec_id, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("audiodatarate"),
+          &v.audio_data_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("audiocodecid"),
+          &v.audio_codec_id, 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t       in_elts[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT, 
+          ngx_null_string,
+          in_inf, sizeof(in_inf) },
+    };
+
+    lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
+    if (lacf == NULL || !lacf->live) {
+        return NGX_OK;
+    }
+
+    ngx_memzero(&v, sizeof(v));
+    if (ngx_rtmp_receive_amf(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "live: error parsing data frame");
+        return NGX_OK;
+    }
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    if ((ctx->flags & NGX_RTMP_LIVE_PUBLISHING) == 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "live: received data stream from non-publisher");
+        return NGX_OK;
+    }
+
+    meta = &ctx->stream->meta;
+    meta->width = v.width;
+    meta->height = v.height;
+    meta->duration = v.duration;
+    meta->frame_rate = v.frame_rate;
+    meta->video_data_rate = v.video_data_rate;
+    meta->video_codec_id = v.video_codec_id;
+    meta->audio_data_rate = v.audio_data_rate;
+    meta->audio_codec_id = v.audio_codec_id;
+
+    ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "live: data frame: "
+            "width=%ui height=%ui duration=%ui frame_rate=%ui "
+            "video=%s (%ui) audio=%s (%ui)",
+            meta->width, meta->height, meta->duration, meta->frame_rate,
+            ngx_rtmp_get_video_codec_name(meta->video_codec_id), 
+            meta->video_codec_id,
+            ngx_rtmp_get_audio_codec_name(meta->audio_codec_id), 
+            meta->audio_codec_id);
+
+    return NGX_OK;
+}
+
+
 static ngx_int_t
 ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 {
     ngx_rtmp_core_main_conf_t          *cmcf;
     ngx_rtmp_handler_pt                *h;
+    ngx_rtmp_amf_handler_t             *ch;
 
-    /* register raw event handlers */
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
+    /* register data frame handler */
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "@setDataFrame");
+    ch->handler = ngx_rtmp_live_data_frame;
+
+    /* register raw event handlers */
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
     *h = ngx_rtmp_live_av;
 
