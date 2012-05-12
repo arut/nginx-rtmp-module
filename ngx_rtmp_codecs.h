@@ -12,7 +12,9 @@
 
 /* Audio codecs */
 enum {
-    NGX_RTMP_AUDIO_UNCOMPRESSED     = 0,
+    /* Uncompressed codec id is actually 0,
+     * but we use another value for consistency */
+    NGX_RTMP_AUDIO_UNCOMPRESSED     = 12,
     NGX_RTMP_AUDIO_ADPCM            = 1,
     NGX_RTMP_AUDIO_MP3              = 2,
     NGX_RTMP_AUDIO_NELLY8           = 5,

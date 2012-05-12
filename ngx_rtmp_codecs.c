@@ -7,7 +7,7 @@
 
 
 const char * audio_codecs[] = {
-    "Uncompressed",
+    "",
     "ADPCM",
     "MP3",
     "",
@@ -18,7 +18,8 @@ const char * audio_codecs[] = {
     "",
     "",
     "HE-ACC",
-    "Speex"
+    "Speex",
+    "Uncompressed"
 };
 
 
@@ -29,6 +30,7 @@ const char * video_codecs[] = {
     "ScreenVideo",
     "On2-VP6",
     "On2-VP6-Alpha",
+    "",
     "H264",
 };
 

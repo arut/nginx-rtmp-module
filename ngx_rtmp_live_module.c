@@ -515,6 +515,11 @@ ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     ngx_memzero(&v, sizeof(v));
+
+    /* use -1 as a sign of unchanged data;
+     * 0 is a valid value for uncompressed audio */
+    v.audio_codec_id = -1; 
+
     if (ngx_rtmp_receive_amf(s, in, in_elts, 
                 sizeof(in_elts) / sizeof(in_elts[0]))) 
     {
@@ -542,7 +547,9 @@ ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     meta->video_data_rate = v.video_data_rate;
     meta->video_codec_id = v.video_codec_id;
     meta->audio_data_rate = v.audio_data_rate;
-    meta->audio_codec_id = v.audio_codec_id;
+    meta->audio_codec_id = (v.audio_codec_id == -1
+            ? 0 : v.audio_codec_id == 0
+            ? NGX_RTMP_AUDIO_UNCOMPRESSED : v.audio_codec_id);
 
     ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "live: data frame: "
