@@ -6,6 +6,8 @@ NGINX-based RTMP server
 
 * Recording published streams in FLV file
 
+* H264 support
+
 * HTTP callbacks on publish/play/record
 
 * Advanced buffering techniques
@@ -16,6 +18,9 @@ NGINX-based RTMP server
 * Works with Flash RTMP clients as well as
   ffmpeg/rtmpdump/flvstreamer etc
   (see examples in test/ subdir)
+
+* Statistics in XML/XSL in machine- & human-
+  readable form
 
 
 Build:
