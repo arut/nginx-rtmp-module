@@ -750,6 +750,7 @@ ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size)
              * we can simply ignore it */
             li = s->in_streams[n].in;
             if (li == NULL || li->next == NULL) {
+                s->in_streams[n].in = NULL;
                 continue;
             }
             /* move from last to the first */
