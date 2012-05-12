@@ -125,7 +125,12 @@
             <xsl:value-of select="flashver"/>
         </td>
         <td>
-            <xsl:value-of select="pageurl"/>
+            <a target="_blank">
+                <xsl:attribute name="href">
+                    <xsl:value-of select="pageurl"/>
+                </xsl:attribute>
+                <xsl:value-of select="pageurl"/>
+            </a>
         </td>
         <td>
             <xsl:value-of select="dropped"/>
