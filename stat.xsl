@@ -76,6 +76,9 @@
                     return false
                 </xsl:attribute>
                 <xsl:value-of select="name"/>
+                <xsl:if test="string-length(name) = 0">
+                    [EMPTY]
+                </xsl:if>
             </a>
         </td>
         <td align="middle"> <xsl:value-of select="nclients"/> </td>
