@@ -533,8 +533,8 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
             ngx_add_timer(c->write, s->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
-                return;
             }
+            return;
         }
 
         b->pos += n;
