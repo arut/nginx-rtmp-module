@@ -4,6 +4,9 @@ NGINX-based RTMP server
 
 * Live streaming of video/audio
 
+* Stream relay support for distributed
+  streaming: push & pull models
+
 * Recording published streams in FLV file
 
 * H264 support
@@ -74,6 +77,24 @@ rtmp {
             deny publish all;
 
             #allow play all;
+        }
+
+        application mypush {
+            live on;
+
+            # Every stream published here
+            # is automatically pushed to 
+            # these two machines
+            push rtmp1.example.com;
+            push rtmp2.example.com:1934;
+        }
+
+        application mypull {
+            live on;
+
+            # Pull all streams from remote machine
+            # and play locally
+            pull rtmp3.example.com;
         }
 
         # Many publishers, many subscribers
