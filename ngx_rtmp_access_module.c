@@ -230,6 +230,11 @@ ngx_rtmp_access(ngx_rtmp_session_t *s, ngx_uint_t flag)
         return NGX_ERROR;
     }
 
+    /* relay etc */
+    if (s->connection->sockaddr == NULL) {
+        return NGX_OK;
+    }
+
     switch (s->connection->sockaddr->sa_family) {
 
     case AF_INET:

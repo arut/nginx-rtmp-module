@@ -71,7 +71,7 @@
         <td>
             <a href="">
                 <xsl:attribute name="onclick">
-                    var d=document.getElementById('<xsl:value-of select="name"/>');
+                    var d=document.getElementById('<xsl:value-of select="../../name"/>-<xsl:value-of select="name"/>');
                     d.style.display=d.style.display=='none'?'':'none';
                     return false
                 </xsl:attribute>
@@ -91,7 +91,7 @@
     </tr>
     <tr style="display:none">
         <xsl:attribute name="id">
-            <xsl:value-of select="name"/>
+            <xsl:value-of select="../../name"/>-<xsl:value-of select="name"/>
         </xsl:attribute>
         <td colspan="7" ngcolor="#eeeeee">
             <table cellspacing="1" cellpadding="5">

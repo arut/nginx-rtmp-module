@@ -205,7 +205,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
 
 #define NGX_RTMP_SET_STRPAR(name)                                             \
-    s->name.len = ngx_strlen(v->name);                                         \
+    s->name.len = ngx_strlen(v->name);                                        \
     s->name.data = ngx_palloc(s->connection->pool, s->name.len);              \
     ngx_memcpy(s->name.data, v->name, s->name.len)
 
