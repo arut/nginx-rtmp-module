@@ -295,6 +295,12 @@ ngx_rtmp_relay_init(ngx_rtmp_session_t *s, u_char *name)
     len = ngx_strlen(name);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+
+    /* is this local relay end? */
+    if (ctx && ctx->src == ctx) {
+        return NGX_OK;
+    }
+
     if (ctx == NULL) {
         ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_relay_ctx_t));
         if (ctx == NULL) {
@@ -706,7 +712,6 @@ ngx_rtmp_relay_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (*cctx) {
         *cctx = ctx->next;
     }
-    ngx_rtmp_finalize_session(ctx->session);
 
     return NGX_OK;
 }
