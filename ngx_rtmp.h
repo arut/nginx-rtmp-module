@@ -126,7 +126,8 @@ typedef struct {
 
 #define NGX_RTMP_CONNECT                NGX_RTMP_MSG_MAX + 1
 #define NGX_RTMP_DISCONNECT             NGX_RTMP_MSG_MAX + 2
-#define NGX_RTMP_MAX_EVENT              NGX_RTMP_MSG_MAX + 3
+#define NGX_RTMP_HANDSHAKE_DONE         NGX_RTMP_MSG_MAX + 3
+#define NGX_RTMP_MAX_EVENT              NGX_RTMP_MSG_MAX + 4
 
 
 /* RMTP control message types */
@@ -193,8 +194,7 @@ typedef struct {
     ngx_str_t               page_url;
 
     /* handshake data */
-    ngx_buf_t              *hs_in;
-    ngx_buf_t              *hs_out1, *hs_out2;
+    ngx_buf_t              *hs_buf, *hs_bufs[3];
     ngx_uint_t              hs_stage;
 
     /* connection timestamps */
@@ -343,19 +343,23 @@ char* ngx_rtmp_message_type(uint8_t type);
 char* ngx_rtmp_user_message_type(uint16_t evt);
 #endif
 
-
 void ngx_rtmp_init_connection(ngx_connection_t *c);
+ngx_rtmp_session_t * ngx_rtmp_init_session(ngx_connection_t *c, 
+     ngx_rtmp_addr_conf_t *addr_conf);
 void ngx_rtmp_finalize_session(ngx_rtmp_session_t *s);
 void ngx_rtmp_handshake(ngx_rtmp_session_t *s);
+void ngx_rtmp_client_handshake(ngx_rtmp_session_t *s);
 void ngx_rtmp_free_handshake_buffers(ngx_rtmp_session_t *s);
 void ngx_rtmp_cycle(ngx_rtmp_session_t *s);
+ngx_int_t ngx_rtmp_fire_event(ngx_rtmp_session_t *s, ngx_uint_t evt,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 
 ngx_int_t ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size);
 
 
 /* Bit reverse: we need big-endians in many places  */
-void * ngx_rtmp_rmemcpy(void *dst, void* src, size_t n);
+void * ngx_rtmp_rmemcpy(void *dst, const void* src, size_t n);
 
 #define ngx_rtmp_rcpymem(dst, src, n) \
     (((u_char*)ngx_rtmp_rmemcpy(dst, src, n)) + (n))

@@ -9,6 +9,7 @@ CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_record_module                      \
                 ngx_rtmp_netcall_module                     \
                 ngx_rtmp_notify_module                      \
+                ngx_rtmp_relay_module                       \
                 "
 
 
@@ -34,6 +35,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_netcall_module.c    \
                 $ngx_addon_dir/ngx_rtmp_notify_module.c     \
                 $ngx_addon_dir/ngx_rtmp_stat_module.c       \
+                $ngx_addon_dir/ngx_rtmp_relay_module.c      \
                 $ngx_addon_dir/ngx_rtmp_bandwidth.c         \
                 $ngx_addon_dir/ngx_rtmp_codecs.c            \
                 "

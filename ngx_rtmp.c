@@ -762,8 +762,30 @@ ngx_rtmp_cmp_conf_addrs(const void *one, const void *two)
 }
 
 
+ngx_int_t
+ngx_rtmp_fire_event(ngx_rtmp_session_t *s, ngx_uint_t evt,
+        ngx_rtmp_header_t *h, ngx_chain_t *in)
+{
+    ngx_rtmp_core_main_conf_t      *cmcf;
+    ngx_array_t                    *ch;
+    ngx_rtmp_handler_pt            *hh;
+    size_t                          n;
+
+    cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
+
+    ch = &cmcf->events[evt];
+    hh = ch->elts;
+    for(n = 0; n < ch->nelts; ++n, ++hh) {
+        if (*hh && (*hh)(s, h, in) != NGX_OK) {
+            return NGX_ERROR;
+        }
+    }
+    return NGX_OK;
+}
+
+
 void *
-ngx_rtmp_rmemcpy(void *dst, void* src, size_t n)
+ngx_rtmp_rmemcpy(void *dst, const void* src, size_t n)
 {
     u_char     *d, *s;
 
