@@ -65,48 +65,26 @@ ngx_rtmp_make_digest(ngx_str_t *key, ngx_buf_t *src,
 {
     HMAC_CTX                hmac;
     unsigned int            len;
-    ngx_int_t               rc;
 
-    rc = NGX_ERROR;
     HMAC_CTX_init(&hmac);
-
-    if (HMAC_Init_ex(&hmac, key->data, key->len, 
-                EVP_sha256(), NULL) == 0) 
-    {
-        ngx_log_error(NGX_LOG_INFO, log, 0, "HMAC_Init_ex error");
-        goto out;
-    }
+    HMAC_Init_ex(&hmac, key->data, key->len, EVP_sha256(), NULL);
 
     if (skip && src->pos <= skip && skip <= src->last) {
-        if (skip != src->pos
-                && HMAC_Update(&hmac, src->pos, skip - src->pos) == 0) 
-        {
-            ngx_log_error(NGX_LOG_INFO, log, 0, "HMAC_Update error");
-            goto out;
+        if (skip != src->pos) {
+            HMAC_Update(&hmac, src->pos, skip - src->pos);
         }
-        if (src->last != skip + NGX_RTMP_KEYLEN
-                && HMAC_Update(&hmac, skip + NGX_RTMP_KEYLEN, 
-                    src->last - skip - NGX_RTMP_KEYLEN) == 0) 
-        {
-            ngx_log_error(NGX_LOG_INFO, log, 0, "HMAC_Update error");
-            goto out;
+        if (src->last != skip + NGX_RTMP_KEYLEN) {
+            HMAC_Update(&hmac, skip + NGX_RTMP_KEYLEN, 
+                    src->last - skip - NGX_RTMP_KEYLEN);
         }
-    } else if (HMAC_Update(&hmac, src->pos, src->last - src->pos) == 0) {
-        ngx_log_error(NGX_LOG_INFO, log, 0, "HMAC_Update error");
-        goto out;
+    } else {
+        HMAC_Update(&hmac, src->pos, src->last - src->pos);
     }
 
-    if (HMAC_Final(&hmac, dst, &len) == 0) {
-        ngx_log_error(NGX_LOG_INFO, log, 0, "HMAC_Final error");
-        goto out;
-    }
-
-    rc = NGX_OK;
-
-out:
+    HMAC_Final(&hmac, dst, &len);
     HMAC_CTX_cleanup(&hmac);
 
-    return rc;
+    return NGX_OK;
 }
 
 
