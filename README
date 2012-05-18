@@ -59,8 +59,6 @@ rtmp {
 
         chunk_size 4000;
 
-        max_buf 1M;
-
         # TV mode: one publisher, many subscribers
         application mytv {
 
