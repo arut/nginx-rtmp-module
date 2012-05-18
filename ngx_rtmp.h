@@ -348,7 +348,7 @@ ngx_rtmp_session_t * ngx_rtmp_init_session(ngx_connection_t *c,
      ngx_rtmp_addr_conf_t *addr_conf);
 void ngx_rtmp_finalize_session(ngx_rtmp_session_t *s);
 void ngx_rtmp_handshake(ngx_rtmp_session_t *s);
-void ngx_rtmp_client_handshake(ngx_rtmp_session_t *s);
+void ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async);
 void ngx_rtmp_free_handshake_buffers(ngx_rtmp_session_t *s);
 void ngx_rtmp_cycle(ngx_rtmp_session_t *s);
 ngx_int_t ngx_rtmp_fire_event(ngx_rtmp_session_t *s, ngx_uint_t evt,

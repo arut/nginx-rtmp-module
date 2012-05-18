@@ -594,7 +594,7 @@ ngx_rtmp_handshake(ngx_rtmp_session_t *s)
 
 
 void
-ngx_rtmp_client_handshake(ngx_rtmp_session_t *s)
+ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async)
 {
     ngx_connection_t           *c;
 
@@ -611,6 +611,14 @@ ngx_rtmp_client_handshake(ngx_rtmp_session_t *s)
 
     if (ngx_rtmp_handshake_make_client_request(s) != NGX_OK) {
         ngx_rtmp_finalize_session(s);
+        return;
+    }
+
+    if (async) {
+        ngx_add_timer(c->write, s->timeout);
+        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+            ngx_rtmp_finalize_session(s);
+        }
         return;
     }
 
