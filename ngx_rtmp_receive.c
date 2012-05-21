@@ -46,10 +46,14 @@ ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
 
         case NGX_RTMP_MSG_ACK:
             /* receive ack with sequence number =val */
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                "receive ack seq=%uD", val);
             break;
 
         case NGX_RTMP_MSG_ACK_SIZE:
             /* receive window size =val */
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                "receive ack_size=%uD", val);
             break;
 
         case NGX_RTMP_MSG_BANDWIDTH:
@@ -58,6 +62,10 @@ ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
 
                 (void)val;
                 (void)limit;
+
+                ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                    "receive bandwidth=%uD limit=%d", 
+                    val, (int)limit);
 
                 /* receive window size =val
                  * && limit */

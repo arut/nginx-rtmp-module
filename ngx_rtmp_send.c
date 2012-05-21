@@ -50,6 +50,9 @@
 ngx_int_t
 ngx_rtmp_send_chunk_size(ngx_rtmp_session_t *s, uint32_t chunk_size)
 {
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "send chunk_size=%uD", chunk_size);
+
     NGX_RTMP_USER_START(s, NGX_RTMP_MSG_CHUNK_SIZE);
 
     NGX_RTMP_USER_OUT4(chunk_size);
@@ -72,6 +75,9 @@ ngx_rtmp_send_abort(ngx_rtmp_session_t *s, uint32_t csid)
 ngx_int_t
 ngx_rtmp_send_ack(ngx_rtmp_session_t *s, uint32_t seq)
 {
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "send ack seq=%uD", seq);
+
     NGX_RTMP_USER_START(s, NGX_RTMP_MSG_ACK);
 
     NGX_RTMP_USER_OUT4(seq);
@@ -83,6 +89,9 @@ ngx_rtmp_send_ack(ngx_rtmp_session_t *s, uint32_t seq)
 ngx_int_t
 ngx_rtmp_send_ack_size(ngx_rtmp_session_t *s, uint32_t ack_size)
 {
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "send ack_size=%uD", ack_size);
+
     NGX_RTMP_USER_START(s, NGX_RTMP_MSG_ACK_SIZE);
 
     NGX_RTMP_USER_OUT4(ack_size);
@@ -95,6 +104,10 @@ ngx_int_t
 ngx_rtmp_send_bandwidth(ngx_rtmp_session_t *s, uint32_t ack_size,
         uint8_t limit_type)
 {
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "send bandwidth ack_size=%uD limit=%d", 
+            ack_size, (int)limit_type);
+
     NGX_RTMP_USER_START(s, NGX_RTMP_MSG_BANDWIDTH);
 
     NGX_RTMP_USER_OUT4(ack_size);
