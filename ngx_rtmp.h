@@ -194,7 +194,9 @@ typedef struct {
     ngx_str_t               page_url;
 
     /* handshake data */
-    ngx_buf_t              *hs_buf, *hs_bufs[3];
+    ngx_buf_t              *hs_buf;
+    u_char                 *hs_digest;
+    unsigned                hs_old:1;
     ngx_uint_t              hs_stage;
 
     /* connection timestamps */

@@ -14,6 +14,22 @@ static void ngx_rtmp_handshake_recv(ngx_event_t *rev);
 static void ngx_rtmp_handshake_done(ngx_rtmp_session_t *s);
 
 
+/* RTMP handshake :
+ *
+ *          =peer1=                      =peer2=
+ * challenge ----> (.....[digest1]......) ----> 1537 bytes
+ * response  <---- (...........[digest2]) <---- 1536 bytes
+ *
+ *
+ * - both packets contain random bytes except for digests
+ * - digest1 position is calculated on random packet bytes
+ * - digest2 is always at the end of the packet
+ *
+ * digest1: HMAC_SHA256(packet, peer1_partial_key)
+ * digest2: HMAC_SHA256(packet, HMAC_SHA256(digest1, peer2_full_key))
+ */
+
+
 /* Handshake keys */
 static u_char 
 ngx_rtmp_server_key[] = {
@@ -75,6 +91,8 @@ static ngx_str_t            ngx_rtmp_server_full_key
 static ngx_str_t            ngx_rtmp_server_partial_key
     = { 36, ngx_rtmp_server_key };
 
+static ngx_str_t            ngx_rtmp_client_full_key
+    = { sizeof(ngx_rtmp_client_key), ngx_rtmp_client_key };
 static ngx_str_t            ngx_rtmp_client_partial_key
     = { 30, ngx_rtmp_client_key };
 
@@ -166,15 +184,14 @@ ngx_rtmp_fill_random_buffer(ngx_buf_t *b)
 
 
 static ngx_buf_t *
-ngx_rtmp_alloc_handshake_buffer(ngx_rtmp_session_t *s, int short_buf)
+ngx_rtmp_alloc_handshake_buffer(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_chain_t                *cl;
     ngx_buf_t                  *b;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "handshake: allocating %sbuffer",
-            short_buf ? "short " : "");
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "handshake: allocating buffer");
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
@@ -197,90 +214,67 @@ ngx_rtmp_alloc_handshake_buffer(ngx_rtmp_session_t *s, int short_buf)
         b->end = b->start + NGX_RTMP_HANDSHAKE_BUFSIZE;
     }
 
-    if (short_buf) {
-        b->pos = b->last = b->start + 1;
-    } else {
-        b->pos = b->last = b->start;
-    }
+    b->pos = b->last = b->start;
 
     return b;
-}
-
-
-static ngx_int_t
-ngx_rtmp_free_handshake_buffer(ngx_rtmp_session_t *s, ngx_buf_t *b)
-{
-    ngx_rtmp_core_srv_conf_t   *cscf;
-    ngx_chain_t                *cl;
-
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
-    cl = ngx_alloc_chain_link(cscf->pool);
-    if (cl == NULL) {
-        return NGX_ERROR;
-    }
-    cl->buf = b;
-    cl->next = cscf->free_hs;
-    cscf->free_hs = cl;
-    return NGX_OK;
 }
 
 
 void
 ngx_rtmp_free_handshake_buffers(ngx_rtmp_session_t *s)
 {
-    size_t          n;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+    ngx_chain_t                *cl;
 
-    for (n = 0; n < sizeof(s->hs_bufs) / sizeof(s->hs_bufs[0]); ++n) {
-        if (s->hs_bufs[n]) {
-            ngx_rtmp_free_handshake_buffer(s, s->hs_bufs[n]);
-            s->hs_bufs[n] = NULL;
-        }
+    if (s->hs_buf == NULL) {
+        return;
     }
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+    cl = ngx_alloc_chain_link(cscf->pool);
+    if (cl == NULL) {
+        return;
+    }
+    cl->buf = s->hs_buf;
+    cl->next = cscf->free_hs;
+    cscf->free_hs = cl;
+    s->hs_buf = NULL;
 }
 
 
 static ngx_int_t
-ngx_rtmp_old_handshake_response(ngx_rtmp_session_t *s)
+ngx_rtmp_handshake_create_challenge(ngx_rtmp_session_t *s,
+        const u_char version[4], ngx_str_t *key)
 {
-    ngx_buf_t              *b;
-    u_char                 *src;
-    size_t                  len;
+    ngx_buf_t          *b;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-            "handshake: old-style handshake");
-
-    src = s->hs_bufs[0]->pos + 8;
-    len = s->hs_bufs[0]->last - src;
-
-    b = s->hs_bufs[1];
+    b = s->hs_buf;
+    b->last = b->pos = b->start;
     *b->last++ = '\x03';
     b->last = ngx_rtmp_rcpymem(b->last, &s->epoch, 4);
-    ngx_memzero(b->last, 4);
-    b->last = ngx_cpymem(b->last + 4, src, len);
-
-    b = s->hs_bufs[2];
-    b->last = ngx_rtmp_rcpymem(b->last, &s->peer_epoch, 4);
-    ngx_memzero(b->last, 4);
-    b->last = ngx_cpymem(b->last + 4, src, len);
-
+    b->last = ngx_cpymem(b->last, version, 4);
+    ngx_rtmp_fill_random_buffer(b);
+    ++b->pos;
+    if (ngx_rtmp_write_digest(b, key, 0, s->connection->log) != NGX_OK) {
+        return NGX_ERROR;
+    }
+    --b->pos;
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_rtmp_handshake_response(ngx_rtmp_session_t *s)
+ngx_rtmp_handshake_parse_challenge(ngx_rtmp_session_t *s, 
+        ngx_str_t *peer_key, ngx_str_t *key)
 {
-    u_char                 *p;
     ngx_buf_t              *b;
+    u_char                 *p;
     ngx_int_t               offs;
-    u_char                  digest[NGX_RTMP_HANDSHAKE_KEYLEN];
-    ngx_str_t               key;
 
-    /* read input buffer */
-    b = s->hs_bufs[0];
+    b = s->hs_buf;
     if (*b->pos != '\x03') {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
-                "handshake: unexpected RTMP version: %i", (ngx_int_t)*b->pos);
+                "handshake: unexpected RTMP version: %i", 
+                (ngx_int_t)*b->pos);
         return NGX_ERROR;
     }
     ++b->pos;
@@ -288,93 +282,58 @@ ngx_rtmp_handshake_response(ngx_rtmp_session_t *s)
 
     p = b->pos + 4;
     ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "handshake: client version=%i.%i.%i.%i epoch=%uD",
+            "handshake: peer version=%i.%i.%i.%i epoch=%uD",
             (ngx_int_t)p[3], (ngx_int_t)p[2],
             (ngx_int_t)p[1], (ngx_int_t)p[0],
             s->peer_epoch);
     if (*(uint32_t *)p == 0) {
-        return ngx_rtmp_old_handshake_response(s);
+        s->hs_old = 1;
+        return NGX_OK;
     }
 
-    offs = ngx_rtmp_find_digest(b, &ngx_rtmp_client_partial_key, 
-            772, s->connection->log);
+    offs = ngx_rtmp_find_digest(b, peer_key, 772, s->connection->log);
     if (offs == NGX_ERROR) {
-        offs = ngx_rtmp_find_digest(b, &ngx_rtmp_client_partial_key,
-                8, s->connection->log);
+        offs = ngx_rtmp_find_digest(b, peer_key, 8, s->connection->log);
     }
     if (offs == NGX_ERROR) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
                 "handshake: digest not found");
-        return ngx_rtmp_old_handshake_response(s);
-    }
-    b->pos += offs;
-    b->last = b->pos + NGX_RTMP_HANDSHAKE_KEYLEN;
-    if (ngx_rtmp_make_digest(&ngx_rtmp_server_full_key, b,
-            NULL, digest, s->connection->log) != NGX_OK)
-    {
-        return NGX_ERROR;
+        s->hs_old = 1;
+        return NGX_OK;
     }
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "handshake: digest found at pos=%i", offs);
-
-    /* create first output buffer */
-    b = s->hs_bufs[1];
-    *b->last++ = '\x03';
-    b->last = ngx_rtmp_rcpymem(b->last, &s->epoch, 4);
-    b->last = ngx_cpymem(b->last, ngx_rtmp_server_version, 4);
-    ngx_rtmp_fill_random_buffer(b);
-    ++b->pos;
-    if (ngx_rtmp_write_digest(b, &ngx_rtmp_server_partial_key, 
-                0, s->connection->log) != NGX_OK) 
+    b->pos += offs;
+    b->last = b->pos + NGX_RTMP_HANDSHAKE_KEYLEN;
+    s->hs_digest = ngx_palloc(s->connection->pool, NGX_RTMP_HANDSHAKE_KEYLEN);
+    if (ngx_rtmp_make_digest(key, b, NULL, s->hs_digest, s->connection->log) 
+            != NGX_OK)
     {
         return NGX_ERROR;
     }
-    --b->pos;
-
-    /* create second output buffer */
-    b = s->hs_bufs[2];
-    ngx_rtmp_fill_random_buffer(b);
-    key.data = digest;
-    key.len = sizeof(digest);
-    p = b->last - key.len;
-    if (ngx_rtmp_make_digest(&key, b, p, p, s->connection->log) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_rtmp_handshake_client_response(ngx_rtmp_session_t *s)
-{
-    /*TODO: implement good client response generation
-     * to make it possible relaying data from/to FMS.
-     *
-     * This module as server ignores the last response
-     * from client. */
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_rtmp_handshake_make_client_request(ngx_rtmp_session_t *s)
+ngx_rtmp_handshake_create_response(ngx_rtmp_session_t *s)
 {
     ngx_buf_t          *b;
+    u_char             *p;
+    ngx_str_t           key;
 
-    b = s->hs_bufs[0];
-    *b->last++ = '\x03';
-    b->last = ngx_rtmp_rcpymem(b->last, &s->epoch, 4);
-    b->last = ngx_rtmp_rcpymem(b->last, ngx_rtmp_client_version, 4);
+    b = s->hs_buf;
+    b->pos = b->last = b->start + 1;
     ngx_rtmp_fill_random_buffer(b);
-    ++b->pos;
-    if (ngx_rtmp_write_digest(b, &ngx_rtmp_client_partial_key,
-                0, s->connection->log) != NGX_OK) {
-        return NGX_ERROR;
+    if (s->hs_digest) {
+        p = b->last - NGX_RTMP_HANDSHAKE_KEYLEN;
+        key.data = s->hs_digest;
+        key.len = NGX_RTMP_HANDSHAKE_KEYLEN;
+        if (ngx_rtmp_make_digest(&key, b, p, p, s->connection->log) != NGX_OK) {
+            return NGX_ERROR;
+        }
     }
-    --b->pos;
-    
+
     return NGX_OK;
 }
 
@@ -456,15 +415,29 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
 
     switch (s->hs_stage) {
         case NGX_RTMP_HANDSHAKE_SERVER_SEND_CHALLENGE:
-            s->hs_bufs[1] = ngx_rtmp_alloc_handshake_buffer(s, 0);
-            s->hs_bufs[2] = ngx_rtmp_alloc_handshake_buffer(s, 1);
-            if (ngx_rtmp_handshake_response(s) != NGX_OK) {
+            if (ngx_rtmp_handshake_parse_challenge(s, 
+                    &ngx_rtmp_client_partial_key,
+                    &ngx_rtmp_server_full_key) != NGX_OK)
+            {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0, 
-                        "handshake: response error");
+                        "handshake: error parsing challenge");
                 ngx_rtmp_finalize_session(s);
                 return;
             }
-            s->hs_buf = s->hs_bufs[1];
+            if (s->hs_old) {
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                        "handshake: old-style challenge");
+                s->hs_buf->pos = s->hs_buf->start;
+                s->hs_buf->last = s->hs_buf->end;
+            } else if (ngx_rtmp_handshake_create_challenge(s,
+                        ngx_rtmp_server_version,
+                        &ngx_rtmp_server_partial_key) != NGX_OK) 
+            {
+                ngx_log_error(NGX_LOG_INFO, c->log, 0, 
+                        "handshake: error creating challenge");
+                ngx_rtmp_finalize_session(s);
+                return;
+            }
             ngx_rtmp_handshake_send(c->write);
             break;
 
@@ -473,19 +446,26 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
             break;
 
         case NGX_RTMP_HANDSHAKE_CLIENT_RECV_RESPONSE:
-            s->hs_bufs[2] = ngx_rtmp_alloc_handshake_buffer(s, 1);
-            s->hs_buf = s->hs_bufs[2];
+            if (ngx_rtmp_handshake_parse_challenge(s, 
+                    &ngx_rtmp_server_partial_key,
+                    &ngx_rtmp_client_full_key) != NGX_OK)
+            {
+                ngx_log_error(NGX_LOG_INFO, c->log, 0, 
+                        "handshake: error parsing challenge");
+                ngx_rtmp_finalize_session(s);
+                return;
+            }
+            s->hs_buf->pos = s->hs_buf->last = s->hs_buf->start + 1;
             ngx_rtmp_handshake_recv(c->read);
             break;
 
         case NGX_RTMP_HANDSHAKE_CLIENT_SEND_RESPONSE:
-            if (ngx_rtmp_handshake_client_response(s) != NGX_OK) {
+            if (ngx_rtmp_handshake_create_response(s) != NGX_OK) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0, 
-                        "handshake: client response error");
+                        "handshake: response error");
                 ngx_rtmp_finalize_session(s);
                 return;
             }
-            s->hs_buf = s->hs_bufs[2];
             ngx_rtmp_handshake_send(c->write);
             break;
     }
@@ -550,19 +530,27 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
 
     switch (s->hs_stage) {
         case NGX_RTMP_HANDSHAKE_SERVER_SEND_RESPONSE:
-            s->hs_buf = s->hs_bufs[2];
+            if (s->hs_old) {
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                        "handshake: old-style response");
+                s->hs_buf->pos = s->hs_buf->start + 1;
+                s->hs_buf->last = s->hs_buf->end;
+            } else if (ngx_rtmp_handshake_create_response(s) != NGX_OK) {
+                ngx_log_error(NGX_LOG_INFO, c->log, 0, 
+                        "handshake: response error");
+                ngx_rtmp_finalize_session(s);
+                return;
+            }
             ngx_rtmp_handshake_send(wev);
             break;
 
         case NGX_RTMP_HANDSHAKE_SERVER_RECV_RESPONSE:
-            s->hs_buf = s->hs_bufs[0];
             s->hs_buf->pos = s->hs_buf->last = s->hs_buf->start + 1;
             ngx_rtmp_handshake_recv(c->read);
             break;
 
         case NGX_RTMP_HANDSHAKE_CLIENT_RECV_CHALLENGE:
-            s->hs_bufs[1] = ngx_rtmp_alloc_handshake_buffer(s, 0);
-            s->hs_buf = s->hs_bufs[1];
+            s->hs_buf->pos = s->hs_buf->last = s->hs_buf->start;
             ngx_rtmp_handshake_recv(c->read);
             break;
 
@@ -585,8 +573,7 @@ ngx_rtmp_handshake(ngx_rtmp_session_t *s)
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "handshake: start server handshake");
 
-    s->hs_bufs[0] = ngx_rtmp_alloc_handshake_buffer(s, 0);
-    s->hs_buf = s->hs_bufs[0];
+    s->hs_buf = ngx_rtmp_alloc_handshake_buffer(s);
     s->hs_stage = NGX_RTMP_HANDSHAKE_SERVER_RECV_CHALLENGE;
 
     ngx_rtmp_handshake_recv(c->read);
@@ -605,11 +592,13 @@ ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async)
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "handshake: start client handshake");
 
-    s->hs_bufs[0] = ngx_rtmp_alloc_handshake_buffer(s, 0);
-    s->hs_buf = s->hs_bufs[0];
+    s->hs_buf = ngx_rtmp_alloc_handshake_buffer(s);
     s->hs_stage = NGX_RTMP_HANDSHAKE_CLIENT_SEND_CHALLENGE;
 
-    if (ngx_rtmp_handshake_make_client_request(s) != NGX_OK) {
+    if (ngx_rtmp_handshake_create_challenge(s, 
+                ngx_rtmp_client_version,
+                &ngx_rtmp_client_partial_key) != NGX_OK) 
+    {
         ngx_rtmp_finalize_session(s);
         return;
     }
