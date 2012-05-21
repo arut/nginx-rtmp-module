@@ -445,8 +445,8 @@ next:
 
 
 static ngx_int_t 
-ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
-        ngx_chain_t *in)
+ngx_rtmp_live_ext_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+        ngx_chain_t *in, ngx_uint_t skip)
 {
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_live_ctx_t            *ctx;
@@ -509,6 +509,7 @@ ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
           in_inf, sizeof(in_inf) },
     };
 
+
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL || !lacf->live) {
         return NGX_OK;
@@ -520,8 +521,8 @@ ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
      * 0 is a valid value for uncompressed audio */
     v.audio_codec_id = -1; 
 
-    if (ngx_rtmp_receive_amf(s, in, in_elts, 
-                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    if (ngx_rtmp_receive_amf(s, in, in_elts + skip, 
+                sizeof(in_elts) / sizeof(in_elts[0]) - skip)) 
     {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "live: error parsing data frame");
@@ -565,6 +566,22 @@ ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 }
 
 
+static ngx_int_t 
+ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+        ngx_chain_t *in)
+{
+    return ngx_rtmp_live_ext_meta_data(s, h, in, 0);
+}
+
+
+static ngx_int_t 
+ngx_rtmp_live_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+        ngx_chain_t *in)
+{
+    return ngx_rtmp_live_ext_meta_data(s, h, in, 1);
+}
+
+
 static ngx_int_t
 ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 {
@@ -574,13 +591,20 @@ ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
-    /* register data frame handler */
+    /* register metadata handler */
     ch = ngx_array_push(&cmcf->amf);
     if (ch == NULL) {
         return NGX_ERROR;
     }
     ngx_str_set(&ch->name, "@setDataFrame");
     ch->handler = ngx_rtmp_live_data_frame;
+
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "onMetaData");
+    ch->handler = ngx_rtmp_live_meta_data;
 
     /* register raw event handlers */
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
