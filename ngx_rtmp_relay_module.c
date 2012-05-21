@@ -691,14 +691,42 @@ static ngx_int_t
 ngx_rtmp_relay_on_result(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
-    static double               trans;
     ngx_rtmp_relay_ctx_t       *ctx;
+    static struct {
+        double                  trans;
+        u_char                  level[32];
+        u_char                  code[128];
+        u_char                  desc[1024];
+    } v;
+
+    static ngx_rtmp_amf_elt_t   in_inf[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("level"),
+          &v.level, sizeof(v.level) },
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("code"),
+          &v.code, sizeof(v.code) },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("description"),
+          &v.desc, sizeof(v.desc) },
+    };
 
     static ngx_rtmp_amf_elt_t   in_elts[] = {
 
         { NGX_RTMP_AMF_NUMBER,
           ngx_null_string,
-          &trans, 0 },
+          &v.trans, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          in_inf, sizeof(in_inf) },
     };
 
 
@@ -707,15 +735,18 @@ ngx_rtmp_relay_on_result(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    /* TODO: add analyzing <code> for errors */
-    trans = 0;
+    ngx_memzero(&v, sizeof(v));
     if (ngx_rtmp_receive_amf(s, in, in_elts, 
                 sizeof(in_elts) / sizeof(in_elts[0]))) 
     {
         return NGX_ERROR;
     }
 
-    switch ((ngx_int_t)trans) {
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+            "relay: _result: level='%s' code='%s' description='%s'",
+            v.level, v.code, v.desc);
+
+    switch ((ngx_int_t)v.trans) {
         case NGX_RTMP_RELAY_CONNECT_TRANS:
             return ngx_rtmp_relay_send_create_stream(s);
 
@@ -736,6 +767,141 @@ ngx_rtmp_relay_on_result(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         default:
             return NGX_OK;
     }
+}
+
+
+static ngx_int_t
+ngx_rtmp_relay_on_error(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    ngx_rtmp_relay_ctx_t       *ctx;
+    static struct {
+        double                  trans;
+        u_char                  level[32];
+        u_char                  code[128];
+        u_char                  desc[1024];
+    } v;
+
+    static ngx_rtmp_amf_elt_t   in_inf[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("level"),
+          &v.level, sizeof(v.level) },
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("code"),
+          &v.code, sizeof(v.code) },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("description"),
+          &v.desc, sizeof(v.desc) },
+    };
+
+    static ngx_rtmp_amf_elt_t   in_elts[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &v.trans, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          in_inf, sizeof(in_inf) },
+    };
+
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+    if (ctx == NULL || !ctx->relay) {
+        return NGX_OK;
+    }
+
+    ngx_memzero(&v, sizeof(v));
+    if (ngx_rtmp_receive_amf(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+            "relay: _error: level='%s' code='%s' description='%s'",
+            v.level, v.code, v.desc);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_relay_on_status(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    ngx_rtmp_relay_ctx_t       *ctx;
+    static struct {
+        double                  trans;
+        u_char                  level[32];
+        u_char                  code[128];
+        u_char                  desc[1024];
+    } v;
+
+    static ngx_rtmp_amf_elt_t   in_inf[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("level"),
+          &v.level, sizeof(v.level) },
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("code"),
+          &v.code, sizeof(v.code) },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("description"),
+          &v.desc, sizeof(v.desc) },
+    };
+
+    static ngx_rtmp_amf_elt_t   in_elts[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &v.trans, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          in_inf, sizeof(in_inf) },
+    };
+
+    static ngx_rtmp_amf_elt_t   in_elts_meta[] = {
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          in_inf, sizeof(in_inf) },
+    };
+
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+    if (ctx == NULL || !ctx->relay) {
+        return NGX_OK;
+    }
+
+    ngx_memzero(&v, sizeof(v));
+    if (h->type == NGX_RTMP_MSG_AMF_META) {
+        ngx_rtmp_receive_amf(s, in, in_elts_meta, 
+                sizeof(in_elts_meta) / sizeof(in_elts_meta[0]));
+    } else {
+        ngx_rtmp_receive_amf(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]));
+    }
+
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+            "relay: onStatus: level='%s' code='%s' description='%s'",
+            v.level, v.code, v.desc);
+
+    return NGX_OK;
 }
 
 
@@ -906,6 +1072,14 @@ ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf)
     ch = ngx_array_push(&cmcf->amf);
     ngx_str_set(&ch->name, "_result");
     ch->handler = ngx_rtmp_relay_on_result;
+
+    ch = ngx_array_push(&cmcf->amf);
+    ngx_str_set(&ch->name, "_error");
+    ch->handler = ngx_rtmp_relay_on_error;
+
+    ch = ngx_array_push(&cmcf->amf);
+    ngx_str_set(&ch->name, "onStatus");
+    ch->handler = ngx_rtmp_relay_on_status;
 
     return NGX_OK;
 }
