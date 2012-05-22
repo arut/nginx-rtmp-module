@@ -586,7 +586,7 @@ ngx_rtmp_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
 
             ls->addr_ntop = 1;
             ls->handler = ngx_rtmp_init_connection;
-            ls->pool_size = 256;
+            ls->pool_size = 4096;
 
             /* TODO: error_log directive */
             ls->logp = &cf->cycle->new_log;
