@@ -43,6 +43,7 @@ typedef struct {
 typedef struct {
     u_char                          name[256];
     u_char                          type[16];
+    int                             silent;
 } ngx_rtmp_publish_t;
 
 
@@ -61,6 +62,7 @@ typedef struct {
     double                          start;
     double                          duration;
     int                             reset;
+    int                             silent;
 } ngx_rtmp_play_t;
 
 

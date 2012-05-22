@@ -514,6 +514,7 @@ ngx_rtmp_relay_play_local(ngx_rtmp_session_t *s)
     }
 
     ngx_memzero(&v, sizeof(ngx_rtmp_play_t));
+    v.silent = 1;
     *(ngx_cpymem(v.name, ctx->name.data, 
             ngx_min(sizeof(v.name) - 1, ctx->name.len))) = 0;
 
@@ -533,6 +534,7 @@ ngx_rtmp_relay_publish_local(ngx_rtmp_session_t *s)
     }
 
     ngx_memzero(&v, sizeof(ngx_rtmp_publish_t));
+    v.silent = 1;
     *(ngx_cpymem(v.name, ctx->name.data, 
             ngx_min(sizeof(v.name) - 1, ctx->name.len))) = 0;
 

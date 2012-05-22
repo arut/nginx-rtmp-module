@@ -445,9 +445,13 @@ ngx_rtmp_cmd_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
           out_inf, sizeof(out_inf) },
     };
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "publish: name='%s' type=%s",
-            v->name, v->type);
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "publish: name='%s' type=%s silent=%d",
+            v->name, v->type, v->silent);
+
+    if (v->silent) {
+        return NGX_OK;
+    }
 
     /* send onStatus reply */
     memset(&h, 0, sizeof(h));
@@ -717,10 +721,14 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
           out4_inf, sizeof(out4_inf) },
     };
 
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "play: name='%s' start=%uD duration=%uD reset=%d",
+    ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "play: name='%s' start=%uD duration=%uD reset=%d silent=%d",
             v->name, (uint32_t)v->start, 
-            (uint32_t)v->duration, v->reset);
+            (uint32_t)v->duration, v->reset, v->silent);
+
+    if (v->silent) {
+        return NGX_OK;
+    }
 
     /* send onStatus reply */
     memset(&h, 0, sizeof(h));
