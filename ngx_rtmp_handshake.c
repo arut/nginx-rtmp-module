@@ -101,10 +101,15 @@ static ngx_int_t
 ngx_rtmp_make_digest(ngx_str_t *key, ngx_buf_t *src, 
         u_char *skip, u_char *dst, ngx_log_t *log)
 {
-    HMAC_CTX                hmac;
+    static HMAC_CTX         hmac;
+    static unsigned         hmac_initialized;
     unsigned int            len;
 
-    HMAC_CTX_init(&hmac);
+    if (!hmac_initialized) {
+        HMAC_CTX_init(&hmac);
+        hmac_initialized = 1;
+    }
+
     HMAC_Init_ex(&hmac, key->data, key->len, EVP_sha256(), NULL);
 
     if (skip && src->pos <= skip && skip <= src->last) {
@@ -120,7 +125,6 @@ ngx_rtmp_make_digest(ngx_str_t *key, ngx_buf_t *src,
     }
 
     HMAC_Final(&hmac, dst, &len);
-    HMAC_CTX_cleanup(&hmac);
 
     return NGX_OK;
 }
