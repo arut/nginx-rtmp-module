@@ -193,8 +193,8 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t *app,
         ngx_str_t *name, ngx_url_t *url)
 {
     ngx_rtmp_relay_ctx_t           *rctx;
-    ngx_rtmp_addr_conf_t            addr_conf;
-    ngx_rtmp_conf_ctx_t             addr_ctx;
+    ngx_rtmp_addr_conf_t           *addr_conf;
+    ngx_rtmp_conf_ctx_t            *addr_ctx;
     ngx_rtmp_session_t             *rs;
     ngx_rtmp_relay_app_conf_t      *racf;
     ngx_peer_connection_t          *pc;
@@ -263,13 +263,20 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t *app,
     c = pc->connection;
     c->pool = pool;
 
-    ngx_memzero(&addr_conf, sizeof(addr_conf));
-    addr_conf.ctx = &addr_ctx;
-    addr_ctx.main_conf = s->main_conf;
-    addr_ctx.srv_conf  = s->srv_conf;
-    ngx_str_set(&addr_conf.addr_text, "ngx-relay");
+    addr_conf = ngx_pcalloc(pool, sizeof(ngx_rtmp_addr_conf_t));
+    if (addr_conf == NULL) {
+        goto clear;
+    }
+    addr_ctx = ngx_pcalloc(pool, sizeof(ngx_rtmp_conf_ctx_t));
+    if (addr_ctx == NULL) {
+        goto clear;
+    }
+    addr_conf->ctx = addr_ctx;
+    addr_ctx->main_conf = s->main_conf;
+    addr_ctx->srv_conf  = s->srv_conf;
+    ngx_str_set(&addr_conf->addr_text, "ngx-relay");
 
-    rs = ngx_rtmp_init_session(c, &addr_conf);
+    rs = ngx_rtmp_init_session(c, addr_conf);
     if (rs == NULL) {
         /* no need to destroy pool */
         return NULL;
