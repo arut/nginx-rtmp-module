@@ -453,7 +453,7 @@ ngx_int_t ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s,
         uint32_t timestamp);
 
 /* AMF sender/receiver */
-ngx_int_t ngx_rtmp_append_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+ngx_int_t ngx_rtmp_append_amf(ngx_rtmp_session_t *s,
         ngx_chain_t **first, ngx_chain_t **last, 
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
 ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,

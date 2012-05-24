@@ -226,7 +226,7 @@ ngx_rtmp_alloc_amf_buf(void *arg)
 
 /* NOTE: this function does not free shared bufs on error */
 ngx_int_t
-ngx_rtmp_append_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+ngx_rtmp_append_amf(ngx_rtmp_session_t *s,
         ngx_chain_t **first, ngx_chain_t **last, 
         ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
@@ -272,7 +272,7 @@ ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     first = NULL;
-    rc = ngx_rtmp_append_amf(s, h, &first, NULL, elts, nelts);
+    rc = ngx_rtmp_append_amf(s, &first, NULL, elts, nelts);
     if (rc != NGX_OK || first == NULL) {
         goto done;
     }
