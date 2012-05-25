@@ -2,6 +2,7 @@
 
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 
+
 <xsl:template match="/">
     <html>
         <head>
@@ -29,6 +30,7 @@
             <th>Video</th>
             <th>Audio</th>
             <th>State</th>
+            <th>Time</th>
         </tr>
         <tr>
             <td colspan="2"/>
@@ -91,6 +93,11 @@
         <td><xsl:value-of select="meta/video"/></td>
         <td><xsl:value-of select="meta/audio"/></td>
         <td> <xsl:apply-templates select="publishing"/> </td>
+        <td>
+            <xsl:call-template name="showtime">
+               <xsl:with-param name="time" select="time"/>
+            </xsl:call-template>
+        </td>
     </tr>
     <tr style="display:none">
         <xsl:attribute name="id">
@@ -104,6 +111,7 @@
                     <th>Flash version</th>
                     <th>Page URL</th>
                     <th>Dropped</th>
+                    <th>Time</th>
                 </tr>
                 <xsl:apply-templates select="client"/>
             </table>
@@ -111,17 +119,34 @@
     </tr>
 </xsl:template>
 
+<xsl:template name="showtime">
+    <xsl:param name="time"/>
+
+    <xsl:variable name="sec">
+        <xsl:value-of select="floor(time div 1000)"/>
+    </xsl:variable>
+
+    <xsl:if test="$sec &gt;= 86400">
+        <xsl:value-of select="(floor($sec div 86400)) mod 60"/>d
+    </xsl:if>
+
+    <xsl:if test="$sec &gt;= 3600">
+        <xsl:value-of select="(floor($sec div 3600)) mod 60"/>h
+    </xsl:if>
+
+    <xsl:if test="$sec &gt;= 60">
+        <xsl:value-of select="(floor($sec div 60)) mod 60"/>m
+    </xsl:if>
+
+    <xsl:value-of select="$sec mod 60"/>s
+</xsl:template>
+
+
 <xsl:template match="client">
     <tr bgcolor="#eeeeee">
-        <td>
-            <xsl:apply-templates select="publishing"/>
-        </td>
-        <td>
-            <xsl:value-of select="address"/>
-        </td>
-        <td>
-            <xsl:value-of select="flashver"/>
-        </td>
+        <td><xsl:apply-templates select="publishing"/></td>
+        <td><xsl:value-of select="address"/></td>
+        <td><xsl:value-of select="flashver"/></td>
         <td>
             <a target="_blank">
                 <xsl:attribute name="href">
@@ -130,8 +155,11 @@
                 <xsl:value-of select="pageurl"/>
             </a>
         </td>
+        <td><xsl:value-of select="dropped"/></td>
         <td>
-            <xsl:value-of select="dropped"/>
+            <xsl:call-template name="showtime">
+               <xsl:with-param name="time" select="time"/>
+            </xsl:call-template>
         </td>
     </tr>
 </xsl:template>

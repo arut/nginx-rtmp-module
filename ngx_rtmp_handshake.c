@@ -282,6 +282,7 @@ ngx_rtmp_handshake_parse_challenge(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
     ++b->pos;
+    s->peer_epoch = 0;
     ngx_rtmp_rmemcpy(&s->peer_epoch, b->pos, 4);
 
     p = b->pos + 4;
@@ -289,7 +290,7 @@ ngx_rtmp_handshake_parse_challenge(ngx_rtmp_session_t *s,
             "handshake: peer version=%i.%i.%i.%i epoch=%uD",
             (ngx_int_t)p[3], (ngx_int_t)p[2],
             (ngx_int_t)p[1], (ngx_int_t)p[0],
-            s->peer_epoch);
+            (uint32_t)s->peer_epoch);
     if (*(uint32_t *)p == 0) {
         s->hs_old = 1;
         return NGX_OK;

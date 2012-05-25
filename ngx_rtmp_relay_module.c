@@ -1030,6 +1030,15 @@ ngx_rtmp_relay_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             ngx_rtmp_relay_push(ctx-publish->session,
                     &ctx->publish->name, &target);
         }*/
+#ifdef NGX_DEBUG
+        {
+            ngx_uint_t  n = 0;
+            for (cctx = &ctx->publish->play; *cctx; cctx = &(*cctx)->next, ++n);
+            ngx_log_debug3(NGX_LOG_DEBUG_RTMP, ctx->session->connection->log, 0, 
+                "relay: play left after disconnect app='%V' name='%V': %ui",
+                &ctx->app, &ctx->name, n);
+        }
+#endif
 
         if (ctx->publish->play == NULL) {
             ngx_log_debug2(NGX_LOG_DEBUG_RTMP, 

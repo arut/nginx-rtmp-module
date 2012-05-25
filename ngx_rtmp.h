@@ -200,8 +200,8 @@ typedef struct {
     ngx_uint_t              hs_stage;
 
     /* connection timestamps */
-    uint32_t                epoch;
-    uint32_t                peer_epoch;
+    ngx_msec_t              epoch;
+    ngx_msec_t              peer_epoch;
 
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */

@@ -53,6 +53,7 @@ struct ngx_rtmp_live_stream_s {
     ngx_rtmp_bandwidth_t                bw_in;
     ngx_rtmp_bandwidth_t                bw_out;
     ngx_rtmp_live_meta_t                meta;
+    ngx_msec_t                          epoch;
 };
 
 

@@ -161,6 +161,7 @@ ngx_rtmp_live_get_stream(ngx_rtmp_session_t *s, u_char *name, int create)
     ngx_memzero(*stream, sizeof(ngx_rtmp_live_stream_t));
     ngx_memcpy((*stream)->name, name, 
             ngx_min(sizeof((*stream)->name) - 1, len));
+    (*stream)->epoch = ngx_current_msec;
 
     return stream;
 }

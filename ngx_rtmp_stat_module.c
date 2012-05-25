@@ -227,6 +227,11 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
             NGX_RTMP_STAT_ECS(stream->name);
             NGX_RTMP_STAT_L("</name>\r\n");
 
+            NGX_RTMP_STAT_L("<time>");
+            NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
+                        "%M", ngx_current_msec - stream->epoch) - buf);
+            NGX_RTMP_STAT_L("</time>");
+
             meta = &stream->meta;
             NGX_RTMP_STAT_L("<meta><width>");
             NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
@@ -263,6 +268,11 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                     NGX_RTMP_STAT_L("<address>");
                     NGX_RTMP_STAT_S(&s->connection->addr_text);
                     NGX_RTMP_STAT_L("</address>");
+
+                    NGX_RTMP_STAT_L("<time>");
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
+                                "%M", ngx_current_msec - s->epoch) - buf);
+                    NGX_RTMP_STAT_L("</time>");
 
                     NGX_RTMP_STAT_L("<dropped>");
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
