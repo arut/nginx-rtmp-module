@@ -133,7 +133,8 @@ ngx_rtmp_reset_ping(ngx_rtmp_session_t *s)
         return;
     }
 
-    s->ping_pending = 0;
+    s->ping_active = 0;
+    s->ping_reset = 0;
     ngx_add_timer(&s->ping_evt, cscf->ping);
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -153,7 +154,13 @@ ngx_rtmp_ping(ngx_event_t *pev)
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
-    if (s->ping_pending) {
+    /* i/o event has happened; no need to ping */
+    if (s->ping_reset) {
+        ngx_rtmp_reset_ping(s);
+        return;
+    }
+
+    if (s->ping_active) {
         ngx_log_error(NGX_LOG_INFO, c->log, 0, 
                 "ping: unresponded");
         ngx_rtmp_finalize_session(s);
@@ -170,7 +177,7 @@ ngx_rtmp_ping(ngx_event_t *pev)
         return;
     }
 
-    s->ping_pending = 1;
+    s->ping_active = 1;
     ngx_add_timer(pev, cscf->ping_timeout);
 }
 
@@ -253,6 +260,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 return;
             }
 
+            s->ping_reset = 1;
             ngx_rtmp_update_bandwidth(&ngx_rtmp_bw_in, n);
             b->last += n;
             s->in_bytes += n;
@@ -510,6 +518,7 @@ ngx_rtmp_send(ngx_event_t *wev)
             return;
         }
 
+        s->ping_reset = 1;
         ngx_rtmp_update_bandwidth(&ngx_rtmp_bw_out, n);
         s->out_bpos += n;
         if (s->out_bpos == s->out_chain->buf->last) {
