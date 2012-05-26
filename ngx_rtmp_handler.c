@@ -9,6 +9,7 @@
 
 static void ngx_rtmp_recv(ngx_event_t *rev);
 static void ngx_rtmp_send(ngx_event_t *rev);
+static void ngx_rtmp_ping(ngx_event_t *rev);
 static ngx_int_t ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
        ngx_rtmp_header_t *h, ngx_chain_t *in);
 static ngx_int_t ngx_rtmp_finalize_set_chunk_size(ngx_rtmp_session_t *s);
@@ -78,10 +79,18 @@ void
 ngx_rtmp_cycle(ngx_rtmp_session_t *s)
 {
     ngx_connection_t           *c;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     c = s->connection;
     c->read->handler =  ngx_rtmp_recv;
     c->write->handler = ngx_rtmp_send;
+
+    s->ping_evt.data = c;
+    s->ping_evt.log = c->log;
+    s->ping_evt.handler = ngx_rtmp_ping;
+    ngx_rtmp_reset_ping(s);
 
     ngx_rtmp_recv(c->read);
 }
@@ -111,6 +120,58 @@ ngx_rtmp_alloc_in_buf(ngx_rtmp_session_t *s)
     b->end = b->start + size;
 
     return cl;
+}
+
+
+void
+ngx_rtmp_reset_ping(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_core_srv_conf_t   *cscf;
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+    if (cscf->ping == 0) {
+        return;
+    }
+
+    s->ping_pending = 0;
+    ngx_add_timer(&s->ping_evt, cscf->ping);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "ping: wait %Mms", cscf->ping);
+}
+
+
+static void 
+ngx_rtmp_ping(ngx_event_t *pev)
+{
+    ngx_connection_t           *c;
+    ngx_rtmp_session_t         *s;
+    ngx_rtmp_core_srv_conf_t   *cscf;
+
+    c = pev->data;
+    s = c->data;
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
+    if (s->ping_pending) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0, 
+                "ping: unresponded");
+        ngx_rtmp_finalize_session(s);
+        return;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "ping: schedule %Mms", cscf->ping_timeout);
+
+    if (ngx_rtmp_send_user_ping_request(s, (uint32_t)ngx_current_msec) 
+            != NGX_OK)
+    {
+        ngx_rtmp_finalize_session(s);
+        return;
+    }
+
+    s->ping_pending = 1;
+    ngx_add_timer(pev, cscf->ping_timeout);
 }
 
 
@@ -149,7 +210,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
         if (st->in == NULL) {
             st->in = ngx_rtmp_alloc_in_buf(s);
             if (st->in == NULL) {
-                ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR, 
+                ngx_log_error(NGX_LOG_INFO, c->log, 0,
                         "in buf alloc failed");
                 ngx_rtmp_finalize_session(s);
                 return;
@@ -240,7 +301,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     (int)fmt, csid);
 
             if (csid >= (uint32_t)cscf->max_streams) {
-                ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR,
+                ngx_log_error(NGX_LOG_INFO, c->log, 0,
                     "RTMP in chunk stream too big: %D >= %D",
                     csid, cscf->max_streams);
                 ngx_rtmp_finalize_session(s);
@@ -344,7 +405,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             b->pos = p;
 
             if (h->mlen > cscf->max_message) {
-                ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR, 
+                ngx_log_error(NGX_LOG_INFO, c->log, 0,
                         "too big message: %uz", cscf->max_message);
                 ngx_rtmp_finalize_session(s);
                 return;
@@ -491,7 +552,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (h->csid >= (uint32_t)cscf->max_streams) {
-        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ERROR,
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
                 "RTMP out chunk stream too big: %D >= %D",
                 h->csid, cscf->max_streams);
         ngx_rtmp_finalize_session(s);

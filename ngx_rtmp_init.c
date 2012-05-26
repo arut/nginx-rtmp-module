@@ -248,6 +248,10 @@ ngx_rtmp_close_session_handler(ngx_event_t *e)
     if (s) {
         ngx_rtmp_fire_event(s, NGX_RTMP_DISCONNECT, NULL, NULL);
 
+        if (s->ping_evt.timer_set) {
+            ngx_del_timer(&s->ping_evt);
+        }
+
         if (s->in_old_pool) {
             ngx_destroy_pool(s->in_old_pool);
         }

@@ -153,6 +153,7 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
 
         case NGX_RTMP_USER_PING_RESPONSE:
             /* use =val as incoming timestamp */
+            ngx_rtmp_reset_ping(s);
             break;
 
         default:

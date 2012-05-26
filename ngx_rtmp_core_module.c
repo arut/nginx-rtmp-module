@@ -71,6 +71,20 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, timeout),
       NULL },
 
+    { ngx_string("ping"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, ping),
+      NULL },
+
+    { ngx_string("ping_timeout"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, ping_timeout),
+      NULL },
+
     { ngx_string("max_streams"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -200,6 +214,8 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     }
 
     conf->timeout = NGX_CONF_UNSET_MSEC;
+    conf->ping = NGX_CONF_UNSET_MSEC;
+    conf->ping_timeout = NGX_CONF_UNSET_MSEC;
     conf->so_keepalive = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
     conf->chunk_size = NGX_CONF_UNSET;
@@ -220,6 +236,8 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_core_srv_conf_t *conf = child;
 
     ngx_conf_merge_msec_value(conf->timeout, prev->timeout, 60000);
+    ngx_conf_merge_msec_value(conf->ping, prev->ping, 0);
+    ngx_conf_merge_msec_value(conf->ping_timeout, prev->ping_timeout, 30000);
 
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 32);

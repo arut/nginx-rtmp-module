@@ -203,6 +203,10 @@ typedef struct {
     ngx_msec_t              epoch;
     ngx_msec_t              peer_epoch;
 
+    /* ping */
+    ngx_event_t             ping_evt;
+    ngx_int_t               ping_pending;
+
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */
 
@@ -263,6 +267,8 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_array_t             applications; /* ngx_rtmp_core_app_conf_t */
 
     ngx_msec_t              timeout;
+    ngx_msec_t              ping;
+    ngx_msec_t              ping_timeout;
     ngx_flag_t              so_keepalive;
     ngx_int_t               max_streams;
 
@@ -353,6 +359,7 @@ void ngx_rtmp_handshake(ngx_rtmp_session_t *s);
 void ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async);
 void ngx_rtmp_free_handshake_buffers(ngx_rtmp_session_t *s);
 void ngx_rtmp_cycle(ngx_rtmp_session_t *s);
+void ngx_rtmp_reset_ping(ngx_rtmp_session_t *s);
 ngx_int_t ngx_rtmp_fire_event(ngx_rtmp_session_t *s, ngx_uint_t evt,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 
