@@ -459,10 +459,34 @@ ngx_rtmp_live_ext_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         double                      duration;
         double                      frame_rate;
         double                      video_data_rate;
-        double                      video_codec_id;
+        double                      video_codec_id_n;
+        u_char                      video_codec_id_s[32];
         double                      audio_data_rate;
-        double                      audio_codec_id;
+        double                      audio_codec_id_n;
+        u_char                      audio_codec_id_s[32];
     }                               v;
+
+    static ngx_rtmp_amf_elt_t       in_video_codec_id[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &v.video_codec_id_n, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          &v.video_codec_id_s, sizeof(v.video_codec_id_s) },
+    };
+
+    static ngx_rtmp_amf_elt_t       in_audio_codec_id[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &v.audio_codec_id_n, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          &v.audio_codec_id_s, sizeof(v.audio_codec_id_s) },
+    };
 
     static ngx_rtmp_amf_elt_t       in_inf[] = {
 
@@ -486,17 +510,17 @@ ngx_rtmp_live_ext_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
           ngx_string("videodatarate"),
           &v.video_data_rate, 0 },
 
-        { NGX_RTMP_AMF_NUMBER, 
+        { NGX_RTMP_AMF_VARIANT, 
           ngx_string("videocodecid"),
-          &v.video_codec_id, 0 },
+          in_video_codec_id, sizeof(in_video_codec_id) },
 
         { NGX_RTMP_AMF_NUMBER, 
           ngx_string("audiodatarate"),
           &v.audio_data_rate, 0 },
 
-        { NGX_RTMP_AMF_NUMBER, 
+        { NGX_RTMP_AMF_VARIANT, 
           ngx_string("audiocodecid"),
-          &v.audio_codec_id, 0 },
+          in_audio_codec_id, sizeof(in_audio_codec_id) },
     };
 
     static ngx_rtmp_amf_elt_t       in_elts[] = {
@@ -520,7 +544,7 @@ ngx_rtmp_live_ext_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* use -1 as a sign of unchanged data;
      * 0 is a valid value for uncompressed audio */
-    v.audio_codec_id = -1; 
+    v.audio_codec_id_n = -1; 
 
     if (ngx_rtmp_receive_amf(s, in, in_elts + skip, 
                 sizeof(in_elts) / sizeof(in_elts[0]) - skip)) 
@@ -547,11 +571,11 @@ ngx_rtmp_live_ext_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     meta->duration = v.duration;
     meta->frame_rate = v.frame_rate;
     meta->video_data_rate = v.video_data_rate;
-    meta->video_codec_id = v.video_codec_id;
+    meta->video_codec_id = v.video_codec_id_n;
     meta->audio_data_rate = v.audio_data_rate;
-    meta->audio_codec_id = (v.audio_codec_id == -1
-            ? 0 : v.audio_codec_id == 0
-            ? NGX_RTMP_AUDIO_UNCOMPRESSED : v.audio_codec_id);
+    meta->audio_codec_id = (v.audio_codec_id_n == -1
+            ? 0 : v.audio_codec_id_n == 0
+            ? NGX_RTMP_AUDIO_UNCOMPRESSED : v.audio_codec_id_n);
 
     ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "live: data frame: "
