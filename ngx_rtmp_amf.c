@@ -250,6 +250,34 @@ ngx_rtmp_amf_read_array(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 }
 
 
+static ngx_int_t 
+ngx_rtmp_amf_read_variant(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts, 
+        size_t nelts)
+{
+    uint8_t                 type;
+    ngx_int_t               rc;
+    size_t                  n;
+    ngx_rtmp_amf_elt_t      elt;
+
+    rc = ngx_rtmp_amf_get(ctx, &type, 1);
+    if (rc != NGX_OK) {
+        return rc;
+    }
+
+    ngx_memzero(&elt, sizeof(elt));
+    for (n = 0; n < nelts; ++n, ++elts) {
+        if (type == elts->type) {
+            elt.data = elts->data;
+            elt.len  = elts->len;
+        }
+    }
+
+    elt.type = type | NGX_RTMP_AMF_TYPELESS;
+
+    return ngx_rtmp_amf_read(ctx, &elt, 1);
+}
+
+
 static ngx_int_t
 ngx_rtmp_amf_is_compatible_type(uint8_t t1, uint8_t t2)
 {
@@ -357,6 +385,15 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                 if (ngx_rtmp_amf_read_array(ctx, data, 
                     data && elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
                     ) != NGX_OK) 
+                {
+                    return NGX_ERROR;
+                }
+                break;
+
+            case NGX_RTMP_AMF_VARIANT_:
+                if (ngx_rtmp_amf_read_variant(ctx, data,
+                    data && elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
+                    ) != NGX_OK)
                 {
                     return NGX_ERROR;
                 }

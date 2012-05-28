@@ -26,10 +26,14 @@
 #define NGX_RTMP_AMF_INT8               0x0100
 #define NGX_RTMP_AMF_INT16              0x0101
 #define NGX_RTMP_AMF_INT32              0x0102
+#define NGX_RTMP_AMF_VARIANT_           0x0103
 
 /* r/w flags */
 #define NGX_RTMP_AMF_OPTIONAL           0x1000
 #define NGX_RTMP_AMF_TYPELESS           0x2000
+
+#define NGX_RTMP_AMF_VARIANT            (NGX_RTMP_AMF_VARIANT_\
+                                        |NGX_RTMP_AMF_TYPELESS)
 
 
 typedef struct {
