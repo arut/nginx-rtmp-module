@@ -1,0 +1,13 @@
+ngx_addon_name="ngx_rtmp_hls_module"
+
+CORE_MODULES="$CORE_MODULES 
+                ngx_rtmp_hls_module                         \
+                "
+
+
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
+                $ngx_addon_dir/ngx_rtmp_hls_module.c        \
+                "
+
+CORE_LIBS="$CORE_LIBS /home/rarutyunyan/root/lib/libavcodec.so /home/rarutyunyan/root/lib/libavformat.so"
+
