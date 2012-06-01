@@ -49,6 +49,7 @@ struct ngx_rtmp_relay_ctx_s {
     ngx_str_t                       name;
     ngx_str_t                       app;
     ngx_str_t                       url;
+    ngx_log_t                       log;
     ngx_rtmp_session_t             *session;
     ngx_rtmp_relay_ctx_t           *publish;
     ngx_rtmp_relay_ctx_t           *play;
@@ -243,7 +244,9 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t *app,
     if (pc == NULL) {
         goto clear;
     }
-    pc->log = racf->log;
+    /* copy log to keep shared log unchanged */
+    rctx->log = *racf->log;
+    pc->log = &rctx->log;
     pc->get = ngx_rtmp_relay_get_peer;
     pc->free = ngx_rtmp_relay_free_peer;
     pc->name = &url->host;
