@@ -265,6 +265,7 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t *app,
     }
     c = pc->connection;
     c->pool = pool;
+    c->addr_text = rctx->url;
 
     addr_conf = ngx_pcalloc(pool, sizeof(ngx_rtmp_addr_conf_t));
     if (addr_conf == NULL) {
