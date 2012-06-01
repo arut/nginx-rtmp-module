@@ -11,3 +11,5 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
 
 CORE_LIBS="$CORE_LIBS /home/rarutyunyan/root/lib/libavcodec.so /home/rarutyunyan/root/lib/libavformat.so"
 
+CFLAGS="$CFLAGS -I/home/rarutyunyan/root/include"
+
