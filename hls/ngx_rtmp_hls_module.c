@@ -70,10 +70,16 @@ typedef struct {
     ngx_uint_t                          flags;
     ngx_event_t                         restart_evt;
 
+    ngx_str_t                           playlist;
+    ngx_str_t                           playlist_bak;
+    ngx_str_t                           stream;
+    ngx_str_t                           name;
+
     ngx_int_t                           frag;
 
     ngx_uint_t                          width;
     ngx_uint_t                          height;
+    ngx_int_t                           sample_rate;
 
     ngx_int_t                           in_vcodec_id;
     ngx_int_t                           in_acodec_id;
@@ -96,8 +102,11 @@ typedef struct {
 typedef struct {
     ngx_flag_t                          hls;
     ngx_msec_t                          fraglen;
+    ngx_msec_t                          playlen;
+    size_t                              nfrags;
     ngx_rtmp_hls_ctx_t                **ctx;
     ngx_uint_t                          nbuckets;
+    ngx_str_t                           path;
 } ngx_rtmp_hls_app_conf_t;
 
 
@@ -115,6 +124,20 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, fraglen),
+      NULL },
+
+    { ngx_string("hls_path"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, path),
+      NULL },
+
+    { ngx_string("hls_playlist_length"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, playlen),
       NULL },
 
     ngx_null_command
@@ -337,12 +360,16 @@ ngx_rtmp_hls_init_out_video(ngx_rtmp_session_t *s, const char *cname,
     ctx->out_vcodec = stream->codec;
     ctx->out_vstream = stream->index;
 
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: video stream: %i", ctx->out_vstream);
+
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_rtmp_hls_init_out_audio(ngx_rtmp_session_t *s, const char *cname)
+ngx_rtmp_hls_init_out_audio(ngx_rtmp_session_t *s, const char *cname, 
+        ngx_int_t sample_rate)
 {
     AVCodec                    *codec;
     AVStream                   *stream;
@@ -365,8 +392,8 @@ ngx_rtmp_hls_init_out_audio(ngx_rtmp_session_t *s, const char *cname)
 
     stream->codec->codec_id = CODEC_ID_NONE;
     stream->codec->codec_type = AVMEDIA_TYPE_UNKNOWN;
-    stream->codec->sample_fmt = AV_SAMPLE_FMT_S16;
-    stream->codec->sample_rate = 44100;
+    stream->codec->sample_fmt = AV_SAMPLE_FMT_S32;
+    stream->codec->sample_rate = sample_rate;
     stream->codec->bit_rate = 128000;
     stream->codec->channels = 1;
 
@@ -379,17 +406,95 @@ ngx_rtmp_hls_init_out_audio(ngx_rtmp_session_t *s, const char *cname)
     ctx->out_acodec = stream->codec;
     ctx->out_astream = stream->index;
 
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: audio stream: %i", ctx->out_astream);
+
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, const char *fpath)
+ngx_rtmp_hls_update_playlist(ngx_rtmp_session_t *s)
+{
+    static u_char                   buffer[1024];
+    int                             fd;
+    u_char                         *p;
+    ngx_rtmp_hls_ctx_t             *ctx;
+    ssize_t                         n;
+    ngx_int_t                       ffrag;
+    ngx_rtmp_hls_app_conf_t        *hacf;
+
+
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    fd = ngx_open_file(ctx->playlist_bak.data, NGX_FILE_WRONLY, 
+            NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "hls: open failed: '%V'", 
+                &ctx->playlist_bak);
+        return NGX_ERROR;
+    }
+
+    ffrag = ctx->frag - hacf->nfrags;
+    if (ffrag < 1) {
+        ffrag = 1;
+    }
+
+    p = ngx_snprintf(buffer, sizeof(buffer), 
+            "#EXTM3U\r\n"
+            "#EXT-X-TARGETDURATION:%i\r\n"
+            "#EXT-X-MEDIA-SEQUENCE:%i\r\n\r\n",
+            /*TODO: float*/(ngx_int_t)(hacf->fraglen / 1000), ffrag);
+    n = write(fd, buffer, p - buffer);
+    if (n < 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "hls: write failed: '%V'", 
+                &ctx->playlist_bak);
+        ngx_close_file(fd);
+        return NGX_ERROR;
+    }
+
+    for (; ffrag < ctx->frag; ++ffrag) {
+        p = ngx_snprintf(buffer, sizeof(buffer), 
+                "#EXTINF: %i,\r\n"
+                "%V-%i.ts\r\n", 
+                /*TODO:float*/(ngx_int_t)(hacf->fraglen / 1000),
+                &ctx->name, ffrag);
+        n = write(fd, buffer, p - buffer);
+        if (n < 0) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                    "hls: write failed: '%V'", 
+                    &ctx->playlist_bak);
+            ngx_close_file(fd);
+            return NGX_ERROR;
+        }
+    }
+
+    ngx_close_file(fd);
+
+    if (ngx_rename_file(ctx->playlist_bak.data, ctx->playlist.data)) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "hls: rename failed: '%V'->'%V'", 
+                &ctx->playlist_bak, &ctx->playlist);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, u_char *fpath)
 {
     AVOutputFormat         *format;
     ngx_rtmp_hls_ctx_t     *ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: open stream file 's'", fpath);
 
     /* create output format */
     format = av_guess_format("mpegts", NULL, NULL);
@@ -413,10 +518,12 @@ ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, const char *fpath)
     }
 
     /* create audio stream */
-    ngx_rtmp_hls_init_out_audio(s, "libmp3lame");
+    if (ctx->sample_rate) {
+        ngx_rtmp_hls_init_out_audio(s, "libmp3lame", ctx->sample_rate);
+    }
 
     /* open file */
-    if (avio_open(&ctx->out_format->pb, fpath, AVIO_FLAG_WRITE) < 0) {
+    if (avio_open(&ctx->out_format->pb, (char *)fpath, AVIO_FLAG_WRITE) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "hls: avio_open failed");
         return NGX_ERROR;
@@ -473,7 +580,6 @@ ngx_rtmp_hls_restart(ngx_event_t *hev)
     ngx_connection_t               *c;
     ngx_rtmp_session_t             *s;
     ngx_rtmp_hls_ctx_t             *ctx;
-    static u_char                   path[NGX_MAX_PATH];
 
 
     c = hev->data;
@@ -481,15 +587,31 @@ ngx_rtmp_hls_restart(ngx_event_t *hev)
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
-    ++ctx->frag;
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "hls: restart frag=%i", ctx->frag);
 
     ngx_rtmp_hls_close_file(s);
 
-    /*TODO: escape path name */
-    *ngx_snprintf(path, sizeof(path), "/tmp/frag%i.ts", ctx->frag) = 0;
-    ngx_rtmp_hls_open_file(s, (const char *)path);
+    /* remember we have preallocated memory in ctx->stream */
+
+    /* erase old file */
+    if (ctx->frag > (ngx_int_t)hacf->nfrags) {
+        *ngx_sprintf(ctx->stream.data + ctx->stream.len, "-%i.ts", 
+                ctx->frag - hacf->nfrags) = 0;
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "hls: delete stream file '%s'", ctx->stream.data);
+        ngx_delete_file(ctx->stream.data);
+    }
+
+    ++ctx->frag;
+
+    /* create new one */
+    *ngx_sprintf(ctx->stream.data + ctx->stream.len, "-%i.ts", 
+            ctx->frag) = 0;
+    ngx_rtmp_hls_open_file(s, ctx->stream.data);
+
+    /* update playlist */
+    ngx_rtmp_hls_update_playlist(s);
 
     ngx_add_timer(hev, hacf->fraglen);
 }
@@ -501,10 +623,12 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_hls_ctx_t             *ctx;
     ngx_event_t                    *e;
+    size_t                          len;
+    u_char                         *p;
 
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
-    if (hacf == NULL || !hacf->hls) {
+    if (hacf == NULL || !hacf->hls || hacf->path.len == 0) {
         goto next;
     }
 
@@ -533,6 +657,48 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     e->log = s->connection->log;
     e->handler = ngx_rtmp_hls_restart;
     ngx_add_timer(e, hacf->fraglen);
+
+    len = ngx_strlen(v->name);
+
+    ctx->name.len = len + (ngx_uint_t)ngx_escape_uri(NULL, v->name, len, 
+            NGX_ESCAPE_URI_COMPONENT);
+    ctx->name.data = ngx_palloc(s->connection->pool,
+            ctx->name.len);
+    ngx_escape_uri(ctx->name.data, v->name, len, NGX_ESCAPE_URI_COMPONENT);
+
+    ctx->playlist.data = ngx_palloc(s->connection->pool,
+        hacf->path.len + 1 + ctx->name.len + sizeof(".m3u8"));
+    p = ngx_cpymem(ctx->playlist.data, hacf->path.data, hacf->path.len);
+    if (p[-1] != '/') {
+        *p++ = '/';
+    }
+    p = ngx_cpymem(p, ctx->name.data, ctx->name.len);
+
+    /* ctx->stream_path holds initial part of stream file path 
+     * however the space for the whole stream path
+     * is allocated */
+    ctx->stream.len = p - ctx->playlist.data;
+    ctx->stream.data = ngx_palloc(s->connection->pool,
+            ctx->stream.len + 1 + NGX_OFF_T_LEN + sizeof(".ts"));
+    ngx_memcpy(ctx->stream.data, ctx->playlist.data, ctx->stream.len);
+
+    /* playlist path */
+    p = ngx_cpymem(p, ".m3u8", sizeof(".m3u8") - 1);
+    ctx->playlist.len = p - ctx->playlist.data;
+    *p = 0;
+
+    /* playlist bak (new playlist) path */
+    ctx->playlist_bak.data = ngx_palloc(s->connection->pool, 
+        ctx->playlist.len + sizeof(".bak"));
+    p = ngx_cpymem(ctx->playlist_bak.data, ctx->playlist.data, 
+            ctx->playlist.len);
+    p = ngx_cpymem(p, ".bak", sizeof(".bak") - 1);
+    ctx->playlist_bak.len = p - ctx->playlist_bak.data;
+    *p = 0;
+
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: playlist='%V' playlist_bak='%V' stream_pattern='%V'",
+            &ctx->playlist, &ctx->playlist_bak, &ctx->stream);
 
     ngx_rtmp_hls_restart(e);
 
@@ -624,8 +790,6 @@ ngx_rtmp_hls_process_video(ngx_rtmp_session_t *s,
         return NGX_AGAIN;
     }
 
-    out_packet->stream_index = ctx->out_vstream;
-
     got_frame = 0;
     n = avcodec_encode_video2(ctx->out_vcodec, out_packet,
             ctx->frame, &got_frame);
@@ -638,6 +802,8 @@ ngx_rtmp_hls_process_video(ngx_rtmp_session_t *s,
         return NGX_AGAIN;
     }
 
+    out_packet->stream_index = ctx->out_vstream;
+
     return NGX_OK;
 }
 
@@ -648,6 +814,7 @@ ngx_rtmp_hls_process_audio(ngx_rtmp_session_t *s,
 {
     int                     got_frame, n;
     ngx_rtmp_hls_ctx_t     *ctx;
+    static ngx_int_t        sample_rates[4] = { 5512, 11025, 22050, 44100 };
 
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
@@ -656,6 +823,8 @@ ngx_rtmp_hls_process_audio(ngx_rtmp_session_t *s,
     if (ngx_rtmp_hls_init_in_audio(s, (fmt & 0xf0) >> 4) != NGX_OK) {
         return NGX_ERROR;
     }
+
+    ctx->sample_rate = sample_rates[(fmt & 0x0c) >> 2];
 
     got_frame = 0;
     n = avcodec_decode_audio4(ctx->in_acodec, ctx->frame, 
@@ -674,8 +843,6 @@ ngx_rtmp_hls_process_audio(ngx_rtmp_session_t *s,
         return NGX_AGAIN;
     }
 
-    out_packet->stream_index = ctx->out_astream;
-
     got_frame = 0;
     n = avcodec_encode_audio2(ctx->out_acodec, out_packet,
             ctx->frame, &got_frame);
@@ -687,6 +854,8 @@ ngx_rtmp_hls_process_audio(ngx_rtmp_session_t *s,
     if (!got_frame) {
         return NGX_AGAIN;
     }
+
+    out_packet->stream_index = ctx->out_astream;
 
     return NGX_OK;
 }
@@ -746,14 +915,11 @@ ngx_rtmp_hls_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     av_init_packet(&in_packet);
     in_packet.data = ngx_rtmp_hls_in_buffer + 1;
     in_packet.size = p - ngx_rtmp_hls_in_buffer - 1;
-    in_packet.dts  = 0;/*h->timestamp;*/
 
     /* prepare output packet */
     av_init_packet(&out_packet);
     out_packet.data = ngx_rtmp_hls_out_buffer;
     out_packet.size = sizeof(ngx_rtmp_hls_out_buffer);
-    /*out_packet.pts = AV_NOPTS_VALUE;
-    out_packet.dts = h->timestamp;*/
 
     n = h->type == NGX_RTMP_MSG_VIDEO
         ? ngx_rtmp_hls_process_video(s, fmt, &in_packet, &out_packet) 
@@ -788,6 +954,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
 
     conf->hls = NGX_CONF_UNSET;
     conf->fraglen = NGX_CONF_UNSET;
+    conf->playlen = NGX_CONF_UNSET;
     conf->nbuckets = 1024;
 
 	return conf;
@@ -802,10 +969,15 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
 	ngx_conf_merge_value(conf->hls, prev->hls, 0);
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
+    ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
+    ngx_conf_merge_str_value(conf->path, prev->path, "");
     conf->ctx = ngx_pcalloc(cf->pool, 
             sizeof(ngx_rtmp_hls_ctx_t *) * conf->nbuckets);
     if (conf->ctx == NULL) {
         return NGX_CONF_ERROR;
+    }
+    if (conf->fraglen) {
+        conf->nfrags = conf->playlen / conf->fraglen;
     }
 
 	return NGX_CONF_OK;
