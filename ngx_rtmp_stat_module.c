@@ -3,6 +3,7 @@
  */
 
 
+#include <nginx.h>
 #include <ngx_http.h>
 
 #include "ngx_rtmp.h"
@@ -398,6 +399,10 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     }
 
     NGX_RTMP_STAT_L("<rtmp>\r\n");
+
+    NGX_RTMP_STAT_L("<version>" NGINX_VERSION "</version>\r\n");
+    NGX_RTMP_STAT_L("<compiler>" NGX_COMPILER "</compiler>\r\n");
+    NGX_RTMP_STAT_L("<built>" __DATE__ " " __TIME__ "</built>\r\n");
 
     ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_in, &ngx_rtmp_bw_out);
 
