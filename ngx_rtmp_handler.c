@@ -79,9 +79,6 @@ void
 ngx_rtmp_cycle(ngx_rtmp_session_t *s)
 {
     ngx_connection_t           *c;
-    ngx_rtmp_core_srv_conf_t   *cscf;
-
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     c = s->connection;
     c->read->handler =  ngx_rtmp_recv;
