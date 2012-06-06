@@ -733,9 +733,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
     ngx_array_t                *evhs;
     size_t                      n;
     ngx_rtmp_handler_pt        *evh;
-    ngx_connection_t           *c;
 
-    c = s->connection;
     cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
 
 #ifdef NGX_DEBUG
@@ -747,7 +745,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
                 ch->next; 
                 ch = ch->next, ++nbufs);
 
-        ngx_log_debug7(NGX_LOG_DEBUG_RTMP, c->log, 0,
+        ngx_log_debug7(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "RTMP recv %s (%d) csid=%D timestamp=%D "
                 "mlen=%D msid=%D nbufs=%d",
                 ngx_rtmp_message_type(h->type), (int)h->type, 
@@ -756,7 +754,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
 #endif
 
     if (h->type >= NGX_RTMP_MSG_MAX) {
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "unexpected RTMP message type: %d", (int)h->type);
         return NGX_OK;
     }
@@ -764,19 +762,19 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
     evhs = &cmcf->events[h->type];
     evh = evhs->elts;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "nhandlers: %d", evhs->nelts);
 
     for(n = 0; n < evhs->nelts; ++n, ++evh) {
         if (!evh) {
             continue;
         }
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "calling handler %d", n);
            
         switch ((*evh)(s, h, in)) {
             case NGX_ERROR:
-                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                         "handler %d failed", n);
                 return NGX_ERROR;
             case NGX_DONE:
