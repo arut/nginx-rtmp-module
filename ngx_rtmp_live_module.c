@@ -285,7 +285,6 @@ static ngx_int_t
 ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *in)
 {
-    ngx_connection_t               *c;
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
     ngx_chain_t                    *out, *out_abs;
     ngx_rtmp_core_srv_conf_t       *cscf;
@@ -295,10 +294,9 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_uint_t                      prio, peer_prio;
     ngx_uint_t                      peers, dropped_peers;
 
-    c = s->connection;
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, 
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                 "live: NULL application");
         return NGX_ERROR;
     }
@@ -314,12 +312,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     if ((ctx->flags & NGX_RTMP_LIVE_PUBLISHING) == 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0,
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "live: received audio/video from non-publisher");
         return NGX_OK;
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "live: av: %s timestamp=%uD",
             h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio",
             h->timestamp);
