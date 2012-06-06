@@ -280,7 +280,6 @@ ngx_rtmp_netcall_close(ngx_connection_t *cc)
     ngx_rtmp_netcall_session_t         *cs, **css;
     ngx_pool_t                         *pool;
     ngx_rtmp_session_t                 *s;
-    ngx_connection_t                   *c;
     ngx_rtmp_netcall_ctx_t             *ctx;
 
     cs = cc->data;
@@ -293,7 +292,6 @@ ngx_rtmp_netcall_close(ngx_connection_t *cc)
 
     if (!cs->detached) {
         s = cs->session;
-        c = s->connection;
         ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_netcall_module);
 
         for(css = &ctx->cs; *css; css = &((*css)->next)) {
