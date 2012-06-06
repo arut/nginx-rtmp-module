@@ -421,14 +421,12 @@ static ngx_int_t
 ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *in)
 {
-    ngx_connection_t               *c;
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_rtmp_record_app_conf_t     *racf;
     u_char                          hdr[11], *p, *ph;
     uint32_t                        timestamp, tag_size;
     ngx_time_t                      next;
 
-    c = s->connection;
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
 
@@ -473,7 +471,7 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "record: av: mlen=%uD", h->mlen);
 
     if (ctx->file.offset == 0) {
