@@ -10,27 +10,31 @@ const char * audio_codecs[] = {
     "",
     "ADPCM",
     "MP3",
-    "",
-    "",
+    "LinearLE",
+    "Nellymoser16",
     "Nellymoser8",
     "Nellymoser",
+    "G711A",
+    "G711U",
     "",
-    "",
-    "",
-    "HE-ACC",
+    "AAC",
     "Speex",
+    "",
+    "",
+    "MP3-8K",
+    "DeviceSpecific",
     "Uncompressed"
 };
 
 
 const char * video_codecs[] = {
     "",
-    "",
+    "Jpeg",
     "Sorenson-H263",
     "ScreenVideo",
     "On2-VP6",
     "On2-VP6-Alpha",
-    "",
+    "ScreenVideo2",
     "H264",
 };
 
