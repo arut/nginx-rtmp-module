@@ -20,7 +20,7 @@ ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
     b = in->buf;
 
     if (b->last - b->pos < 4) {
-        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "too small buffer for %d message: %d",
                 (int)h->type, b->last - b->pos);
         return NGX_OK;
