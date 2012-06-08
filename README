@@ -12,7 +12,7 @@ NGINX-based RTMP server
 * H264 support
 
 * Online transcoding with FFmpeg 
-  (experimental)
+  (experimental; Linux only)
 
 * HTTP callbacks on publish/play/record
 
