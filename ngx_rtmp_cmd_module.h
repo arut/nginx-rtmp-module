@@ -13,19 +13,22 @@
 #include "ngx_rtmp.h"
 
 
-/* Basic RTMP call support */
+#define NGX_RTMP_MAX_APP            128
+#define NGX_RTMP_MAX_NAME           256
+#define NGX_RTMP_MAX_URL            256
 
-/* TODO: improve string sizes */
+
+/* Basic RTMP call support */
 
 typedef struct {
     double                          trans;
-    u_char                          app[128];
+    u_char                          app[NGX_RTMP_MAX_APP];
     u_char                          flashver[32];
-    u_char                          swf_url[256];
-    u_char                          tc_url[256];
+    u_char                          swf_url[NGX_RTMP_MAX_URL];
+    u_char                          tc_url[NGX_RTMP_MAX_URL];
     double                          acodecs;
     double                          vcodecs;
-    u_char                          page_url[256];
+    u_char                          page_url[NGX_RTMP_MAX_URL];
 } ngx_rtmp_connect_t;
 
 
@@ -41,14 +44,14 @@ typedef struct {
 
 
 typedef struct {
-    u_char                          name[256];
+    u_char                          name[NGX_RTMP_MAX_NAME];
     u_char                          type[16];
     int                             silent;
 } ngx_rtmp_publish_t;
 
 
 typedef struct {
-    u_char                          name[256];
+    u_char                          name[NGX_RTMP_MAX_NAME];
 } ngx_rtmp_fcpublish_t;
 
 
@@ -58,7 +61,7 @@ typedef ngx_rtmp_fcpublish_t ngx_rtmp_fcunsubscribe_t;
 
 
 typedef struct {
-    u_char                          name[256];
+    u_char                          name[NGX_RTMP_MAX_NAME];
     double                          start;
     double                          duration;
     int                             reset;
