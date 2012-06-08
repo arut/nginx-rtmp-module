@@ -61,6 +61,8 @@ static ngx_int_t
 ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
+    size_t                      len;
+
     static ngx_rtmp_connect_t   v;
 
     static ngx_rtmp_amf_elt_t  in_cmd[] = {
@@ -110,6 +112,11 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 sizeof(in_elts) / sizeof(in_elts[0]))) 
     {
         return NGX_ERROR;
+    }
+
+    len = ngx_strlen(v.app);
+    if (len && v.app[len - 1] == '/') {
+        v.app[len - 1] = 0;
     }
 
     return ngx_rtmp_connect 
@@ -363,6 +370,18 @@ ngx_rtmp_cmd_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 }
 
 
+static void
+ngx_rtmp_cmd_cutoff_args(u_char *s)
+{
+    u_char      *p;
+
+    p = (u_char *)ngx_strchr(s, '?');
+    if (p) {
+        *p = 0;
+    }
+}
+
+
 static ngx_int_t
 ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
@@ -397,6 +416,8 @@ ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     {
         return NGX_ERROR;
     }
+
+    ngx_rtmp_cmd_cutoff_args(v.name);
 
     return ngx_rtmp_publish
         ? ngx_rtmp_publish(s, &v)
@@ -604,6 +625,8 @@ ngx_rtmp_cmd_play_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     {
         return NGX_ERROR;
     }
+
+    ngx_rtmp_cmd_cutoff_args(v.name);
 
     return ngx_rtmp_play
         ? ngx_rtmp_play(s, &v)
