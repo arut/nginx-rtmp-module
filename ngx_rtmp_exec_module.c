@@ -35,6 +35,8 @@ typedef struct {
 
 typedef struct {
     ngx_array_t                         execs; /* ngx_rtmp_exec_conf_t */
+    ngx_msec_t                          respawn_timeout;
+    ngx_flag_t                          respawn;
 } ngx_rtmp_exec_app_conf_t;
 
 
@@ -42,11 +44,11 @@ typedef struct {
     ngx_rtmp_session_t                 *session;
     size_t                              index;
     unsigned                            active:1;
-    unsigned                            respawn:1;
     int                                 pid;
     int                                 pipefd;
     ngx_connection_t                    dummy_conn; /*needed by ngx_xxx_event*/
     ngx_event_t                         read_evt, write_evt;
+    ngx_event_t                         respawn_evt;
 } ngx_rtmp_exec_t;
 
 
@@ -68,6 +70,20 @@ static ngx_command_t  ngx_rtmp_exec_commands[] = {
       ngx_rtmp_exec_exec,
       NGX_RTMP_APP_CONF_OFFSET,
       0,
+      NULL },
+    
+    { ngx_string("respawn"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_exec_app_conf_t, respawn),
+      NULL },
+
+    { ngx_string("respawn_timeout"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_exec_app_conf_t, respawn_timeout),
       NULL },
 
       ngx_null_command
@@ -112,6 +128,9 @@ ngx_rtmp_exec_create_app_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    eacf->respawn = NGX_CONF_UNSET;
+    eacf->respawn_timeout = NGX_CONF_UNSET;
+
     if (ngx_array_init(&eacf->execs, cf->pool, 1, 
                 sizeof(ngx_rtmp_exec_conf_t)) != NGX_OK)
     {
@@ -130,6 +149,10 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     size_t                      n;
     ngx_rtmp_exec_conf_t       *ec, *pec;
 
+    ngx_conf_merge_value(conf->respawn, prev->respawn, 1);
+    ngx_conf_merge_msec_value(conf->respawn_timeout, prev->respawn_timeout, 
+            5000);
+
     if (prev->execs.nelts) {
         ec = ngx_array_push_n(&conf->execs, prev->execs.nelts);
         if (ec == NULL) {
@@ -146,26 +169,50 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
 static void 
+ngx_rtmp_exec_respawn(ngx_event_t *ev)
+{
+    ngx_rtmp_exec_t                *e;
+
+    e = ev->data;
+    ngx_rtmp_exec_run(e->session, e->index);
+}
+
+
+static void 
 ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 {
     ngx_connection_t               *dummy_conn;
     ngx_rtmp_exec_t                *e;
     ngx_rtmp_session_t             *s;
+    ngx_rtmp_exec_app_conf_t       *eacf;
 
     dummy_conn = ev->data;
     e = dummy_conn->data;
     s = e->session;
+    eacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_exec_module);
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "exec: child %ui exited; %s", 
             (ngx_int_t)e->pid,
-            e->respawn ? "respawning" : "ignoring");
+            eacf->respawn ? "respawning" : "ignoring");
 
     ngx_rtmp_exec_kill(s, e, 0);
 
-    if (e->respawn) {
-        ngx_rtmp_exec_run(s, e->index);
+    if (!eacf->respawn) {
+        return;
     }
+
+    if (eacf->respawn_timeout == 0) {
+        ngx_rtmp_exec_run(s, e->index);
+        return;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "exec: shedule respawn %Mmsec", eacf->respawn_timeout);
+    e->respawn_evt.data = e;
+    e->respawn_evt.log = s->connection->log;
+    e->respawn_evt.handler = ngx_rtmp_exec_respawn;
+    ngx_add_timer(&e->respawn_evt, eacf->respawn_timeout);
 }
 
 
@@ -175,6 +222,10 @@ ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "exec: terminating child %ui", 
             (ngx_int_t)e->pid);
+
+    if (e->respawn_evt.timer_set) {
+        ngx_del_timer(&e->respawn_evt);
+    }
 
     ngx_del_event(&e->read_evt, NGX_READ_EVENT, 0);
     e->active = 0;
@@ -322,7 +373,6 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
             if (args == NULL) {
                 exit(1);
             }
-            /*TODO: implement variables $app $name */
             arg = ec->args.elts;
             args[0] = (char *)ec->cmd.data;
             for (n = 0; n < ec->args.nelts; ++n, ++arg) {
@@ -340,7 +390,6 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
             e->session = s;
             e->index = n;
             e->active = 1;
-            e->respawn = 1;
             e->pid = pid;
             e->pipefd = pipefd[0];
 
