@@ -582,9 +582,6 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->epoch = h->timestamp;
 
         codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
-        if (codec_ctx == NULL) {
-            return NGX_OK;
-        }
         if (codec_ctx) {
             ch = *h;
 
