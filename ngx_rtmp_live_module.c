@@ -374,14 +374,14 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             if (codec_ctx) {
                 peer_out = NULL;
                 if (h->type == NGX_RTMP_MSG_AUDIO) {
-                    if (codec_ctx->aac_header) {
-                        peer_out = codec_ctx->aac_header;
+                    if (codec_ctx->aac_pheader) {
+                        peer_out = codec_ctx->aac_pheader;
                         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 
                                 0, "live: sending AAC header");
                     }
                 } else {
-                    if (codec_ctx->avc_header) {
-                        peer_out = codec_ctx->avc_header;
+                    if (codec_ctx->avc_pheader) {
+                        peer_out = codec_ctx->avc_pheader;
                         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log,
                                 0, "live: sending AVC/H264 header");
                     }

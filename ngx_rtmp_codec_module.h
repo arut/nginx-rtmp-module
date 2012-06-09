@@ -49,6 +49,10 @@ u_char * ngx_rtmp_get_video_codec_name(ngx_uint_t id);
 typedef struct {
     ngx_chain_t                *avc_header;
     ngx_chain_t                *aac_header;
+
+    /* prepared headers (for live streaming) */
+    ngx_chain_t                *avc_pheader;
+    ngx_chain_t                *aac_pheader;
 } ngx_rtmp_codec_ctx_t;
 
 

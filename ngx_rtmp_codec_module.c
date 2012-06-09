@@ -116,6 +116,16 @@ ngx_rtmp_codec_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->aac_header = NULL;
     }
 
+    if (ctx->avc_pheader) {
+        ngx_rtmp_free_shared_chain(cscf, ctx->avc_pheader);
+        ctx->avc_pheader = NULL;
+    }
+
+    if (ctx->aac_pheader) {
+        ngx_rtmp_free_shared_chain(cscf, ctx->aac_pheader);
+        ctx->aac_pheader = NULL;
+    }
+
     return NGX_OK;
 }
 
@@ -126,7 +136,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 {
     ngx_rtmp_core_srv_conf_t           *cscf;
     ngx_rtmp_codec_ctx_t               *ctx;
-    ngx_chain_t                       **header;
+    ngx_chain_t                       **header, **pheader;
     uint8_t                             fmt;
     ngx_rtmp_header_t                   ch, lh;
 
@@ -155,12 +165,14 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (h->type == NGX_RTMP_MSG_AUDIO) {
         if (((fmt & 0xf0) >> 4) == NGX_RTMP_AUDIO_AAC) {
             header = &ctx->aac_header;
+            pheader = &ctx->aac_pheader;
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                     "codec: AAC header arrived");
         }
     } else {
         if ((fmt & 0x0f) == NGX_RTMP_VIDEO_H264) {
             header = &ctx->avc_header;
+            pheader = &ctx->avc_pheader;
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                     "codec: AVC/H264 header arrived");
         }
@@ -174,6 +186,10 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_free_shared_chain(cscf, *header);
     }
 
+    if (*pheader) {
+        ngx_rtmp_free_shared_chain(cscf, *pheader);
+    }
+
     /* equal headers; timeout diff is zero */
     ngx_memzero(&ch, sizeof(ch));
     ngx_memzero(&lh, sizeof(lh));
@@ -185,7 +201,8 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         : NGX_RTMP_LIVE_CSID_AUDIO);
     lh = ch;
     *header = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
-    ngx_rtmp_prepare_message(s, &ch, &lh, *header);
+    *pheader = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
+    ngx_rtmp_prepare_message(s, &ch, &lh, *pheader);
 
     return NGX_OK;
 }

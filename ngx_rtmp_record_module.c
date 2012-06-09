@@ -240,11 +240,6 @@ ngx_rtmp_record_open(ngx_rtmp_session_t *s)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
             "record: opened '%s'", ctx->path);
 
-    if (ngx_rtmp_record_write_header(&ctx->file) != NGX_OK) {
-        ngx_rtmp_record_close(s);
-        return NGX_OK;
-    }
-
     return NGX_OK;
 }
 
@@ -581,11 +576,17 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (ctx->file.offset == 0) {
         ctx->epoch = h->timestamp;
 
+        if (ngx_rtmp_record_write_header(&ctx->file) != NGX_OK) {
+            ngx_rtmp_record_close(s);
+            return NGX_OK;
+        }
+
         codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
         if (codec_ctx) {
             ch = *h;
 
-            if (codec_ctx->aac_header) {
+            if (codec_ctx->aac_header && (racf->flags & NGX_RTMP_RECORD_AUDIO)) 
+            {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                         "record: writing AAC header");
                 ch.type = NGX_RTMP_MSG_AUDIO;
@@ -597,7 +598,9 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 }
             }
 
-            if (codec_ctx->avc_header) {
+            if (codec_ctx->avc_header && (racf->flags 
+                & (NGX_RTMP_RECORD_VIDEO|NGX_RTMP_RECORD_KEYFRAMES))) 
+            {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                         "record: writing AVC header");
                 ch.type = NGX_RTMP_MSG_VIDEO;
