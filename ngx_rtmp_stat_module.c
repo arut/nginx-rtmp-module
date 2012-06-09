@@ -8,7 +8,7 @@
 
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_live_module.h"
-#include "ngx_rtmp_codecs.h"
+#include "ngx_rtmp_codec_module.h"
 
 
 static ngx_int_t ngx_rtmp_stat_postconfiguration(ngx_conf_t *cf);
