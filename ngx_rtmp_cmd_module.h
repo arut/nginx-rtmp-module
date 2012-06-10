@@ -29,6 +29,7 @@ typedef struct {
     double                          acodecs;
     double                          vcodecs;
     u_char                          page_url[NGX_RTMP_MAX_URL];
+    double                          object_encoding;
 } ngx_rtmp_connect_t;
 
 

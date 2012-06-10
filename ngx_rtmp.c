@@ -384,8 +384,12 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     };
 
     static size_t               amf_events[] = {
+        NGX_RTMP_MSG_AMF_CMD,
         NGX_RTMP_MSG_AMF_META,
-        NGX_RTMP_MSG_AMF_CMD
+        NGX_RTMP_MSG_AMF_SHARED,
+        NGX_RTMP_MSG_AMF3_CMD,
+        NGX_RTMP_MSG_AMF3_META,
+        NGX_RTMP_MSG_AMF3_SHARED
     };
 
     /* init standard protocol events */
@@ -399,10 +403,6 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
         eh = ngx_array_push(&cmcf->events[amf_events[n]]);
         *eh = ngx_rtmp_amf_message_handler;
     }
-
-    /* init amf shared object events */
-    eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AMF_SHARED]);
-    *eh = ngx_rtmp_amf_shared_object_handler;
 
     /* init user protocol events */
     eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_USER]);

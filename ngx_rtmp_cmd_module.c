@@ -94,6 +94,10 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         { NGX_RTMP_AMF_STRING,
           ngx_string("pageUrl"),
           v.page_url, sizeof(v.page_url) },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("objectEncoding"),
+          &v.object_encoding, 0},
     };
 
     static ngx_rtmp_amf_elt_t  in_elts[] = {
@@ -195,11 +199,13 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
-    ngx_log_debug7(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+    ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "connect: app='%s' flashver='%s' swf_url='%s' "
-            "tc_url='%s' page_url='%s' acodecs=%uD vcodecs=%uD", 
+            "tc_url='%s' page_url='%s' acodecs=%uD vcodecs=%uD "
+            "object_encoding=%ui", 
             v->app, v->flashver, v->swf_url, v->tc_url, v->page_url,
-            (uint32_t)v->acodecs, (uint32_t)v->vcodecs);
+            (uint32_t)v->acodecs, (uint32_t)v->vcodecs,
+            (ngx_int_t)v->object_encoding);
 
     trans = v->trans;
 
@@ -246,6 +252,8 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
                 "connect: application not found: '%s'", v->app);
         return NGX_ERROR;
     }
+
+    object_encoding = v->object_encoding;
 
     /* send all replies */
     return ngx_rtmp_send_ack_size(s, cscf->ack_window) != NGX_OK
