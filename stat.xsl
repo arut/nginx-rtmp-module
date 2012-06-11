@@ -113,6 +113,7 @@
                     <th>Flash version</th>
                     <th>Page URL</th>
                     <th>Dropped</th>
+                    <th>A-V</th>
                     <th>Time</th>
                 </tr>
                 <xsl:apply-templates select="client"/>
@@ -158,6 +159,7 @@
             </a>
         </td>
         <td><xsl:value-of select="dropped"/></td>
+        <td><xsl:value-of select="avsync"/></td>
         <td>
             <xsl:call-template name="showtime">
                <xsl:with-param name="time" select="time"/>
