@@ -365,7 +365,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     header_offset = 0;
     header_version = 0;
     if (codec_ctx) {
-        peer_out = NULL;
         if (h->type == NGX_RTMP_MSG_AUDIO) {
             if (codec_ctx->aac_pheader) {
                 header_out = codec_ctx->aac_pheader;
