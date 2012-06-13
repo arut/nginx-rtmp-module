@@ -93,6 +93,7 @@ ngx_module_t  ngx_rtmp_stat_module = {
 };
 
 
+
 #define NGX_RTMP_STAT_BUFSIZE           256
 
 
@@ -199,6 +200,51 @@ ngx_rtmp_stat_bw(ngx_http_request_t *r, ngx_chain_t ***lll,
 }
 
 
+#ifdef NGX_RTMP_POOL_DEBUG
+static void
+ngx_rtmp_stat_get_pool_size(ngx_pool_t *pool, ngx_uint_t *nlarge,
+        size_t *size)
+{
+    ngx_pool_large_t       *l;
+    ngx_pool_t             *p, *n;
+
+    *nlarge = 0;
+    for (l = pool->large; l; l = l->next) {
+        ++*nlarge;
+    }
+
+    *size = 0;
+    for (p = pool, n = pool->d.next; /* void */; p = n, n = n->d.next) {
+        *size += (p->d.last - (u_char *)p);
+        if (n == NULL) {
+            break;
+        }
+    }
+}
+
+
+static void
+ngx_rtmp_stat_dump_pool(ngx_http_request_t *r, ngx_chain_t ***lll, 
+        ngx_pool_t *pool)
+{
+    ngx_uint_t              nlarge;
+    size_t                  size;
+    u_char                  buf[NGX_OFF_T_LEN + 1];
+
+    size = 0;
+    nlarge = 0;
+    ngx_rtmp_stat_get_pool_size(pool, &nlarge, &size);
+    NGX_RTMP_STAT_L("<pool><nlarge>");
+    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                "%ui", nlarge) - buf);
+    NGX_RTMP_STAT_L("</nlarge><size>");
+    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                "%uz", size) - buf);
+    NGX_RTMP_STAT_L("</size></pool>\r\n");
+}
+#endif
+
+
 static void
 ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll, 
         ngx_rtmp_live_app_conf_t *lacf)
@@ -265,6 +311,10 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                  * 2) drop stats  */
                 if (slcf->stat & NGX_RTMP_STAT_CLIENTS) {
                     NGX_RTMP_STAT_L("<client>");
+
+#ifdef NGX_RTMP_POOL_DEBUG
+                    ngx_rtmp_stat_dump_pool(r, lll, s->connection->pool);
+#endif
 
                     NGX_RTMP_STAT_L("<address>");
                     NGX_RTMP_STAT_S(&s->connection->addr_text);
@@ -362,6 +412,10 @@ ngx_rtmp_stat_server(ngx_http_request_t *r, ngx_chain_t ***lll,
     size_t                          n;
 
     NGX_RTMP_STAT_L("<server>\r\n");
+
+#ifdef NGX_RTMP_POOL_DEBUG
+    ngx_rtmp_stat_dump_pool(r, lll, cscf->pool);
+#endif
 
     cacf = cscf->applications.elts;
     for (n = 0; n < cscf->applications.nelts; ++n, ++cacf) {
