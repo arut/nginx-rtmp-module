@@ -11,6 +11,11 @@
 static ngx_int_t ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf);
 
 
+/* Global header version is used to identify
+ * incoming AAC/AVC header */
+static ngx_uint_t       header_version;
+
+
 static ngx_rtmp_module_t  ngx_rtmp_codec_module_ctx = {
     NULL,                                   /* preconfiguration */
     ngx_rtmp_codec_postconfiguration,       /* postconfiguration */
@@ -139,6 +144,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t                       **header, **pheader;
     uint8_t                             fmt;
     ngx_rtmp_header_t                   ch, lh;
+    ngx_uint_t                         *version;
 
     /* save AVC/AAC header */
     if ((h->type != NGX_RTMP_MSG_AUDIO
@@ -166,6 +172,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         if (((fmt & 0xf0) >> 4) == NGX_RTMP_AUDIO_AAC) {
             header = &ctx->aac_header;
             pheader = &ctx->aac_pheader;
+            version = &ctx->aac_version;
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                     "codec: AAC header arrived");
         }
@@ -173,6 +180,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         if ((fmt & 0x0f) == NGX_RTMP_VIDEO_H264) {
             header = &ctx->avc_header;
             pheader = &ctx->avc_pheader;
+            version = &ctx->avc_version;
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                     "codec: AVC/H264 header arrived");
         }
@@ -203,6 +211,11 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     *header = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
     *pheader = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
     ngx_rtmp_prepare_message(s, &ch, &lh, *pheader);
+
+    /* don't want zero as version value */
+    do {
+        *version = ++header_version;
+    } while (*version == 0);
 
     return NGX_OK;
 }

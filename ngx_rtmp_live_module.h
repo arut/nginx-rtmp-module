@@ -49,6 +49,8 @@ struct ngx_rtmp_live_ctx_s {
     uint32_t                            next_push;
     uint32_t                            last_audio;
     uint32_t                            last_video;
+    ngx_uint_t                          aac_version;
+    ngx_uint_t                          avc_version;
 };
 
 

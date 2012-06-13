@@ -283,7 +283,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 {
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
-    ngx_chain_t                    *out, *peer_out;
+    ngx_chain_t                    *out, *peer_out, *header_out;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
@@ -291,6 +291,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_uint_t                      prio, peer_prio;
     ngx_uint_t                      peers, dropped_peers;
     uint8_t                         flv_fmt;
+    size_t                          header_offset;
+    ngx_uint_t                      header_version;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
@@ -358,6 +360,27 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
     }
 
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+    header_out = NULL;
+    header_offset = 0;
+    header_version = 0;
+    if (codec_ctx) {
+        peer_out = NULL;
+        if (h->type == NGX_RTMP_MSG_AUDIO) {
+            if (codec_ctx->aac_pheader) {
+                header_out = codec_ctx->aac_pheader;
+                header_offset = offsetof(ngx_rtmp_live_ctx_t, aac_version);
+                header_version = codec_ctx->aac_version;
+            }
+        } else {
+            if (codec_ctx->avc_pheader) {
+                header_out = codec_ctx->avc_pheader;
+                header_offset = offsetof(ngx_rtmp_live_ctx_t, avc_version);
+                header_version = codec_ctx->avc_version;
+            }
+        }
+    }
+
     /* broadcast to all subscribers */
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
         if (pctx == ctx) {
@@ -378,29 +401,19 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             pctx->msg_mask |= (1 << h->type);
             ngx_rtmp_send_message(ss, peer_out, prio);
             ngx_rtmp_free_shared_chain(cscf, peer_out);
-
-            /* send AVC/H264 header */
-            codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
-            if (codec_ctx) {
-                peer_out = NULL;
-                if (h->type == NGX_RTMP_MSG_AUDIO) {
-                    if (codec_ctx->aac_pheader) {
-                        peer_out = codec_ctx->aac_pheader;
-                        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 
-                                0, "live: sending AAC header");
-                    }
-                } else {
-                    if (codec_ctx->avc_pheader) {
-                        peer_out = codec_ctx->avc_pheader;
-                        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log,
-                                0, "live: sending AVC/H264 header");
-                    }
-                }
-                if (peer_out) {
-                    ngx_rtmp_send_message(ss, peer_out, prio);
-                }
-            }
             continue;
+        }
+
+        /* send AVC/H264 header */
+        if (header_out && *(ngx_uint_t *)((u_char *)pctx + header_offset) 
+                != header_version) 
+        {
+            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
+                    "live: sending codec header");
+            if (ngx_rtmp_send_message(ss, header_out, prio) == NGX_OK) {
+                *(ngx_uint_t *)((u_char *)pctx + header_offset) 
+                    = header_version;
+            }
         }
 
         /* push buffered data */

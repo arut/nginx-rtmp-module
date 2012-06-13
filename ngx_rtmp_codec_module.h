@@ -47,6 +47,9 @@ u_char * ngx_rtmp_get_video_codec_name(ngx_uint_t id);
 
 
 typedef struct {
+    ngx_uint_t                  avc_version;
+    ngx_uint_t                  aac_version;
+
     ngx_chain_t                *avc_header;
     ngx_chain_t                *aac_header;
 
