@@ -200,8 +200,6 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* equal headers; timeout diff is zero */
     ngx_memzero(&ch, sizeof(ch));
-    ngx_memzero(&lh, sizeof(lh));
-    ch.timestamp = h->timestamp;
     ch.msid = NGX_RTMP_LIVE_MSID;
     ch.type = h->type;
     ch.csid = (h->type == NGX_RTMP_MSG_VIDEO
