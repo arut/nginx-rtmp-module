@@ -290,6 +290,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_header_t               ch, lh;
     ngx_uint_t                      prio, peer_prio;
     ngx_uint_t                      peers, dropped_peers;
+    uint8_t                         flv_fmt;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
@@ -347,6 +348,15 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     peers = 0;
     dropped_peers = 0;
+
+    if (in->buf->last - in->buf->pos >= 1) {
+        flv_fmt = *in->buf->pos;
+        if (h->type == NGX_RTMP_MSG_AUDIO) {
+            ctx->stream->meta.audio_codec_id = (flv_fmt & 0xf0) >> 4;
+        } else {
+            ctx->stream->meta.video_codec_id = (flv_fmt & 0x0f);
+        }
+    }
 
     /* broadcast to all subscribers */
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
