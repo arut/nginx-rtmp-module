@@ -8,11 +8,18 @@
 
 
 #include "ngx_rtmp.h"
+#include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_bandwidth.h"
 
 
 /* session flags */
 #define NGX_RTMP_LIVE_PUBLISHING        0x01
+
+
+/* Chunk stream ids for output */
+#define NGX_RTMP_LIVE_CSID_AUDIO        6
+#define NGX_RTMP_LIVE_CSID_VIDEO        7
+#define NGX_RTMP_LIVE_MSID              1
 
 
 typedef struct {
@@ -46,7 +53,7 @@ struct ngx_rtmp_live_ctx_s {
 
 
 struct ngx_rtmp_live_stream_s {
-    u_char                              name[256];
+    u_char                              name[NGX_RTMP_MAX_NAME];
     ngx_rtmp_live_stream_t             *next;
     ngx_rtmp_live_ctx_t                *ctx;
     ngx_uint_t                          flags;
@@ -54,7 +61,6 @@ struct ngx_rtmp_live_stream_s {
     ngx_rtmp_bandwidth_t                bw_out;
     ngx_rtmp_live_meta_t                meta;
     ngx_msec_t                          epoch;
-    ngx_chain_t                        *avc_header;
 };
 
 

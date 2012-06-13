@@ -5,18 +5,12 @@
 
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"
-#include "ngx_rtmp_codecs.h"
+#include "ngx_rtmp_codec_module.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_delete_stream_pt        next_delete_stream;
-
-
-/* Chunk stream ids for output */
-#define NGX_RTMP_LIVE_CSID_AUDIO        6
-#define NGX_RTMP_LIVE_CSID_VIDEO        7
-#define NGX_RTMP_LIVE_MSID              1
 
 
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
@@ -268,10 +262,6 @@ ngx_rtmp_live_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "live: delete empty stream '%s'", ctx->stream->name);
 
-    if (ctx->stream->avc_header) {
-        ngx_rtmp_free_shared_chain(cscf, ctx->stream->avc_header);
-    }
-
     stream = ngx_rtmp_live_get_stream(s, ctx->stream->name, 0);
     if (stream == NULL) {
         return NGX_ERROR;
@@ -292,14 +282,14 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
-    ngx_chain_t                    *out, *out_abs;
+    ngx_rtmp_codec_ctx_t           *codec_ctx;
+    ngx_chain_t                    *out, *peer_out;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
     ngx_rtmp_header_t               ch, lh;
     ngx_uint_t                      prio, peer_prio;
     ngx_uint_t                      peers, dropped_peers;
-    uint8_t                         flv_fmt;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
@@ -358,28 +348,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     peers = 0;
     dropped_peers = 0;
 
-    /* parse meta */
-    if (in->buf->last - in->buf->pos >= 1) {
-        flv_fmt = *in->buf->pos;
-        if (h->type == NGX_RTMP_MSG_AUDIO) {
-            ctx->stream->meta.audio_codec_id = (flv_fmt & 0xf0) >> 4;
-        } else {
-            ctx->stream->meta.video_codec_id = (flv_fmt & 0x0f);
-            if (ctx->stream->meta.video_codec_id == 7 
-                    && in->buf->last - in->buf->pos >= 2
-                    && in->buf->pos[1] == 0) 
-            {
-                /* AVC/H264 sequence header;
-                 * save it for future */
-                if (ctx->stream->avc_header) {
-                    ngx_rtmp_free_shared_chain(cscf, ctx->stream->avc_header);
-                }
-                ctx->stream->avc_header = out;
-                ngx_rtmp_acquire_shared_chain(out);
-            }
-        }
-    }
-
     /* broadcast to all subscribers */
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
         if (pctx == ctx) {
@@ -395,27 +363,38 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                     "live: av: abs %s timestamp=%uD",
                     h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio",
                     ch.timestamp);
-            out_abs = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
-            ngx_rtmp_prepare_message(s, &ch, NULL, out_abs);
+            peer_out = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
+            ngx_rtmp_prepare_message(s, &ch, NULL, peer_out);
             pctx->msg_mask |= (1 << h->type);
-            ngx_rtmp_send_message(ss, out_abs, prio);
-            ngx_rtmp_free_shared_chain(cscf, out_abs);
+            ngx_rtmp_send_message(ss, peer_out, prio);
+            ngx_rtmp_free_shared_chain(cscf, peer_out);
 
             /* send AVC/H264 header */
-            if (ctx->stream->avc_header) {
-                /*TODO: make it absolute & send instead of ythe above frame */
-                ngx_rtmp_send_message(ss, ctx->stream->avc_header, prio);
+            codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+            if (codec_ctx) {
+                peer_out = NULL;
+                if (h->type == NGX_RTMP_MSG_AUDIO) {
+                    if (codec_ctx->aac_pheader) {
+                        peer_out = codec_ctx->aac_pheader;
+                        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 
+                                0, "live: sending AAC header");
+                    }
+                } else {
+                    if (codec_ctx->avc_pheader) {
+                        peer_out = codec_ctx->avc_pheader;
+                        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log,
+                                0, "live: sending AVC/H264 header");
+                    }
+                }
+                if (peer_out) {
+                    ngx_rtmp_send_message(ss, peer_out, prio);
+                }
             }
             continue;
         }
 
         /* push buffered data */
         peer_prio = prio;
-        /*
-        if (lacf->buflen && h->timestamp >= pctx->next_push) {
-            peer_prio = 0;
-            pctx->next_push = h->timestamp + lacf->buflen;
-        }*/
         if (ngx_rtmp_send_message(ss, out, peer_prio) != NGX_OK) {
             ++pctx->dropped;
             ++dropped_peers;
