@@ -106,18 +106,25 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, chunk_size),
       NULL },
 
-    { ngx_string("max_queue"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_size_slot,
-      NGX_RTMP_SRV_CONF_OFFSET,
-      offsetof(ngx_rtmp_core_srv_conf_t, max_queue),
-      NULL },
-
     { ngx_string("max_message"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
       NGX_RTMP_SRV_CONF_OFFSET,
       offsetof(ngx_rtmp_core_srv_conf_t, max_message),
+      NULL },
+
+    { ngx_string("out_queue"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, out_queue),
+      NULL },
+
+    { ngx_string("out_cork"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, out_cork),
       NULL },
 
     /* time fixes are needed for flash clients */
@@ -220,8 +227,9 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->max_streams = NGX_CONF_UNSET;
     conf->chunk_size = NGX_CONF_UNSET;
     conf->ack_window = NGX_CONF_UNSET;
-    conf->max_queue = NGX_CONF_UNSET;
     conf->max_message = NGX_CONF_UNSET;
+    conf->out_queue = NGX_CONF_UNSET;
+    conf->out_cork = NGX_CONF_UNSET;
     conf->play_time_fix = NGX_CONF_UNSET;
     conf->publish_time_fix = NGX_CONF_UNSET;
 
@@ -243,9 +251,10 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 32);
     ngx_conf_merge_value(conf->chunk_size, prev->chunk_size, 4096);
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
-    ngx_conf_merge_size_value(conf->max_queue, prev->max_queue, 256);
     ngx_conf_merge_size_value(conf->max_message, prev->max_message, 
             1 * 1024 * 1024);
+    ngx_conf_merge_size_value(conf->out_queue, prev->out_queue, 256);
+    ngx_conf_merge_size_value(conf->out_cork, prev->out_cork, 32);
     ngx_conf_merge_value(conf->play_time_fix, prev->play_time_fix, 1);
     ngx_conf_merge_value(conf->publish_time_fix, prev->publish_time_fix, 1);
 
