@@ -293,6 +293,10 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
           &v.frame_rate, 0 },
 
         { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("fps"),
+          &v.frame_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
           ngx_string("videodatarate"),
           &v.video_data_rate, 0 },
 
