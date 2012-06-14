@@ -177,11 +177,11 @@
 </xsl:template>
 
 <xsl:template match="profile">
-    /<xsl:value-of select="."/>
+    / <xsl:value-of select="."/>
 </xsl:template>
 
 <xsl:template match="level">
-    /<xsl:value-of select="."/>
+    / <xsl:value-of select="."/>
 </xsl:template>
 
 </xsl:stylesheet>
