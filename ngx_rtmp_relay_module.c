@@ -9,6 +9,7 @@
 
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_play_pt             next_play;
+static ngx_rtmp_delete_stream_pt    next_delete_stream;
 
 
 static ngx_int_t ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf);
@@ -316,6 +317,10 @@ ngx_rtmp_relay_create_local_ctx(ngx_rtmp_session_t *s, ngx_str_t *app,
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_relay_module);
     }
     ctx->session = s;
+
+    if (ctx->publish) {
+        return NULL;
+    }
     
     ctx->name.len = name->len;
     ctx->name.data = ngx_palloc(s->connection->pool, name->len);
@@ -1003,8 +1008,7 @@ ngx_rtmp_relay_handshake_done(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
 
 static ngx_int_t
-ngx_rtmp_relay_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_chain_t *in)
+ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 {
     ngx_rtmp_relay_app_conf_t          *racf;
     ngx_rtmp_relay_ctx_t               *ctx, **cctx;
@@ -1012,7 +1016,7 @@ ngx_rtmp_relay_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx == NULL || ctx->publish == NULL) {
-        return NGX_OK;
+        goto next;
     }
 
     /* play end disconnect? */
@@ -1052,7 +1056,9 @@ ngx_rtmp_relay_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             ngx_rtmp_finalize_session(ctx->publish->session);
         }
 
-        return NGX_OK;
+        ctx->publish = NULL;
+
+        goto next;
     }
 
     /* publish end disconnect */
@@ -1077,7 +1083,8 @@ ngx_rtmp_relay_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         *cctx = ctx->next;
     }
 
-    return NGX_OK;
+next:
+    return next_delete_stream(s, v);
 }
 
 
@@ -1149,15 +1156,15 @@ ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf)
     h = ngx_array_push(&cmcf->events[NGX_RTMP_HANDSHAKE_DONE]);
     *h = ngx_rtmp_relay_handshake_done;
 
-    h = ngx_array_push(&cmcf->events[NGX_RTMP_DISCONNECT]);
-    *h = ngx_rtmp_relay_disconnect;
-
 
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_relay_publish;
 
     next_play = ngx_rtmp_play;
     ngx_rtmp_play = ngx_rtmp_relay_play;
+
+    next_delete_stream = ngx_rtmp_delete_stream;
+    ngx_rtmp_delete_stream = ngx_rtmp_relay_delete_stream;
 
 
     ch = ngx_array_push(&cmcf->amf);

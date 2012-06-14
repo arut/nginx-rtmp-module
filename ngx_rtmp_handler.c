@@ -41,7 +41,7 @@ ngx_rtmp_message_type(uint8_t type)
         "?",
         "amf3_meta",
         "amf3_shared",
-        "amd3_cmd",
+        "amf3_cmd",
         "amf_meta",
         "amf_shared",
         "amf_cmd",

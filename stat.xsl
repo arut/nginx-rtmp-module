@@ -92,7 +92,11 @@
         <td><xsl:value-of select="round(bwout div 1024)"/></td>
         <td><xsl:value-of select="meta/width"/>x<xsl:value-of select="meta/height"/></td>
         <td align="middle"><xsl:value-of select="meta/framerate"/></td>
-        <td><xsl:value-of select="meta/video"/></td>
+        <td>
+            <xsl:value-of select="meta/video"/>
+            <xsl:apply-templates select="meta/profile"/>
+            <xsl:apply-templates select="meta/level"/>
+        </td>
         <td><xsl:value-of select="meta/audio"/></td>
         <td> <xsl:apply-templates select="publishing"/> </td>
         <td>
@@ -113,6 +117,7 @@
                     <th>Flash version</th>
                     <th>Page URL</th>
                     <th>Dropped</th>
+                    <th>A-V</th>
                     <th>Time</th>
                 </tr>
                 <xsl:apply-templates select="client"/>
@@ -158,6 +163,7 @@
             </a>
         </td>
         <td><xsl:value-of select="dropped"/></td>
+        <td><xsl:value-of select="avsync"/></td>
         <td>
             <xsl:call-template name="showtime">
                <xsl:with-param name="time" select="time"/>
@@ -168,6 +174,14 @@
 
 <xsl:template match="publishing">
     publishing
+</xsl:template>
+
+<xsl:template match="profile">
+    / <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="level">
+    / <xsl:value-of select="."/>
 </xsl:template>
 
 </xsl:stylesheet>

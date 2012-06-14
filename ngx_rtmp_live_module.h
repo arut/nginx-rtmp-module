@@ -8,6 +8,7 @@
 
 
 #include "ngx_rtmp.h"
+#include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_bandwidth.h"
 
 
@@ -15,16 +16,10 @@
 #define NGX_RTMP_LIVE_PUBLISHING        0x01
 
 
-typedef struct {
-    ngx_uint_t                          width;
-    ngx_uint_t                          height;
-    ngx_uint_t                          duration;
-    ngx_uint_t                          frame_rate;
-    ngx_uint_t                          video_data_rate;
-    ngx_uint_t                          video_codec_id;
-    ngx_uint_t                          audio_data_rate;
-    ngx_uint_t                          audio_codec_id;
-} ngx_rtmp_live_meta_t;
+/* Chunk stream ids for output */
+#define NGX_RTMP_LIVE_CSID_AUDIO        6
+#define NGX_RTMP_LIVE_CSID_VIDEO        7
+#define NGX_RTMP_LIVE_MSID              1
 
 
 typedef struct ngx_rtmp_live_ctx_s ngx_rtmp_live_ctx_t;
@@ -42,19 +37,19 @@ struct ngx_rtmp_live_ctx_s {
     uint32_t                            next_push;
     uint32_t                            last_audio;
     uint32_t                            last_video;
+    ngx_uint_t                          aac_version;
+    ngx_uint_t                          avc_version;
 };
 
 
 struct ngx_rtmp_live_stream_s {
-    u_char                              name[256];
+    u_char                              name[NGX_RTMP_MAX_NAME];
     ngx_rtmp_live_stream_t             *next;
     ngx_rtmp_live_ctx_t                *ctx;
     ngx_uint_t                          flags;
     ngx_rtmp_bandwidth_t                bw_in;
     ngx_rtmp_bandwidth_t                bw_out;
-    ngx_rtmp_live_meta_t                meta;
     ngx_msec_t                          epoch;
-    ngx_chain_t                        *avc_header;
 };
 
 

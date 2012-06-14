@@ -11,6 +11,9 @@ NGINX-based RTMP server
 
 * H264 support
 
+* Online transcoding with FFmpeg 
+  (experimental; Linux only)
+
 * HTTP callbacks on publish/play/record
 
 * Advanced buffering techniques
@@ -75,6 +78,30 @@ rtmp {
             deny publish all;
 
             #allow play all;
+        }
+
+        # Transcoding (ffmpeg needed)
+        application big {
+            live on;
+
+            # On every pusblished stream run this command (ffmpeg)
+            # with substitutions: $app/${app}, $name/${name} for application & stream name.
+            #
+            # This ffmpeg call receives stream from this application &
+            # reduces the resolution down to 32x32. The stream is the published to
+            # 'small' application (see below) under the same name.
+            #
+            # ffmpeg can do anything with the stream like video/audio
+            # transcoding, resizing, altering container/codec params etc
+            #
+            # Multiple exec lines can be specified.
+
+            exec /usr/bin/ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name};
+        }
+
+        application small {
+            live on;
+            # Video with rediced resolution comes here from ffmpeg
         }
 
         application mypush {

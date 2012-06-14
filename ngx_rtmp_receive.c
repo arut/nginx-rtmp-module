@@ -164,9 +164,9 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
 }
 
 
-static ngx_int_t 
-ngx_rtmp_amf_message_basic_handler(ngx_rtmp_session_t *s,
-        ngx_rtmp_header_t *h, ngx_chain_t *in, ngx_int_t name_typeless)
+ngx_int_t 
+ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
     ngx_rtmp_amf_ctx_t          act;
     ngx_rtmp_core_main_conf_t  *cmcf;
@@ -185,10 +185,22 @@ ngx_rtmp_amf_message_basic_handler(ngx_rtmp_session_t *s,
 
     /* AMF command names come with string type, but shared object names
      * come without type */
-    if (name_typeless) {
+    if (h->type == NGX_RTMP_MSG_AMF_SHARED || 
+        h->type == NGX_RTMP_MSG_AMF3_SHARED) 
+    {
         elts[0].type |= NGX_RTMP_AMF_TYPELESS;
     } else {
         elts[0].type &= ~NGX_RTMP_AMF_TYPELESS;
+    }
+
+    if ((h->type == NGX_RTMP_MSG_AMF3_SHARED ||
+         h->type == NGX_RTMP_MSG_AMF3_META ||
+         h->type == NGX_RTMP_MSG_AMF3_CMD)
+         && in->buf->last > in->buf->pos) 
+    {
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "AMF3 prefix: %ui", (ngx_int_t)*in->buf->pos);
+        ++in->buf->pos;
     }
 
     cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
@@ -230,22 +242,6 @@ ngx_rtmp_amf_message_basic_handler(ngx_rtmp_session_t *s,
     }
 
     return NGX_OK;
-}
-
-
-ngx_int_t 
-ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
-        ngx_rtmp_header_t *h, ngx_chain_t *in)
-{
-    return ngx_rtmp_amf_message_basic_handler(s, h, in, 0);
-}
-
-
-ngx_int_t 
-ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
-        ngx_rtmp_header_t *h, ngx_chain_t *in)
-{
-    return ngx_rtmp_amf_message_basic_handler(s, h, in, 1);
 }
 
 

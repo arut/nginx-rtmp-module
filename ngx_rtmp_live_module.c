@@ -5,18 +5,12 @@
 
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"
-#include "ngx_rtmp_codecs.h"
+#include "ngx_rtmp_codec_module.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_delete_stream_pt        next_delete_stream;
-
-
-/* Chunk stream ids for output */
-#define NGX_RTMP_LIVE_CSID_AUDIO        6
-#define NGX_RTMP_LIVE_CSID_VIDEO        7
-#define NGX_RTMP_LIVE_MSID              1
 
 
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
@@ -268,10 +262,6 @@ ngx_rtmp_live_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "live: delete empty stream '%s'", ctx->stream->name);
 
-    if (ctx->stream->avc_header) {
-        ngx_rtmp_free_shared_chain(cscf, ctx->stream->avc_header);
-    }
-
     stream = ngx_rtmp_live_get_stream(s, ctx->stream->name, 0);
     if (stream == NULL) {
         return NGX_ERROR;
@@ -292,14 +282,16 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
-    ngx_chain_t                    *out, *out_abs;
+    ngx_rtmp_codec_ctx_t           *codec_ctx;
+    ngx_chain_t                    *out, *peer_out, *header_out, *pheader_out;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
     ngx_rtmp_header_t               ch, lh;
     ngx_uint_t                      prio, peer_prio;
     ngx_uint_t                      peers, dropped_peers;
-    uint8_t                         flv_fmt;
+    size_t                          header_offset;
+    ngx_uint_t                      header_version;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
@@ -358,24 +350,25 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     peers = 0;
     dropped_peers = 0;
 
-    /* parse meta */
-    if (in->buf->last - in->buf->pos >= 1) {
-        flv_fmt = *in->buf->pos;
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+    header_out = NULL;
+    pheader_out = NULL;
+    header_offset = 0;
+    header_version = 0;
+    if (codec_ctx) {
         if (h->type == NGX_RTMP_MSG_AUDIO) {
-            ctx->stream->meta.audio_codec_id = (flv_fmt & 0xf0) >> 4;
+            if (codec_ctx->aac_pheader) {
+                header_out = codec_ctx->aac_header;
+                pheader_out = codec_ctx->aac_pheader;
+                header_offset = offsetof(ngx_rtmp_live_ctx_t, aac_version);
+                header_version = codec_ctx->aac_version;
+            }
         } else {
-            ctx->stream->meta.video_codec_id = (flv_fmt & 0x0f);
-            if (ctx->stream->meta.video_codec_id == 7 
-                    && in->buf->last - in->buf->pos >= 2
-                    && in->buf->pos[1] == 0) 
-            {
-                /* AVC/H264 sequence header;
-                 * save it for future */
-                if (ctx->stream->avc_header) {
-                    ngx_rtmp_free_shared_chain(cscf, ctx->stream->avc_header);
-                }
-                ctx->stream->avc_header = out;
-                ngx_rtmp_acquire_shared_chain(out);
+            if (codec_ctx->avc_pheader) {
+                header_out = codec_ctx->avc_header;
+                pheader_out = codec_ctx->avc_pheader;
+                header_offset = offsetof(ngx_rtmp_live_ctx_t, avc_version);
+                header_version = codec_ctx->avc_version;
             }
         }
     }
@@ -395,27 +388,35 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                     "live: av: abs %s timestamp=%uD",
                     h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio",
                     ch.timestamp);
-            out_abs = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
-            ngx_rtmp_prepare_message(s, &ch, NULL, out_abs);
+            /* send codec header as abs frame if any */
+            peer_out = ngx_rtmp_append_shared_bufs(cscf, NULL, 
+                    header_out ? header_out : in);
+            ngx_rtmp_prepare_message(s, &ch, NULL, peer_out);
             pctx->msg_mask |= (1 << h->type);
-            ngx_rtmp_send_message(ss, out_abs, prio);
-            ngx_rtmp_free_shared_chain(cscf, out_abs);
-
-            /* send AVC/H264 header */
-            if (ctx->stream->avc_header) {
-                /*TODO: make it absolute & send instead of ythe above frame */
-                ngx_rtmp_send_message(ss, ctx->stream->avc_header, prio);
+            if (ngx_rtmp_send_message(ss, peer_out, prio) == NGX_OK
+                    && header_out)
+            {
+                *(ngx_uint_t *)((u_char *)pctx + header_offset) 
+                    = header_version;
             }
+            ngx_rtmp_free_shared_chain(cscf, peer_out);
             continue;
+        }
+
+        /* send AVC/H264 header if newer header has arrived  */
+        if (pheader_out && *(ngx_uint_t *)((u_char *)pctx + header_offset) 
+                != header_version) 
+        {
+            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
+                    "live: sending codec header");
+            if (ngx_rtmp_send_message(ss, pheader_out, prio) == NGX_OK) {
+                *(ngx_uint_t *)((u_char *)pctx + header_offset) 
+                    = header_version;
+            }
         }
 
         /* push buffered data */
         peer_prio = prio;
-        /*
-        if (lacf->buflen && h->timestamp >= pctx->next_push) {
-            peer_prio = 0;
-            pctx->next_push = h->timestamp + lacf->buflen;
-        }*/
         if (ngx_rtmp_send_message(ss, out, peer_prio) != NGX_OK) {
             ++pctx->dropped;
             ++dropped_peers;
@@ -478,191 +479,13 @@ next:
 }
 
 
-static ngx_int_t 
-ngx_rtmp_live_ext_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
-        ngx_chain_t *in, ngx_uint_t skip)
-{
-    ngx_rtmp_live_app_conf_t       *lacf;
-    ngx_rtmp_live_ctx_t            *ctx;
-    ngx_rtmp_live_meta_t           *meta;
-
-    static struct {
-        double                      width;
-        double                      height;
-        double                      duration;
-        double                      frame_rate;
-        double                      video_data_rate;
-        double                      video_codec_id_n;
-        u_char                      video_codec_id_s[32];
-        double                      audio_data_rate;
-        double                      audio_codec_id_n;
-        u_char                      audio_codec_id_s[32];
-    }                               v;
-
-    static ngx_rtmp_amf_elt_t       in_video_codec_id[] = {
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_null_string,
-          &v.video_codec_id_n, 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          &v.video_codec_id_s, sizeof(v.video_codec_id_s) },
-    };
-
-    static ngx_rtmp_amf_elt_t       in_audio_codec_id[] = {
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_null_string,
-          &v.audio_codec_id_n, 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          &v.audio_codec_id_s, sizeof(v.audio_codec_id_s) },
-    };
-
-    static ngx_rtmp_amf_elt_t       in_inf[] = {
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_string("width"),
-          &v.width, 0 },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_string("height"),
-          &v.height, 0 },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_string("duration"),
-          &v.duration, 0 },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_string("framerate"),
-          &v.frame_rate, 0 },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_string("videodatarate"),
-          &v.video_data_rate, 0 },
-
-        { NGX_RTMP_AMF_VARIANT, 
-          ngx_string("videocodecid"),
-          in_video_codec_id, sizeof(in_video_codec_id) },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_string("audiodatarate"),
-          &v.audio_data_rate, 0 },
-
-        { NGX_RTMP_AMF_VARIANT, 
-          ngx_string("audiocodecid"),
-          in_audio_codec_id, sizeof(in_audio_codec_id) },
-    };
-
-    static ngx_rtmp_amf_elt_t       in_elts[] = {
-
-        { NGX_RTMP_AMF_STRING, 
-          ngx_null_string,
-          NULL, 0 },
-
-        { NGX_RTMP_AMF_OBJECT, 
-          ngx_null_string,
-          in_inf, sizeof(in_inf) },
-    };
-
-
-    lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
-    if (lacf == NULL || !lacf->live) {
-        return NGX_OK;
-    }
-
-    ngx_memzero(&v, sizeof(v));
-
-    /* use -1 as a sign of unchanged data;
-     * 0 is a valid value for uncompressed audio */
-    v.audio_codec_id_n = -1; 
-
-    if (ngx_rtmp_receive_amf(s, in, in_elts + skip, 
-                sizeof(in_elts) / sizeof(in_elts[0]) - skip)) 
-    {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                "live: error parsing data frame");
-        return NGX_OK;
-    }
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
-    if (ctx == NULL) {
-        return NGX_OK;
-    }
-
-    if ((ctx->flags & NGX_RTMP_LIVE_PUBLISHING) == 0) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                "live: received data stream from non-publisher");
-        return NGX_OK;
-    }
-
-    meta = &ctx->stream->meta;
-    meta->width = v.width;
-    meta->height = v.height;
-    meta->duration = v.duration;
-    meta->frame_rate = v.frame_rate;
-    meta->video_data_rate = v.video_data_rate;
-    meta->video_codec_id = v.video_codec_id_n;
-    meta->audio_data_rate = v.audio_data_rate;
-    meta->audio_codec_id = (v.audio_codec_id_n == -1
-            ? 0 : v.audio_codec_id_n == 0
-            ? NGX_RTMP_AUDIO_UNCOMPRESSED : v.audio_codec_id_n);
-
-    ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "live: data frame: "
-            "width=%ui height=%ui duration=%ui frame_rate=%ui "
-            "video=%s (%ui) audio=%s (%ui)",
-            meta->width, meta->height, meta->duration, meta->frame_rate,
-            ngx_rtmp_get_video_codec_name(meta->video_codec_id), 
-            meta->video_codec_id,
-            ngx_rtmp_get_audio_codec_name(meta->audio_codec_id), 
-            meta->audio_codec_id);
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t 
-ngx_rtmp_live_data_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
-        ngx_chain_t *in)
-{
-    return ngx_rtmp_live_ext_meta_data(s, h, in, 0);
-}
-
-
-static ngx_int_t 
-ngx_rtmp_live_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
-        ngx_chain_t *in)
-{
-    return ngx_rtmp_live_ext_meta_data(s, h, in, 1);
-}
-
-
 static ngx_int_t
 ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 {
     ngx_rtmp_core_main_conf_t          *cmcf;
     ngx_rtmp_handler_pt                *h;
-    ngx_rtmp_amf_handler_t             *ch;
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
-
-    /* register metadata handler */
-    ch = ngx_array_push(&cmcf->amf);
-    if (ch == NULL) {
-        return NGX_ERROR;
-    }
-    ngx_str_set(&ch->name, "@setDataFrame");
-    ch->handler = ngx_rtmp_live_data_frame;
-
-    ch = ngx_array_push(&cmcf->amf);
-    if (ch == NULL) {
-        return NGX_ERROR;
-    }
-    ngx_str_set(&ch->name, "onMetaData");
-    ch->handler = ngx_rtmp_live_meta_data;
 
     /* register raw event handlers */
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
