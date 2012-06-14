@@ -22,18 +22,6 @@
 #define NGX_RTMP_LIVE_MSID              1
 
 
-typedef struct {
-    ngx_uint_t                          width;
-    ngx_uint_t                          height;
-    ngx_uint_t                          duration;
-    ngx_uint_t                          frame_rate;
-    ngx_uint_t                          video_data_rate;
-    ngx_uint_t                          video_codec_id;
-    ngx_uint_t                          audio_data_rate;
-    ngx_uint_t                          audio_codec_id;
-} ngx_rtmp_live_meta_t;
-
-
 typedef struct ngx_rtmp_live_ctx_s ngx_rtmp_live_ctx_t;
 typedef struct ngx_rtmp_live_stream_s ngx_rtmp_live_stream_t;
 
@@ -61,7 +49,6 @@ struct ngx_rtmp_live_stream_s {
     ngx_uint_t                          flags;
     ngx_rtmp_bandwidth_t                bw_in;
     ngx_rtmp_bandwidth_t                bw_out;
-    ngx_rtmp_live_meta_t                meta;
     ngx_msec_t                          epoch;
 };
 

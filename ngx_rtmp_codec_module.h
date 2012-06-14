@@ -47,6 +47,15 @@ u_char * ngx_rtmp_get_video_codec_name(ngx_uint_t id);
 
 
 typedef struct {
+    ngx_uint_t                  width;
+    ngx_uint_t                  height;
+    ngx_uint_t                  duration;
+    ngx_uint_t                  frame_rate;
+    ngx_uint_t                  video_data_rate;
+    ngx_uint_t                  video_codec_id;
+    ngx_uint_t                  audio_data_rate;
+    ngx_uint_t                  audio_codec_id;
+
     ngx_uint_t                  avc_version;
     ngx_uint_t                  aac_version;
 
