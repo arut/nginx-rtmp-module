@@ -250,6 +250,8 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         double                      audio_data_rate;
         double                      audio_codec_id_n;
         u_char                      audio_codec_id_s[32];
+        u_char                      profile[32];
+        u_char                      level[32];
     }                               v;
 
     static ngx_rtmp_amf_elt_t       in_video_codec_id[] = {
@@ -311,6 +313,14 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         { NGX_RTMP_AMF_VARIANT, 
           ngx_string("audiocodecid"),
           in_audio_codec_id, sizeof(in_audio_codec_id) },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("profile"),
+          &v.profile, sizeof(v.profile) },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("level"),
+          &v.level, sizeof(v.level) },
     };
 
     static ngx_rtmp_amf_elt_t       in_elts[] = {
@@ -357,6 +367,8 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ctx->audio_codec_id = (v.audio_codec_id_n == -1
             ? 0 : v.audio_codec_id_n == 0
             ? NGX_RTMP_AUDIO_UNCOMPRESSED : v.audio_codec_id_n);
+    ngx_memcpy(ctx->profile, v.profile, sizeof(v.profile));
+    ngx_memcpy(ctx->level, v.level, sizeof(v.level));
 
     ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "codec: data frame: "

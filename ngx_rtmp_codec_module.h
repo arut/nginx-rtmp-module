@@ -55,6 +55,8 @@ typedef struct {
     ngx_uint_t                  video_codec_id;
     ngx_uint_t                  audio_data_rate;
     ngx_uint_t                  audio_codec_id;
+    u_char                      profile[32];
+    u_char                      level[32];
 
     ngx_uint_t                  avc_version;
     ngx_uint_t                  aac_version;

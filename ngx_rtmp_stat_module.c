@@ -347,17 +347,30 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                 NGX_RTMP_STAT_L("</height><framerate>");
                 NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
                             "%ui", codec->frame_rate) - buf);
-                NGX_RTMP_STAT_L("</framerate><video>");
+                NGX_RTMP_STAT_L("</framerate>");
                 cname = ngx_rtmp_get_video_codec_name(codec->video_codec_id);
                 if (*cname) {
+                    NGX_RTMP_STAT_L("<video>");
                     NGX_RTMP_STAT_ECS(cname);
+                    NGX_RTMP_STAT_L("</video>");
                 }
-                NGX_RTMP_STAT_L("</video><audio>");
                 cname = ngx_rtmp_get_audio_codec_name(codec->audio_codec_id);
                 if (*cname) {
+                    NGX_RTMP_STAT_L("<audio>");
                     NGX_RTMP_STAT_ECS(cname);
+                    NGX_RTMP_STAT_L("</audio>");
                 }
-                NGX_RTMP_STAT_L("</audio></meta>\r\n");
+                if (*codec->profile) {
+                    NGX_RTMP_STAT_L("<profile>");
+                    NGX_RTMP_STAT_ECS(codec->profile);
+                    NGX_RTMP_STAT_L("</profile>");
+                }
+                if (*codec->level) {
+                    NGX_RTMP_STAT_L("<level>");
+                    NGX_RTMP_STAT_ECS(codec->level);
+                    NGX_RTMP_STAT_L("</level>");
+                }
+                NGX_RTMP_STAT_L("</meta>\r\n");
             }
 
             NGX_RTMP_STAT_L("<nclients>");
