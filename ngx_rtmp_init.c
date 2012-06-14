@@ -124,8 +124,9 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
     ngx_rtmp_log_ctx_t             *ctx;
 
     s = ngx_pcalloc(c->pool, sizeof(ngx_rtmp_session_t) + 
-            ((ngx_rtmp_core_srv_conf_t *)addr_conf->ctx->srv_conf)->out_queue 
-            * sizeof(ngx_chain_t *));
+            sizeof(ngx_chain_t *) * ((ngx_rtmp_core_srv_conf_t *)
+                addr_conf->ctx-> srv_conf[ngx_rtmp_core_module
+                    .ctx_index])->out_queue);
     if (s == NULL) {
         ngx_rtmp_close_connection(c);
         return NULL;

@@ -254,7 +254,8 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->max_message, prev->max_message, 
             1 * 1024 * 1024);
     ngx_conf_merge_size_value(conf->out_queue, prev->out_queue, 256);
-    ngx_conf_merge_size_value(conf->out_cork, prev->out_cork, 32);
+    ngx_conf_merge_size_value(conf->out_cork, prev->out_cork, 
+            conf->out_queue / 8);
     ngx_conf_merge_value(conf->play_time_fix, prev->play_time_fix, 1);
     ngx_conf_merge_value(conf->publish_time_fix, prev->publish_time_fix, 1);
 
