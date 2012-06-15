@@ -219,9 +219,7 @@ ngx_rtmp_live_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
     ngx_rtmp_live_ctx_t            *ctx, **cctx;
     ngx_rtmp_live_stream_t        **stream;
     ngx_rtmp_live_app_conf_t       *lacf;
-    ngx_rtmp_core_srv_conf_t       *cscf;
 
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
         goto next;
