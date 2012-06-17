@@ -82,6 +82,8 @@ typedef struct {
     ngx_int_t                           out_astream;
     size_t                              nal_len;
     uint32_t                            last_video;
+    u_char                              vheader[NGX_RTMP_HLS_BUFSIZE];
+    size_t                              vheader_size;
 
     AVFormatContext                    *out_format;
 
@@ -469,12 +471,10 @@ ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, u_char *fpath,
     ngx_rtmp_hls_ctx_t             *ctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     ngx_chain_t                    *in;
-    AVPacket                        packet;
     ngx_buf_t                      *b;
     u_char                         *p, *op;
     size_t                          size, space, nsps, npps, osize;
     static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
-    static u_char                   obuffer[NGX_RTMP_HLS_BUFSIZE];
     uint16_t                        len;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
@@ -551,7 +551,7 @@ ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, u_char *fpath,
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "hls: SPS number: %uz", nsps);
 
-    op = obuffer;
+    op = ctx->vheader;
     osize = 0;
     for (; nsps; --nsps) {
         ngx_rtmp_rmemcpy(&len, p, 2);
@@ -603,23 +603,24 @@ ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, u_char *fpath,
         size -= len;
     }
 
+    ctx->vheader_size = osize;
+/*
     av_init_packet(&packet);
     packet.data = obuffer;
     packet.size = osize;
     packet.stream_index = ctx->out_vstream;
     packet.dts = ++ctx->last_video * 100;
     packet.pts = packet.dts;
-    /*packet.flags |= AV_PKT_FLAG_KEY;*/
 
     if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "hls: av_interleaved_write_frame failed on header");
         return NGX_ERROR;
     }
-
+    */
     ctx->opened = 1;
     ctx->newfile = 1;
-
+    
     return NGX_OK;
 }
 
@@ -829,14 +830,16 @@ ngx_rtmp_hls_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_hls_ctx_t             *ctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     AVPacket                        packet;
-    u_char                         *p;
+    u_char                         *p, *op;
     ngx_buf_t                      *b;
     size_t                          size, space;
     uint8_t                         fmt;
     uint32_t                        nsize;
-    ngx_int_t                       header_size;
 
     static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
+    static u_char                   obuffer[NGX_RTMP_HLS_BUFSIZE];
+    size_t                          osize;
+    uint8_t                         unit_type;
 
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -888,7 +891,9 @@ ngx_rtmp_hls_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /* extract NALs & write them */
     size = p - buffer - 5;
     p = buffer + 5;
-    header_size = 4;
+
+    op = obuffer;
+    osize = 0;
     while (size) {
         if (size < 4) {
             return NGX_OK;
@@ -897,43 +902,59 @@ ngx_rtmp_hls_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_rmemcpy(&nsize, p, 4);
         p += 4;
         size -= 4;
-        ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                "hls: NAL unit_type=%i size=%uD remained=%uz", 
-                (ngx_int_t)(*p & 0x1f), nsize, size);
+        unit_type = *p & 0x1f;
+        ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "hls: NAL unit_type=%i fmt_key=%i, size=%uD remained=%uz", 
+                (ngx_int_t)unit_type, (ngx_int_t)((fmt & 0xf0) >> 4), 
+                nsize, size);
         if (size < nsize) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                     "hls: too big NAL");
             return NGX_OK;
         }
 
-        av_init_packet(&packet);
-        ctx->last_video = h->timestamp;
-        packet.dts = h->timestamp * 100;
-        packet.pts = packet.dts;
-        packet.stream_index = ctx->out_vstream;
-        if (((fmt & 0xf0) >> 4) == 1) {
-            packet.flags |= AV_PKT_FLAG_KEY;
-        } else if (ctx->newfile) {
-            continue;
+        /* prepend IDR frame with H264 header (SPS, PPS) */
+        if (unit_type == 5 && ctx->vheader_size) {
+            ngx_memcpy(op, ctx->vheader, ctx->vheader_size);
+            op += ctx->vheader_size;
+            osize += ctx->vheader_size;
         }
-        ctx->newfile = 0;
-        packet.data = p - header_size;
-        packet.size = nsize + header_size;
-        packet.data[0] = 0;
-        packet.data[1] = 0;
-        if (header_size == 4) {
-            packet.data[2] = 0;
-        }
-        packet.data[header_size - 1] = 1;
-        header_size = 3;
 
-        if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {
-            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                    "hls: av_interleaved_write_frame failed");
+        if (op == obuffer) {
+           *op++ = 0;
+           ++osize;
         }
+        *op++ = 0;
+        *op++ = 0;
+        *op++ = 1;
+        osize += 3;
+
+        ngx_memcpy(op, p, nsize);
+        op += nsize;
+        osize += nsize;
 
         p += nsize;
         size -= nsize;
+    }
+
+    av_init_packet(&packet);
+    packet.dts = h->timestamp * 100;
+    packet.pts = packet.dts;
+    packet.stream_index = ctx->out_vstream;
+    ctx->last_video = h->timestamp;
+    /*
+    if (((fmt & 0xf0) >> 4) == 1) {
+        packet.flags |= AV_PKT_FLAG_KEY;
+    } else if (ctx->newfile) {
+        continue;
+    }*/
+    ctx->newfile = 0;
+    packet.data = obuffer;
+    packet.size = osize;
+
+    if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "hls: av_interleaved_write_frame failed");
     }
 
     return NGX_OK;
