@@ -785,7 +785,7 @@ ngx_rtmp_hls_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
     if (hacf == NULL || !hacf->hls || ctx == NULL 
-            || (ctx->flags & NGX_RTMP_HLS_PUBLISHING) == 0) 
+            || (ctx->flags & NGX_RTMP_HLS_PUBLISHING) == 0)
     {
         goto next;
     }
@@ -796,6 +796,10 @@ ngx_rtmp_hls_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
     ctx->flags &= ~NGX_RTMP_HLS_PUBLISHING;
     if (ctx->restart_evt.timer_set) {
         ngx_del_timer(&ctx->restart_evt);
+    }
+
+    if (ctx->out_format == NULL) {
+        goto next;
     }
 
     if (av_write_trailer(ctx->out_format) < 0) {
