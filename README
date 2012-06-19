@@ -14,6 +14,9 @@ NGINX-based RTMP server
 * Online transcoding with FFmpeg 
   (experimental; Linux only)
 
+* HLS (HTTP Live Streaming) support
+  (experimental; H264/MP3 only)
+
 * HTTP callbacks on publish/play/record
 
 * Advanced buffering techniques
@@ -152,6 +155,29 @@ rtmp {
 
         }
 
+
+        # HLS (experimental)
+        # For HLS to work please create a directory in tmpfs (/tmp/app here)
+        # for the fragments. The directory contents is served via HTTP (see
+        # http{} section in config)
+        #
+        # Incoming stream must be in H264/MP3. For iPhones use baseline H264
+        # profile (see ffmpeg example).
+        #
+        # This example creates RTMP stream from movie ready for HLS:
+        #
+        # ffmpeg -loglevel verbose -re -i movie.avi  -vcodec libx264 
+        #    -vprofile baseline -acodec libmp3lame -ar 44100 -ac 1 
+        #    -f flv rtmp://localhost:1935/hls/movie
+        #
+        # If you need to transcode live stream use 'exec' feature.
+        #
+        application hls {
+            hls on;
+            hls_path /tmp/app;
+            hls_fragment 5s;
+        }
+
     }
 }
 
@@ -176,6 +202,11 @@ http {
             # Copy stat.xsl wherever you want
             # and put the full directory path here
             root /path/to/stat.xsl/;
+        }
+
+        location /hls {
+            # Serve HLS fragments
+            alias /tmp/app;
         }
 
     }
