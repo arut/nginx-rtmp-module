@@ -157,6 +157,11 @@ rtmp {
 
 
         # HLS (experimental)
+
+        # HLS requires libavformat & should be configured as a separate
+        # NGINX module in addition to nginx-rtmp-module:
+        # ./configure ... --add-module=/path/to/nginx-rtmp-module/hls ...
+
         # For HLS to work please create a directory in tmpfs (/tmp/app here)
         # for the fragments. The directory contents is served via HTTP (see
         # http{} section in config)
