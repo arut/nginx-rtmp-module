@@ -175,6 +175,7 @@ ngx_rtmp_hls_get_video_codec(ngx_int_t cid)
             return CODEC_ID_NONE;
     }
 }
+#endif
 
 static enum CodecID
 ngx_rtmp_hls_get_audio_codec(ngx_int_t cid)
@@ -204,7 +205,6 @@ ngx_rtmp_hls_get_audio_codec(ngx_int_t cid)
     }
 }
 
-#endif
 
 static ngx_int_t
 ngx_rtmp_hls_init_video(ngx_rtmp_session_t *s)
@@ -240,26 +240,10 @@ ngx_rtmp_hls_init_video(ngx_rtmp_session_t *s)
     stream->codec->codec_id = CODEC_ID_H264;
     stream->codec->codec_type = AVMEDIA_TYPE_VIDEO;
     stream->codec->pix_fmt = PIX_FMT_YUV420P;
-    stream->codec->time_base.den = 90000;
+    stream->codec->time_base.den = 1;
     stream->codec->time_base.num = 1;
     stream->codec->width  = 100;
     stream->codec->height = 100;
-    /*
-    stream->duration = 25 * hacf->fraglen;
-    stream->codec->bit_rate = 150 * 1024;
-    stream->codec->profile = FF_PROFILE_H264_BASELINE;*/
-
-/*    stream->codec->ticks_per_frame = 2;*/
-
-/*  stream->codec->codec_tag = MKTAG('a','v','c','1');
-    stream->codec->codec_tag = MKTAG('H','2','6','4');*/
-    /*stream->codec->level = 30;*/
-    /*stream->codec->ticks_per_frame = 2;
-    stream->codec->frame_number = 0;
-    stream->codec->gop_size = 12;
-    stream->codec->max_b_frames = 2;
-    */
-    /*stream->codec->bit_rate = 96 * 1024 2000000*/;
 
     if (ctx->out_format->oformat->flags & AVFMT_GLOBALHEADER) {
         stream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
@@ -304,21 +288,23 @@ ngx_rtmp_hls_init_audio(ngx_rtmp_session_t *s)
 
     stream->codec->codec_id = ngx_rtmp_hls_get_audio_codec(
             codec_ctx->audio_codec_id);
-    stream->codec->codec_type = AVMEDIA_TYPE_AUDIO;
-    stream->codec->sample_fmt = AV_SAMPLE_FMT_S16;
-    stream->codec->sample_rate = 44100;
-    stream->codec->bit_rate = 9600;
-    stream->codec->channels = 1;
-
-    if (ctx->out_format->oformat->flags & AVFMT_GLOBALHEADER) {
-        stream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    if (stream->codec->codec_id == CODEC_ID_NONE) {
+        return NGX_OK;
     }
+
+    stream->codec->codec_type = AVMEDIA_TYPE_AUDIO;
+    stream->codec->sample_fmt = (codec_ctx->sample_size == 1 ?
+            AV_SAMPLE_FMT_U8 : AV_SAMPLE_FMT_S16);
+    stream->codec->sample_rate = codec_ctx->sample_rate;
+    stream->codec->bit_rate = 128000;
+    stream->codec->channels = codec_ctx->audio_channels;
 
     ctx->out_astream = stream->index;
     ctx->audio = 1;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "hls: audio stream: %i", ctx->out_astream);
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: audio stream: %i %iHz", 
+            ctx->out_astream, codec_ctx->sample_rate);
 
     return NGX_OK;
 }
@@ -855,8 +841,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     packet.data = buffer + 1;
     packet.size = out.pos - buffer - 1;
 
-    /*if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {*/
-    if (av_write_frame(ctx->out_format, &packet) < 0) {
+    if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "hls: av_interleaved_write_frame failed");
     }
@@ -943,6 +928,9 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: parsing NALs");
+
     while (in) {
         llen = ctx->nal_bytes;
         if (ngx_rtmp_hls_copy(s, &rlen, &p, llen, &in) != NGX_OK) {
@@ -986,14 +974,14 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     packet.dts = h->timestamp * 90;
     packet.pts = packet.dts;
     packet.stream_index = ctx->out_vstream;
+    /*
     if (ftype == 1) {
         packet.flags |= AV_PKT_FLAG_KEY;
-    }
+    }*/
     packet.data = buffer;
     packet.size = out.pos - buffer;
 
-    /*if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {*/
-    if (av_write_frame(ctx->out_format, &packet) < 0) {
+    if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "hls: av_interleaved_write_frame failed");
     }
