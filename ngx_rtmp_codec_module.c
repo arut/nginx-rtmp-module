@@ -145,6 +145,8 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     uint8_t                             fmt;
     ngx_rtmp_header_t                   ch, lh;
     ngx_uint_t                         *version;
+    static ngx_uint_t                   sample_rates[] = 
+                                        { 5512, 11025, 22050, 44100 };
 
 
     if (h->type != NGX_RTMP_MSG_AUDIO && h->type != NGX_RTMP_MSG_VIDEO) {
@@ -165,6 +167,9 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     fmt =  in->buf->pos[0];
     if (h->type == NGX_RTMP_MSG_AUDIO) {
         ctx->audio_codec_id = (fmt & 0xf0) >> 4;
+        ctx->audio_channels = (fmt & 0x01) + 1;
+        ctx->sample_size = (fmt & 0x02) ? 2 : 1;
+        ctx->sample_rate = sample_rates[(fmt & 0x0c) >> 2];
     } else {
         ctx->video_codec_id = (fmt & 0x0f);
     }
