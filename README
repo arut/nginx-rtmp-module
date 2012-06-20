@@ -76,6 +76,9 @@ rtmp {
             record_path /tmp/av;
             record_max_size 1K;
 
+            # append current timestamp to each flv
+            #record_unique on;
+
             # publish only from localhost
             allow publish 127.0.0.1;
             deny publish all;
