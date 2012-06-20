@@ -379,14 +379,18 @@ ngx_rtmp_cmd_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 
 
 static void
-ngx_rtmp_cmd_cutoff_args(u_char *s)
+ngx_rtmp_cmd_fill_args(u_char name[NGX_RTMP_MAX_NAME], 
+        u_char args[NGX_RTMP_MAX_ARGS])
 {
     u_char      *p;
 
-    p = (u_char *)ngx_strchr(s, '?');
-    if (p) {
-        *p = 0;
+    p = (u_char *)ngx_strchr(name, '?');
+    if (p == NULL) {
+        return;
     }
+
+    *p++ = 0;
+    ngx_cpystrn(args, p, NGX_RTMP_MAX_ARGS);
 }
 
 
@@ -425,7 +429,7 @@ ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_ERROR;
     }
 
-    ngx_rtmp_cmd_cutoff_args(v.name);
+    ngx_rtmp_cmd_fill_args(v.name, v.args);
 
     return ngx_rtmp_publish
         ? ngx_rtmp_publish(s, &v)
@@ -474,9 +478,9 @@ ngx_rtmp_cmd_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
           out_inf, sizeof(out_inf) },
     };
 
-    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "publish: name='%s' type=%s silent=%d",
-            v->name, v->type, v->silent);
+    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "publish: name='%s' args='%s' type=%s silent=%d",
+            v->name, v->args, v->type, v->silent);
 
     if (v->silent) {
         return NGX_OK;
@@ -634,7 +638,7 @@ ngx_rtmp_cmd_play_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_ERROR;
     }
 
-    ngx_rtmp_cmd_cutoff_args(v.name);
+    ngx_rtmp_cmd_fill_args(v.name, v.args);
 
     return ngx_rtmp_play
         ? ngx_rtmp_play(s, &v)
@@ -752,9 +756,10 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
           out4_inf, sizeof(out4_inf) },
     };
 
-    ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "play: name='%s' start=%uD duration=%uD reset=%d silent=%d",
-            v->name, (uint32_t)v->start, 
+    ngx_log_debug6(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "play: name='%s' args='%s' start=%uD duration=%uD "
+            "reset=%d silent=%d",
+            v->name, v->args, (uint32_t)v->start, 
             (uint32_t)v->duration, v->reset, v->silent);
 
     if (v->silent) {

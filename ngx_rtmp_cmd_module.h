@@ -16,6 +16,7 @@
 #define NGX_RTMP_MAX_APP            128
 #define NGX_RTMP_MAX_NAME           256
 #define NGX_RTMP_MAX_URL            256
+#define NGX_RTMP_MAX_ARGS           NGX_RTMP_MAX_NAME
 
 
 /* Basic RTMP call support */
@@ -46,6 +47,7 @@ typedef struct {
 
 typedef struct {
     u_char                          name[NGX_RTMP_MAX_NAME];
+    u_char                          args[NGX_RTMP_MAX_ARGS];
     u_char                          type[16];
     int                             silent;
 } ngx_rtmp_publish_t;
@@ -63,6 +65,7 @@ typedef ngx_rtmp_fcpublish_t ngx_rtmp_fcunsubscribe_t;
 
 typedef struct {
     u_char                          name[NGX_RTMP_MAX_NAME];
+    u_char                          args[NGX_RTMP_MAX_ARGS];
     double                          start;
     double                          duration;
     int                             reset;

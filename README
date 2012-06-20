@@ -77,7 +77,7 @@ rtmp {
             record_max_size 1K;
 
             # append current timestamp to each flv
-            #record_unique on;
+            record_unique on;
 
             # publish only from localhost
             allow publish 127.0.0.1;
@@ -146,6 +146,17 @@ rtmp {
 
             # Same with playing
             on_play http://localhost:8080/play;
+
+            # Publish/play end (repeats on disconnect)
+            on_done http://localhost:8080/done;
+
+            # All above mentioned notifications receive
+            # standard connect() arguments as well as 
+            # play/publish ones. If any arguments are sent
+            # with GET-style syntax to play & publish
+            # these are also included.
+            # Example URL:
+            #   rtmp://localhost/myapp/mystream?a=b&c=d
 
             # record 10 video keyframes (no audio) every 2 minutes
             record keyframes;
