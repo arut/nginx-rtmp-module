@@ -35,16 +35,18 @@ typedef struct {
     size_t                              max_frames;
     ngx_msec_t                          interval;
     ngx_str_t                           suffix;
+    ngx_flag_t                          unique;
     ngx_url_t                          *url;
 } ngx_rtmp_record_app_conf_t;
 
 
 typedef struct {
     ngx_file_t                          file;
-    u_char                              path[NGX_MAX_PATH + 1];
     ngx_uint_t                          nframes;
     uint32_t                            epoch;
     ngx_time_t                          last;
+    time_t                              timestamp;
+    u_char                              name[NGX_RTMP_MAX_NAME];
 } ngx_rtmp_record_ctx_t;
 
 
@@ -86,6 +88,13 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, suffix),
+      NULL },
+
+    { ngx_string("record_unique"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, unique),
       NULL },
 
     { ngx_string("record_max_size"),
@@ -161,6 +170,7 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     racf->max_size = NGX_CONF_UNSET;
     racf->max_frames = NGX_CONF_UNSET;
     racf->interval = NGX_CONF_UNSET;
+    racf->unique = NGX_CONF_UNSET;
 
     return racf;
 }
@@ -178,6 +188,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->suffix, prev->suffix, ".flv");
     ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
     ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
+    ngx_conf_merge_value(conf->unique, prev->unique, 0);
     ngx_conf_merge_msec_value(conf->interval, prev->interval, 0);
 
     return NGX_CONF_OK;
@@ -209,36 +220,74 @@ ngx_rtmp_record_write_header(ngx_file_t *file)
 }
 
 
+/* This funcion returns pointer to a static buffer */
+static u_char *
+ngx_rtmp_record_make_path(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_record_ctx_t          *ctx;
+    ngx_rtmp_record_app_conf_t     *racf;
+    u_char                         *p, *l;
+    static u_char                   buf[NGX_TIME_T_LEN + 1];
+    static u_char                   path[NGX_MAX_PATH + 1];
+
+    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+
+    /* create file path */
+    p = path;
+    l = path + sizeof(path) - 1;
+    p = ngx_cpymem(p, racf->path.data, 
+                ngx_min(racf->path.len, (size_t)(l - p - 1)));
+    *p++ = '/';
+    p = (u_char *)ngx_escape_uri(p, ctx->name, ngx_min(ngx_strlen(ctx->name),
+                (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
+    if (racf->unique) {
+        /* append timestamp */
+        p = ngx_cpymem(p, buf, ngx_min(ngx_sprintf(buf, "-%T", 
+                        ctx->timestamp) - buf, l - p));
+    }
+    p = ngx_cpymem(p, racf->suffix.data, 
+            ngx_min(racf->suffix.len, (size_t)(l - p)));
+    *p = 0;
+
+    return path;
+}
+
+
 static ngx_int_t
 ngx_rtmp_record_open(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_err_t                       err;
+    u_char                         *path;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
     if (ctx == NULL || ctx->file.fd != NGX_INVALID_FILE) {
         return NGX_ERROR;
     }
+    ctx->timestamp = ngx_cached_time->sec;
+    path = ngx_rtmp_record_make_path(s);
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+            "record: path '%s'", path);
 
     /* open file */
     ctx->nframes = 0;
     ngx_memzero(&ctx->file, sizeof(ctx->file));
     ctx->file.offset = 0;
     ctx->file.log = s->connection->log;
-    ctx->file.fd = ngx_open_file(ctx->path, NGX_FILE_WRONLY, 
+    ctx->file.fd = ngx_open_file(path, NGX_FILE_WRONLY, 
             NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
     if (ctx->file.fd == NGX_INVALID_FILE) {
         err = ngx_errno;
         if (err != NGX_ENOENT) {
             ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
-                    "record: failed to open file" " \"%s\" failed", 
-                    ctx->path);
+                    "record: failed to open file '%s'", path);
         }
         return NGX_OK;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-            "record: opened '%s'", ctx->path);
+            "record: opened '%s'", path);
 
     return NGX_OK;
 }
@@ -249,7 +298,6 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     ngx_rtmp_record_app_conf_t     *racf;
     ngx_rtmp_record_ctx_t          *ctx;
-    u_char                         *p, *l;
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
 
@@ -269,20 +317,7 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_record_module);
     }
 
-    /* create file path */
-    p = ctx->path;
-    l = ctx->path + sizeof(ctx->path) - 1;
-    p = ngx_cpymem(p, racf->path.data, 
-                ngx_min(racf->path.len, (size_t)(l - p - 1)));
-    *p++ = '/';
-    p = (u_char *)ngx_escape_uri(p, v->name, ngx_min(ngx_strlen(v->name), 
-                (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
-    p = ngx_cpymem(p, racf->suffix.data, 
-            ngx_min(racf->suffix.len, (size_t)(l - p)));
-    *p = 0;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-            "record: path '%s'", ctx->path);
+    ngx_memcpy(ctx->name, v->name, sizeof(ctx->name));
 
     if (ngx_rtmp_record_open(s) != NGX_OK) {
         return NGX_ERROR;
@@ -302,6 +337,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
     size_t                          len;
+    u_char                         *path;
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
 
@@ -324,7 +360,8 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
         return NULL;
     }
 
-    len = ngx_strlen(ctx->path);
+    path = ngx_rtmp_record_make_path(s);
+    len = ngx_strlen(path);
 
     b = ngx_create_temp_buf(pool,
             sizeof("&call=record_done") +
@@ -339,7 +376,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
             sizeof("&call=record_done") - 1);
 
     b->last = ngx_cpymem(b->last, (u_char*)"&path=", sizeof("&path=") - 1);
-    b->last = (u_char*)ngx_escape_uri(b->last, ctx->path, len, 0);
+    b->last = (u_char*)ngx_escape_uri(b->last, path, len, 0);
 
     /* HTTP header */
     hl = ngx_rtmp_netcall_http_format_header(racf->url, pool,
@@ -549,7 +586,7 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         {
             if (ngx_rtmp_record_open(s) != NGX_OK) {
                 ngx_log_error(NGX_LOG_CRIT, s->connection->log, 0,
-                        "record: '%s' failed", ctx->path);
+                        "record: failed");
             }
         }
     }
