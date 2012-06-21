@@ -189,7 +189,8 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
     ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
     ngx_conf_merge_value(conf->unique, prev->unique, 0);
-    ngx_conf_merge_msec_value(conf->interval, prev->interval, 0);
+    ngx_conf_merge_msec_value(conf->interval, prev->interval, 
+            (ngx_msec_t)NGX_CONF_UNSET);
 
     return NGX_CONF_OK;
 }
@@ -277,6 +278,7 @@ ngx_rtmp_record_open(ngx_rtmp_session_t *s)
     ctx->file.log = s->connection->log;
     ctx->file.fd = ngx_open_file(path, NGX_FILE_WRONLY, 
             NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+    ctx->last = *ngx_cached_time;
     if (ctx->file.fd == NGX_INVALID_FILE) {
         err = ngx_errno;
         if (err != NGX_ENOENT) {
@@ -433,7 +435,6 @@ ngx_rtmp_record_close(ngx_rtmp_session_t *s)
                 "record: error closing file");
     }
     ctx->file.fd = NGX_INVALID_FILE;
-    ctx->last = *ngx_cached_time;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
             "record: closed");
@@ -573,9 +574,7 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    if (ctx->file.fd == NGX_INVALID_FILE && racf->interval 
-            && (ctx->last.sec || ctx->last.msec)) 
-    {
+    if (racf->interval != (ngx_msec_t)NGX_CONF_UNSET) {
         next = ctx->last;
         next.msec += racf->interval;
         next.sec += (next.msec / 1000);
@@ -584,6 +583,7 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 || (ngx_cached_time->sec == next.sec
                     && ngx_cached_time->msec > next.msec))
         {
+            ngx_rtmp_record_close(s);
             if (ngx_rtmp_record_open(s) != NGX_OK) {
                 ngx_log_error(NGX_LOG_CRIT, s->connection->log, 0,
                         "record: failed");
