@@ -40,6 +40,12 @@
             <td><xsl:value-of select="out"/></td>
             <td><xsl:value-of select="round(bwin div 1024)"/></td>
             <td><xsl:value-of select="round(bwout div 1024)"/></td>
+            <td colspan="5"/>
+            <td>
+                <xsl:call-template name="showtime">
+                    <xsl:with-param name="time" select="/rtmp/uptime * 1000"/>
+                </xsl:call-template>
+            </td>
         </tr>
         <xsl:apply-templates select="server"/>
     </table>
@@ -130,7 +136,7 @@
     <xsl:param name="time"/>
 
     <xsl:variable name="sec">
-        <xsl:value-of select="floor(time div 1000)"/>
+        <xsl:value-of select="floor($time div 1000)"/>
     </xsl:variable>
 
     <xsl:if test="$sec &gt;= 86400">

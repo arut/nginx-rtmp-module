@@ -17,6 +17,9 @@ static char * ngx_rtmp_stat_merge_loc_conf(ngx_conf_t *cf,
         void *parent, void *child);
 
 
+static time_t                       start_time;
+
+
 #define NGX_RTMP_STAT_ALL           0xff
 #define NGX_RTMP_STAT_GLOBAL        0x01
 #define NGX_RTMP_STAT_LIVE          0x02
@@ -448,6 +451,7 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     ngx_chain_t                    *cl, *l, **ll, ***lll;
     size_t                          n;
     off_t                           len;
+    static u_char                   tbuf[NGX_TIME_T_LEN + 1];
 
     r->keepalive = 0;
     slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
@@ -482,6 +486,11 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
 #endif
     NGX_RTMP_STAT_L("<built>" __DATE__ " " __TIME__ "</built>\r\n");
 
+    NGX_RTMP_STAT_L("<uptime>");
+    NGX_RTMP_STAT(tbuf, ngx_snprintf(tbuf, sizeof(tbuf),
+                "%T", ngx_cached_time->sec - start_time) - tbuf);
+    NGX_RTMP_STAT_L("</uptime>\r\n");
+
     ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_in, &ngx_rtmp_bw_out);
 
     cscf = cmcf->servers.elts;
@@ -512,46 +521,48 @@ error:
 static void *
 ngx_rtmp_stat_create_loc_conf(ngx_conf_t *cf)
 {
-	ngx_rtmp_stat_loc_conf_t       *conf;
+    ngx_rtmp_stat_loc_conf_t       *conf;
 
-	conf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_stat_loc_conf_t));
-	if (conf == NULL) {
-		return NULL;
-	}
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_stat_loc_conf_t));
+    if (conf == NULL) {
+        return NULL;
+    }
 
     conf->stat = 0;
 
-	return conf;
+    return conf;
 }
 
 
 static char *
 ngx_rtmp_stat_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-	ngx_rtmp_stat_loc_conf_t       *prev = parent;
-	ngx_rtmp_stat_loc_conf_t       *conf = child;
+    ngx_rtmp_stat_loc_conf_t       *prev = parent;
+    ngx_rtmp_stat_loc_conf_t       *conf = child;
 
-	ngx_conf_merge_bitmask_value(conf->stat, prev->stat, 0);
-	ngx_conf_merge_str_value(conf->stylesheet, prev->stylesheet, "");
+    ngx_conf_merge_bitmask_value(conf->stat, prev->stat, 0);
+    ngx_conf_merge_str_value(conf->stylesheet, prev->stylesheet, "");
 
-	return NGX_CONF_OK;
+    return NGX_CONF_OK;
 }
 
 
 static ngx_int_t
 ngx_rtmp_stat_postconfiguration(ngx_conf_t *cf)
 {
-	ngx_http_handler_pt            *h;
-	ngx_http_core_main_conf_t      *cmcf;
+    ngx_http_handler_pt            *h;
+    ngx_http_core_main_conf_t      *cmcf;
 
-	cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
-	h = ngx_array_push(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers);
-	if (h == NULL) {
-		return NGX_ERROR;
-	}
-	*h = ngx_rtmp_stat_handler;
+    h = ngx_array_push(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers);
+    if (h == NULL) {
+        return NGX_ERROR;
+    }
+    *h = ngx_rtmp_stat_handler;
 
-	return NGX_OK;
+    start_time = ngx_cached_time->sec;
+
+    return NGX_OK;
 }
 
