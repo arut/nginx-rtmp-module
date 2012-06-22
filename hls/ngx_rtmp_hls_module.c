@@ -206,6 +206,30 @@ ngx_rtmp_hls_get_audio_codec(ngx_int_t cid)
 }
 
 
+static size_t
+ngx_rtmp_hls_chain2buffer(u_char *buffer, size_t size, ngx_chain_t *in, 
+        size_t skip)
+{
+    ngx_buf_t                       out;
+
+    out.pos  = buffer;
+    out.last = buffer + size - FF_INPUT_BUFFER_PADDING_SIZE;
+
+    for (; in; in = in->next) {
+        size = in->buf->last - in->buf->pos;
+        if (size < skip) {
+            skip -= size;
+            continue;
+        }
+        out.pos = ngx_cpymem(out.pos, in->buf->pos + skip, ngx_min(
+                    size - skip, (size_t)(out.last - out.pos)));
+        skip = 0;
+    }
+
+    return out.pos - buffer;
+}
+
+
 static ngx_int_t
 ngx_rtmp_hls_init_video(ngx_rtmp_session_t *s)
 {
@@ -295,7 +319,7 @@ ngx_rtmp_hls_init_audio(ngx_rtmp_session_t *s)
     stream->codec->codec_type = AVMEDIA_TYPE_AUDIO;
     stream->codec->sample_fmt = (codec_ctx->sample_size == 1 ?
             AV_SAMPLE_FMT_U8 : AV_SAMPLE_FMT_S16);
-    stream->codec->sample_rate = codec_ctx->sample_rate;
+    stream->codec->sample_rate = 48000;/*codec_ctx->sample_rate;*/
     stream->codec->bit_rate = 128000;
     stream->codec->channels = codec_ctx->audio_channels;
 
@@ -419,8 +443,12 @@ static ngx_int_t
 ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, u_char *fpath)
 {
     ngx_rtmp_hls_ctx_t             *ctx;
+    ngx_rtmp_codec_ctx_t           *codec_ctx;
+    AVStream                       *astream;
+    static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
     if (ctx == NULL || ctx->out_format == NULL) {
         return NGX_OK;
     }
@@ -435,11 +463,31 @@ ngx_rtmp_hls_open_file(ngx_rtmp_session_t *s, u_char *fpath)
         return NGX_ERROR;
     }
 
+    astream = NULL;
+    if (codec_ctx && codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC
+            && codec_ctx->aac_header && codec_ctx->aac_header->buf->last -
+                codec_ctx->aac_header->buf->pos > 2
+            && ctx->audio)
+    {
+        astream = ctx->out_format->streams[ctx->out_astream];
+        astream->codec->extradata = buffer;
+        astream->codec->extradata_size = ngx_rtmp_hls_chain2buffer(buffer, 
+                sizeof(buffer), codec_ctx->aac_header, 2);
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: setting AAC extradata %i bytes", 
+            (ngx_int_t)astream->codec->extradata_size);
+    }
+
     /* write header */
     if (avformat_write_header(ctx->out_format, NULL) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "hls: avformat_write_header failed");
         return NGX_ERROR;
+    }
+
+    if (astream) {
+        astream->codec->extradata = NULL;
+        astream->codec->extradata_size = 0;
     }
 
     ctx->opened = 1;
@@ -802,13 +850,16 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 {
     ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_hls_ctx_t             *ctx;
+    ngx_rtmp_codec_ctx_t           *codec_ctx;
     AVPacket                        packet;
-    ngx_buf_t                       out;
     static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-    if (hacf == NULL || !hacf->hls || ctx == NULL || h->mlen < 1) {
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+    if (hacf == NULL || !hacf->hls || ctx == NULL || codec_ctx == NULL  ||
+            h->mlen < 1) 
+    {
         return NGX_OK;
     }
 
@@ -824,22 +875,26 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    /* copy audio data */
-    out.pos  = buffer;
-    out.last = buffer + sizeof(buffer) - FF_INPUT_BUFFER_PADDING_SIZE;
-
-    for (; in; in = in->next) {
-        out.pos = ngx_cpymem(out.pos, in->buf->pos, ngx_min(
-                    in->buf->last - in->buf->pos, out.last - out.pos));
-    }
-
     /* write to file */
     av_init_packet(&packet);
     packet.dts = h->timestamp * 90;
     packet.pts = packet.dts;
     packet.stream_index = ctx->out_astream;
-    packet.data = buffer + 1;
-    packet.size = out.pos - buffer - 1;
+    packet.data = buffer;
+    packet.size = ngx_rtmp_hls_chain2buffer(buffer, sizeof(buffer), in, 1);
+
+    if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
+        if (packet.size == 0) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "hls: malformed AAC packet");
+            return NGX_OK;
+        }
+        ++packet.data;
+        --packet.size;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: audio buffer %uD", *(uint32_t*)packet.data);
 
     if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
@@ -1012,10 +1067,10 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
 static char *
 ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-	ngx_rtmp_hls_app_conf_t       *prev = parent;
-	ngx_rtmp_hls_app_conf_t       *conf = child;
+    ngx_rtmp_hls_app_conf_t       *prev = parent;
+    ngx_rtmp_hls_app_conf_t       *conf = child;
 
-	ngx_conf_merge_value(conf->hls, prev->hls, 0);
+    ngx_conf_merge_value(conf->hls, prev->hls, 0);
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
     ngx_conf_merge_str_value(conf->path, prev->path, "");
@@ -1028,7 +1083,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->nfrags = conf->playlen / conf->fraglen;
     }
 
-	return NGX_CONF_OK;
+    return NGX_CONF_OK;
 }
 
 
@@ -1059,6 +1114,6 @@ ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
     ngx_rtmp_hls_log = &cf->cycle->new_log;
     av_log_set_callback(ngx_rtmp_hls_av_log_callback);
 
-	return NGX_OK;
+    return NGX_OK;
 }
 

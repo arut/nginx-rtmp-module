@@ -15,7 +15,7 @@ NGINX-based RTMP server
   (experimental; Linux only)
 
 * HLS (HTTP Live Streaming) support
-  (experimental; H264/MP3 only)
+  (experimental; H264/AAC/MP3)
 
 * HTTP callbacks on publish/play/record
 
@@ -107,7 +107,7 @@ rtmp {
 
         application small {
             live on;
-            # Video with rediced resolution comes here from ffmpeg
+            # Video with reduced resolution comes here from ffmpeg
         }
 
         application mypush {
@@ -180,9 +180,8 @@ rtmp {
         # for the fragments. The directory contents is served via HTTP (see
         # http{} section in config)
         #
-        # Incoming stream must be in H264/MP3. For iPhones use baseline H264
+        # Incoming stream must be in H264/AAC/MP3. For iPhones use baseline H264
         # profile (see ffmpeg example).
-        #
         # This example creates RTMP stream from movie ready for HLS:
         #
         # ffmpeg -loglevel verbose -re -i movie.avi  -vcodec libx264 
