@@ -369,57 +369,7 @@ ngx_rtmp_cmd_close_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 static ngx_int_t
 ngx_rtmp_cmd_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 {
-    ngx_rtmp_header_t               h;
-
-    static double                   trans;
-
-    static ngx_rtmp_amf_elt_t      out_inf[] = {
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("code"),
-          "NetStream.Play.Stop", 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("level"),
-          "status", 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("description"),
-          "Stopping.", 0 },
-    };
-
-    static ngx_rtmp_amf_elt_t      out_elts[] = {
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          "onStatus", 0 },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_null_string,
-          &trans, 0 },
-
-        { NGX_RTMP_AMF_NULL, 
-          ngx_null_string,
-          NULL, 0 },
-
-        { NGX_RTMP_AMF_OBJECT, 
-          ngx_null_string,
-          out_inf, sizeof(out_inf) },
-    };
-
-    /* send onStatus reply */
-    memset(&h, 0, sizeof(h));
-    h.type = NGX_RTMP_MSG_AMF_CMD;
-    h.csid = NGX_RTMP_CMD_CSID_AMF;
-    h.msid = NGX_RTMP_CMD_MSID;
-
-    if (ngx_rtmp_send_amf(s, &h, out_elts,
-                sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK)
-    {
-        return NGX_ERROR;
-    }
-
-    return NGX_OK;
+    return ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID);
 }
 
 
@@ -862,6 +812,10 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     h.type = NGX_RTMP_MSG_AMF_CMD;
     h.csid = NGX_RTMP_CMD_CSID_AMF;
     h.msid = NGX_RTMP_CMD_MSID;
+
+    if (ngx_rtmp_send_user_stream_begin(s, NGX_RTMP_CMD_MSID) != NGX_OK) {
+        return NGX_ERROR;
+    }
 
     if (ngx_rtmp_send_amf(s, &h, out_elts,
                 sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK)
