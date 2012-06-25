@@ -239,6 +239,8 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "live: leave '%s'", ctx->stream->name);
 
+    ctx->msg_mask = 0;
+
     if (ctx->stream->flags & NGX_RTMP_LIVE_PUBLISHING
             && ctx->flags & NGX_RTMP_LIVE_PUBLISHING)
     {
