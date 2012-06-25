@@ -11,6 +11,7 @@
 static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_delete_stream_pt        next_delete_stream;
+static ngx_rtmp_pause_pt                next_pause;
 
 
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
@@ -276,6 +277,36 @@ next:
 
 
 static ngx_int_t
+ngx_rtmp_live_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
+{
+    ngx_rtmp_live_ctx_t            *ctx;
+    ngx_rtmp_live_app_conf_t       *lacf;
+
+    lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
+    if (lacf == NULL) {
+        goto next;
+    }
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+    if (ctx == NULL) {
+        goto next;
+    }
+
+    if (v->pause) {
+        ctx->flags |= NGX_RTMP_LIVE_PAUSED;
+    } else {
+        ctx->flags &= ~NGX_RTMP_LIVE_PAUSED;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+            "live: %spaused", v->pause ? "" : "un");
+
+next:
+    return next_pause(s, v);
+}
+
+
+static ngx_int_t
 ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *in)
 {
@@ -373,7 +404,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* broadcast to all subscribers */
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
-        if (pctx == ctx) {
+        if (pctx == ctx || (pctx->flags & NGX_RTMP_LIVE_PAUSED)) {
             continue;
         }
         ++peers;
@@ -501,6 +532,9 @@ ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 
     next_delete_stream = ngx_rtmp_delete_stream;
     ngx_rtmp_delete_stream = ngx_rtmp_live_delete_stream;
+
+    next_pause = ngx_rtmp_pause;
+    ngx_rtmp_pause = ngx_rtmp_live_pause;
 
     return NGX_OK;
 }

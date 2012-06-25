@@ -14,6 +14,7 @@
 
 /* session flags */
 #define NGX_RTMP_LIVE_PUBLISHING        0x01
+#define NGX_RTMP_LIVE_PAUSED            0x02
 
 
 /* Chunk stream ids for output */
