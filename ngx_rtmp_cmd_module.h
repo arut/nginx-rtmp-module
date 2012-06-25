@@ -46,6 +46,11 @@ typedef struct {
 
 
 typedef struct {
+    double                          stream;
+} ngx_rtmp_close_stream_t;
+
+
+typedef struct {
     u_char                          name[NGX_RTMP_MAX_NAME];
     u_char                          args[NGX_RTMP_MAX_ARGS];
     u_char                          type[16];
@@ -77,6 +82,8 @@ typedef ngx_int_t (*ngx_rtmp_connect_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_connect_t *v);
 typedef ngx_int_t (*ngx_rtmp_create_stream_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_create_stream_t *v);
+typedef ngx_int_t (*ngx_rtmp_close_stream_pt)(ngx_rtmp_session_t *s,
+        ngx_rtmp_close_stream_t *v);
 typedef ngx_int_t (*ngx_rtmp_delete_stream_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_delete_stream_t *v);
 
@@ -97,6 +104,7 @@ typedef ngx_int_t (*ngx_rtmp_fcunsubscribe_pt)(ngx_rtmp_session_t *s,
 
 extern ngx_rtmp_connect_pt          ngx_rtmp_connect;
 extern ngx_rtmp_create_stream_pt    ngx_rtmp_create_stream;
+extern ngx_rtmp_close_stream_pt     ngx_rtmp_close_stream;
 extern ngx_rtmp_delete_stream_pt    ngx_rtmp_delete_stream;
 
 extern ngx_rtmp_publish_pt          ngx_rtmp_publish;

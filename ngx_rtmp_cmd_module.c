@@ -15,6 +15,7 @@
 
 ngx_rtmp_connect_pt          ngx_rtmp_connect;
 ngx_rtmp_create_stream_pt    ngx_rtmp_create_stream;
+ngx_rtmp_close_stream_pt     ngx_rtmp_close_stream;
 ngx_rtmp_delete_stream_pt    ngx_rtmp_delete_stream;
 
 ngx_rtmp_publish_pt          ngx_rtmp_publish;
@@ -338,6 +339,91 @@ ngx_rtmp_cmd_create_stream(ngx_rtmp_session_t *s, ngx_rtmp_create_stream_t *v)
 
 
 static ngx_int_t
+ngx_rtmp_cmd_close_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    static ngx_rtmp_close_stream_t     v;
+
+    static ngx_rtmp_amf_elt_t  in_elts[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &v.stream, 0 },
+    };
+
+    if (ngx_rtmp_receive_amf(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "closeStream");
+
+    return ngx_rtmp_close_stream
+        ? ngx_rtmp_close_stream(s, &v)
+        : NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_cmd_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
+{
+    ngx_rtmp_header_t               h;
+
+    static double                   trans;
+
+    static ngx_rtmp_amf_elt_t      out_inf[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("code"),
+          "NetStream.Play.Stop", 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("level"),
+          "status", 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("description"),
+          "Stopping.", 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t      out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          "onStatus", 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_null_string,
+          &trans, 0 },
+
+        { NGX_RTMP_AMF_NULL, 
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT, 
+          ngx_null_string,
+          out_inf, sizeof(out_inf) },
+    };
+
+    /* send onStatus reply */
+    memset(&h, 0, sizeof(h));
+    h.type = NGX_RTMP_MSG_AMF_CMD;
+    h.csid = NGX_RTMP_CMD_CSID_AMF;
+    h.msid = NGX_RTMP_CMD_MSID;
+
+    if (ngx_rtmp_send_amf(s, &h, out_elts,
+                sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_rtmp_cmd_delete_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
@@ -373,8 +459,13 @@ ngx_rtmp_cmd_delete_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 static ngx_int_t
 ngx_rtmp_cmd_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 {
-    /* TODO: send NetStream.Play.Stop? */
-    return NGX_OK;
+    ngx_rtmp_close_stream_t         cv;
+
+    /* chain close_stream */
+    cv.stream = 0;
+    return ngx_rtmp_close_stream
+        ? ngx_rtmp_close_stream(s, &cv)
+        : NGX_OK;
 }
 
 
@@ -658,7 +749,7 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("code"),
-          "NetStream.Play.Reset", 0 },
+          "NetStream.Play.Start", 0 },
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("level"),
@@ -666,7 +757,7 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("description"),
-          "Playing and resetting.", 0 },
+          "Playback started.", 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out_elts[] = {
@@ -912,6 +1003,7 @@ static ngx_rtmp_amf_handler_t ngx_rtmp_cmd_map[] = {
 
     { ngx_string("connect"),            ngx_rtmp_cmd_connect_init           },
     { ngx_string("createStream"),       ngx_rtmp_cmd_create_stream_init     },
+    { ngx_string("closeStream"),        ngx_rtmp_cmd_close_stream_init      },
     { ngx_string("deleteStream"),       ngx_rtmp_cmd_delete_stream_init     },
 
     { ngx_string("publish"),            ngx_rtmp_cmd_publish_init           },
@@ -955,6 +1047,7 @@ ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf)
     /* set initial handlers */
     ngx_rtmp_connect = ngx_rtmp_cmd_connect;
     ngx_rtmp_create_stream = ngx_rtmp_cmd_create_stream;
+    ngx_rtmp_close_stream  = ngx_rtmp_cmd_close_stream;
     ngx_rtmp_delete_stream = ngx_rtmp_cmd_delete_stream;
 
     ngx_rtmp_publish = ngx_rtmp_cmd_publish;
