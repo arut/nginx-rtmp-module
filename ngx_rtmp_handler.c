@@ -524,7 +524,7 @@ ngx_rtmp_send(ngx_event_t *wev)
                 cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
                 ngx_rtmp_free_shared_chain(cscf, s->out[s->out_pos]);
                 ++s->out_pos;
-                s->out_pos %= NGX_RTMP_OUT_QUEUE;
+                s->out_pos %= s->out_queue;
                 if (s->out_pos == s->out_last) {
                     break;
                 }
@@ -688,13 +688,13 @@ ngx_int_t
 ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out, 
         ngx_uint_t priority)
 {
-    ngx_int_t                       nmsg;
+    ngx_uint_t                      nmsg;
 
-    nmsg = (s->out_last - s->out_pos) % NGX_RTMP_OUT_QUEUE + 1;
+    nmsg = (s->out_last - s->out_pos) % s->out_queue + 1;
 
     /* drop packet? 
      * Note we always leave 1 slot free */
-    if (nmsg + priority * 8 >= NGX_RTMP_OUT_QUEUE) {
+    if (nmsg + priority * s->out_queue / 16 >= s->out_queue) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "RTMP drop message bufs=%ui, priority=%ui",
                 nmsg, priority);
@@ -702,7 +702,7 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
     }
 
     s->out[s->out_last++] = out;
-    s->out_last %= NGX_RTMP_OUT_QUEUE;
+    s->out_last %= s->out_queue;
 
     ngx_rtmp_acquire_shared_chain(out);
 
@@ -710,9 +710,7 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
             "RTMP send nmsg=%ui, priority=%ui #%ui",
             nmsg, priority, s->out_last);
 
-    if (priority && s->out_buffer 
-            && nmsg < NGX_RTMP_OUT_QUEUE_LOWAT) 
-    {
+    if (priority && s->out_buffer && nmsg < s->out_cork) {
         return NGX_OK;
     }
 

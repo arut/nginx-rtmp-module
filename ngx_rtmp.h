@@ -148,12 +148,6 @@ typedef struct {
 #define NGX_RTMP_MAX_CHUNK_HEADER       18
 
 
-/* Output buffer queue */
-#define NGX_RTMP_OUT_QUEUE              256
-#define NGX_RTMP_OUT_QUEUE_LOWAT        32
-
-
-
 typedef struct {
     uint32_t                csid;       /* chunk stream id */
     uint32_t                timestamp;  /* timestamp (delta) */
@@ -229,7 +223,9 @@ typedef struct {
     ngx_chain_t            *out_chain;
     u_char                 *out_bpos;
     unsigned                out_buffer:1;
-    ngx_chain_t            *out[NGX_RTMP_OUT_QUEUE];
+    size_t                  out_queue;
+    size_t                  out_cork;
+    ngx_chain_t            *out[0];
 } ngx_rtmp_session_t;
 
 
@@ -279,10 +275,11 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_pool_t             *pool;
     ngx_chain_t            *free;
     ngx_chain_t            *free_hs;
-    size_t                  max_queue;
     size_t                  max_message;
     ngx_flag_t              play_time_fix;
     ngx_flag_t              publish_time_fix;
+    size_t                  out_queue;
+    size_t                  out_cork;
 
     ngx_rtmp_conf_ctx_t    *ctx;
 } ngx_rtmp_core_srv_conf_t;
