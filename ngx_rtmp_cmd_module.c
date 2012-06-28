@@ -369,7 +369,11 @@ ngx_rtmp_cmd_close_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 static ngx_int_t
 ngx_rtmp_cmd_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 {
-    return ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID);
+    ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID);
+
+    /* Whatever happens return OK
+     * since we should be careful with destruction */
+    return NGX_OK;
 }
 
 
