@@ -47,6 +47,7 @@ typedef struct {
     ngx_time_t                          last;
     time_t                              timestamp;
     u_char                              name[NGX_RTMP_MAX_NAME];
+    u_char                              args[NGX_RTMP_MAX_ARGS];
 } ngx_rtmp_record_ctx_t;
 
 
@@ -320,6 +321,7 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     }
 
     ngx_memcpy(ctx->name, v->name, sizeof(ctx->name));
+    ngx_memcpy(ctx->args, v->args, sizeof(ctx->args));
 
     if (ngx_rtmp_record_open(s) != NGX_OK) {
         return NGX_ERROR;
@@ -338,7 +340,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
-    size_t                          len;
+    size_t                          path_len, name_len, args_len;
     u_char                         *path;
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
@@ -363,11 +365,16 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     path = ngx_rtmp_record_make_path(s);
-    len = ngx_strlen(path);
+
+    path_len = ngx_strlen(path);
+    name_len = ngx_strlen(ctx->name);
+    args_len = ngx_strlen(ctx->args);
 
     b = ngx_create_temp_buf(pool,
             sizeof("&call=record_done") +
-            sizeof("&path=") + len * 3);
+            sizeof("&name=") + name_len * 3 +
+            sizeof("&path=") + path_len * 3 +
+            + 1 + args_len);
     if (b == NULL) {
         return NULL;
     }
@@ -377,8 +384,16 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     b->last = ngx_cpymem(b->last, (u_char*)"&call=record_done", 
             sizeof("&call=record_done") - 1);
 
+    b->last = ngx_cpymem(b->last, (u_char*)"&name=", sizeof("&name=") - 1);
+    b->last = (u_char*)ngx_escape_uri(b->last, ctx->name, name_len, 0);
+
     b->last = ngx_cpymem(b->last, (u_char*)"&path=", sizeof("&path=") - 1);
-    b->last = (u_char*)ngx_escape_uri(b->last, path, len, 0);
+    b->last = (u_char*)ngx_escape_uri(b->last, path, path_len, 0);
+
+    if (args_len) {
+        *b->last++ = '&';
+        b->last = (u_char *)ngx_cpymem(b->last, ctx->args, args_len);
+    }
 
     /* HTTP header */
     hl = ngx_rtmp_netcall_http_format_header(racf->url, pool,
