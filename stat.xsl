@@ -122,6 +122,7 @@
                     <th>Address</th>
                     <th>Flash version</th>
                     <th>Page URL</th>
+                    <th>SWF URL</th>
                     <th>Dropped</th>
                     <th>A-V</th>
                     <th>Time</th>
@@ -168,6 +169,7 @@
                 <xsl:value-of select="pageurl"/>
             </a>
         </td>
+        <td><xsl:value-of select="swfurl"/></td>
         <td><xsl:value-of select="dropped"/></td>
         <td><xsl:value-of select="avsync"/></td>
         <td>

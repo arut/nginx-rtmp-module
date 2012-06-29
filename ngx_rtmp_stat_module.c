@@ -327,6 +327,12 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                         NGX_RTMP_STAT_L("</pageurl>");
                     }
 
+                    if (s->swf_url.len) {
+                        NGX_RTMP_STAT_L("<swfurl>");
+                        NGX_RTMP_STAT_ES(&s->swf_url);
+                        NGX_RTMP_STAT_L("</swfurl>");
+                    }
+
                     if (ctx->flags & NGX_RTMP_LIVE_PUBLISHING) {
                         NGX_RTMP_STAT_L("<publishing/>");
                     }
