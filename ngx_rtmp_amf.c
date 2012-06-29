@@ -61,9 +61,10 @@ ngx_rtmp_amf_debug(const char* op, ngx_log_t *log, u_char *p, size_t n)
 static ngx_int_t
 ngx_rtmp_amf_get(ngx_rtmp_amf_ctx_t *ctx, void *p, size_t n)
 {
-    ngx_buf_t      *b;
     size_t          size;
     ngx_chain_t    *l;
+    size_t          offset;
+    u_char         *pos, *last;
 #ifdef NGX_DEBUG
     void           *op = p;
     size_t          on = n;
@@ -72,16 +73,16 @@ ngx_rtmp_amf_get(ngx_rtmp_amf_ctx_t *ctx, void *p, size_t n)
     if (!n)
         return NGX_OK;
 
-    for(l = ctx->link; l; l = l->next) {
+    for(l = ctx->link, offset = ctx->offset; l; l = l->next, offset = 0) {
 
-        b = l->buf;
+        pos  = l->buf->pos + offset;
+        last = l->buf->last;
 
-        if (b->last >= n + b->pos) {
+        if (last >= pos + n) {
             if (p) {
-                p = ngx_cpymem(p, b->pos, n);
+                p = ngx_cpymem(p, pos, n);
             }
-            b->pos += n;
-
+            ctx->offset = offset + n;
             ctx->link = l;
             
 #ifdef NGX_DEBUG
@@ -91,10 +92,10 @@ ngx_rtmp_amf_get(ngx_rtmp_amf_ctx_t *ctx, void *p, size_t n)
             return NGX_OK;
         }
 
-        size = b->last - b->pos;
+        size = last - pos;
 
         if (p) {
-            p = ngx_cpymem(p, b->pos, size);
+            p = ngx_cpymem(p, pos, size);
         }
 
         n -= size;
