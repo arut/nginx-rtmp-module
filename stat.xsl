@@ -141,11 +141,11 @@
     </xsl:variable>
 
     <xsl:if test="$sec &gt;= 86400">
-        <xsl:value-of select="(floor($sec div 86400)) mod 60"/>d
+        <xsl:value-of select="floor($sec div 86400)"/>d
     </xsl:if>
 
     <xsl:if test="$sec &gt;= 3600">
-        <xsl:value-of select="(floor($sec div 3600)) mod 60"/>h
+        <xsl:value-of select="(floor($sec div 3600)) mod 24"/>h
     </xsl:if>
 
     <xsl:if test="$sec &gt;= 60">
