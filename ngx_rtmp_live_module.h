@@ -39,6 +39,7 @@ struct ngx_rtmp_live_ctx_s {
     uint32_t                            last_video;
     ngx_uint_t                          aac_version;
     ngx_uint_t                          avc_version;
+    ngx_uint_t                          meta_version;
 };
 
 
