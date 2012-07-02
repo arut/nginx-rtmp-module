@@ -272,12 +272,24 @@ ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
 
     static ngx_rtmp_amf_elt_t       out_inf[] = {
 
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("Server"),
+          "NGINX RTMP (www.github.com/arut/nginx-rtmp-module)", 0 },
+
         { NGX_RTMP_AMF_NUMBER, 
           ngx_string("width"),
           &v.width, 0 },
 
         { NGX_RTMP_AMF_NUMBER, 
           ngx_string("height"),
+          &v.height, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("displayWidth"),
+          &v.width, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("displayHeight"),
           &v.height, 0 },
 
         { NGX_RTMP_AMF_NUMBER, 
@@ -322,10 +334,6 @@ ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
         { NGX_RTMP_AMF_STRING, 
           ngx_null_string,
           "onMetaData", 0 },
-
-        { NGX_RTMP_AMF_STRING, 
-          ngx_null_string,
-          NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT, 
           ngx_null_string,

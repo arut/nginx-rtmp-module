@@ -637,6 +637,21 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         if (codec_ctx) {
             ch = *h;
 
+#if 0
+            /* metadata */
+            if (codec_ctx->meta) {
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                        "record: writing metadata");
+                ch.type = NGX_RTMP_MSG_AMF_META;
+                ch.mlen = ngx_rtmp_record_get_chain_mlen(codec_ctx->meta);
+                if (ngx_rtmp_record_write_frame(s, &ch, codec_ctx->meta)
+                        != NGX_OK) 
+                {
+                    return NGX_OK;
+                }
+            }
+#endif
+            /* AAC header */
             if (codec_ctx->aac_header && (racf->flags & NGX_RTMP_RECORD_AUDIO)) 
             {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
@@ -650,6 +665,7 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 }
             }
 
+            /* AVC header */
             if (codec_ctx->avc_header && (racf->flags 
                 & (NGX_RTMP_RECORD_VIDEO|NGX_RTMP_RECORD_KEYFRAMES))) 
             {
