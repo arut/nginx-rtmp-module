@@ -274,7 +274,7 @@ ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("Server"),
-          "NGINX RTMP (www.github.com/arut/nginx-rtmp-module)", 0 },
+          "NGINX RTMP (github.com/arut/nginx-rtmp-module)", 0 },
 
         { NGX_RTMP_AMF_NUMBER, 
           ngx_string("width"),
