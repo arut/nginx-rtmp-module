@@ -697,7 +697,7 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ngx_rtmp_header_t               h;
 
     static double                   trans;
-    static int                      bfalse;
+    static int                      access = 1;
 
     static ngx_rtmp_amf_elt_t      out_inf[] = {
 
@@ -776,11 +776,11 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
         { NGX_RTMP_AMF_BOOLEAN,
           ngx_null_string,
-          &bfalse, 0 },
+          &access, 0 },
 
         { NGX_RTMP_AMF_BOOLEAN,
           ngx_null_string,
-          &bfalse, 0 },
+          &access, 0 },
     };
 
     static ngx_rtmp_amf_elt_t      out4_inf[] = {
