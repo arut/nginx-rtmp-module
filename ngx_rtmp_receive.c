@@ -135,7 +135,7 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
                 ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                         "msid=%uD buflen: %uD (msec)", val, arg);
 
-                ngx_rtmp_send_user_stream_begin(s, val);
+                /*ngx_rtmp_send_user_stream_begin(s, val);*/
             }
             break;
 
