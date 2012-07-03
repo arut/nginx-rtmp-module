@@ -32,6 +32,13 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, live),
       NULL },
 
+    { ngx_string("meta"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, meta),
+      NULL },
+
     { ngx_string("stream_buckets"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -89,6 +96,7 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     }
 
     lacf->live = NGX_CONF_UNSET;
+    lacf->meta = NGX_CONF_UNSET;
     lacf->nbuckets = NGX_CONF_UNSET;
     lacf->buflen = NGX_CONF_UNSET;
 
@@ -103,6 +111,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_live_app_conf_t *conf = child;
 
     ngx_conf_merge_value(conf->live, prev->live, 0);
+    ngx_conf_merge_value(conf->meta, prev->meta, 1);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
 
@@ -283,7 +292,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 {
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
-    ngx_chain_t                    *out, *peer_out, *header_out, *pheader_out;
+    ngx_chain_t                    *out, *peer_out, *header_out, 
+                                   *pheader_out, *meta;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
@@ -291,7 +301,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_uint_t                      prio, peer_prio;
     ngx_uint_t                      peers, dropped_peers;
     size_t                          header_offset;
-    ngx_uint_t                      header_version;
+    ngx_uint_t                      header_version, meta_version;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
@@ -355,6 +365,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     pheader_out = NULL;
     header_offset = 0;
     header_version = 0;
+    meta = NULL;
+    meta_version = 0;
     if (codec_ctx) {
         if (h->type == NGX_RTMP_MSG_AUDIO) {
             if (codec_ctx->aac_pheader) {
@@ -370,6 +382,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 header_offset = offsetof(ngx_rtmp_live_ctx_t, avc_version);
                 header_version = codec_ctx->avc_version;
             }
+        }
+        if (lacf->meta && codec_ctx->meta) {
+            meta = codec_ctx->meta;
+            meta_version = codec_ctx->meta_version;
         }
     }
 
@@ -412,6 +428,15 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             if (ngx_rtmp_send_message(ss, pheader_out, prio) == NGX_OK) {
                 *(ngx_uint_t *)((u_char *)pctx + header_offset) 
                     = header_version;
+            }
+        }
+
+        /* send metadata if newer exists */
+        if (meta && meta_version != pctx->meta_version) {
+            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
+                    "live: sending metadata");
+            if (ngx_rtmp_send_message(ss, meta, prio) == NGX_OK) {
+                pctx->meta_version = meta_version;
             }
         }
 

@@ -39,6 +39,7 @@ struct ngx_rtmp_live_ctx_s {
     uint32_t                            last_video;
     ngx_uint_t                          aac_version;
     ngx_uint_t                          avc_version;
+    ngx_uint_t                          meta_version;
 };
 
 
@@ -57,6 +58,7 @@ typedef struct {
     ngx_int_t                           nbuckets;
     ngx_rtmp_live_stream_t            **streams;
     ngx_flag_t                          live;
+    ngx_flag_t                          meta;
     ngx_msec_t                          buflen;
     ngx_pool_t                         *pool;
     ngx_rtmp_live_stream_t             *free_streams;
