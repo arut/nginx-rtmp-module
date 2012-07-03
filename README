@@ -2,6 +2,13 @@
 
 NGINX-based RTMP server
 
+Wiki manual:
+
+  https://github.com/arut/nginx-rtmp-module/wiki
+
+
+Features:
+
 * Live streaming of video/audio
 
 * Stream relay support for distributed
