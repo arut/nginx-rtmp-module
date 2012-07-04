@@ -241,6 +241,9 @@ ngx_rtmp_play_send(ngx_event_t *e)
     if (n != sizeof(header)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                       "play: could not read flv tag header");
+        if (ctx->msg_mask == 0) {
+            ngx_rtmp_play_restart(s, 0);
+        }
         return;
     }
     ctx->offset += sizeof(header);
