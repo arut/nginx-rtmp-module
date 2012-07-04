@@ -370,7 +370,7 @@ ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
     }
 
     ngx_memzero(&h, sizeof(h));
-    h.csid = 5;
+    h.csid = NGX_RTMP_LIVE_CSID_META;
     h.msid = NGX_RTMP_LIVE_MSID;
     h.type = NGX_RTMP_MSG_AMF_META;
     ngx_rtmp_prepare_message(s, &h, NULL, ctx->meta);

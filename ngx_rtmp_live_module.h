@@ -17,6 +17,7 @@
 
 
 /* Chunk stream ids for output */
+#define NGX_RTMP_LIVE_CSID_META         5
 #define NGX_RTMP_LIVE_CSID_AUDIO        6
 #define NGX_RTMP_LIVE_CSID_VIDEO        7
 #define NGX_RTMP_LIVE_MSID              1
