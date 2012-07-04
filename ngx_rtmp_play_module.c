@@ -21,7 +21,6 @@ static void ngx_rtmp_play_send(ngx_event_t *e);
 
 typedef struct {
     ngx_str_t                           root;
-    ngx_flag_t                          seek;
 } ngx_rtmp_play_app_conf_t;
 
 
@@ -50,13 +49,6 @@ static ngx_command_t  ngx_rtmp_play_commands[] = {
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_play_app_conf_t, root),
-      NULL },
-
-    { ngx_string("seek"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_flag_slot,
-      NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_play_app_conf_t, seek),
       NULL },
 
       ngx_null_command
@@ -101,8 +93,6 @@ ngx_rtmp_play_create_app_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    pacf->seek = NGX_CONF_UNSET;
-
     return pacf;
 }
 
@@ -114,7 +104,6 @@ ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_play_app_conf_t *conf = child;
 
     ngx_conf_merge_str_value(conf->root, prev->root, "");
-    ngx_conf_merge_value(conf->seek, prev->seek, 1);
 
     return NGX_CONF_OK;
 }
@@ -180,8 +169,11 @@ ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t offset)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "play: starting at offset=%D", offset);
 
+    /*TODO: lookup metadata keyframe map
+     * for start_timestamp/ctx->offset */
+
     ctx->offset = 13; /* header + zero tag size */
-    ctx->epoch = ngx_current_msec - s->epoch;
+    ctx->epoch = ngx_current_msec;
     ctx->start_timestamp = offset;
     ctx->msg_mask = 0;
     if (offset) {
@@ -244,40 +236,43 @@ ngx_rtmp_play_send(ngx_event_t *e)
         return;
     }
 
+    /* read tag header */
     n = ngx_read_file(&ctx->file, header, sizeof(header), ctx->offset);
     if (n != sizeof(header)) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "play: could not read flv tag header");
         return;
     }
-
     ctx->offset += sizeof(header);
 
+    /* parse header fields */
     type = header[0];
-
     size = 0;
     ngx_rtmp_rmemcpy(&size, header + 1, 3);
-
     ngx_rtmp_rmemcpy(&timestamp, header + 4, 3);
     ((u_char *) &timestamp)[3] = header[7];
-
-    if (ctx->meta_seeking) {
-        if (type != NGX_RTMP_MSG_AMF_META) {
-            goto skip;
-        }
-    } else {
-        if (type != NGX_RTMP_MSG_AUDIO && type != NGX_RTMP_MSG_VIDEO) {
-            goto skip;
-        }
-        if (ctx->start_timestamp && timestamp < ctx->start_timestamp) {
-            goto skip;
-        }
-    }
 
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "play: type=%i offset=%ui size=%D timestamp=%D",
                    type, ctx->offset, size, timestamp);
 
-    ngx_memzero(&h, sizeof(h));
+    /* expect meta packet at the beginning;
+     * if missing then do not look it up */
+    if (ctx->meta_seeking && type != NGX_RTMP_MSG_AMF_META) {
+        ctx->meta_seeking = 0;
+        ngx_rtmp_play_restart(s, ctx->start_timestamp);
+        return;
+    }
 
+    /* skip early audio/video frames */
+    if ((type == NGX_RTMP_MSG_AUDIO || type == NGX_RTMP_MSG_VIDEO) &&
+       ctx->start_timestamp && timestamp < ctx->start_timestamp) 
+    {
+        goto skip;
+    }
+
+    /* fill RTMP header & last pseudo-header */
+    ngx_memzero(&h, sizeof(h));
     h.type = type;
     h.msid = NGX_RTMP_LIVE_MSID;
     h.timestamp = timestamp;
@@ -312,28 +307,38 @@ ngx_rtmp_play_send(ngx_event_t *e)
         goto next;
     }
 
+    /* read tag body */
     n = ngx_read_file(&ctx->file, buffer, size, ctx->offset);
     if (n != size) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "play: could not read flv tag");
         return;
     }
 
-    if (ctx->key_seeking
-       && !(h.type == NGX_RTMP_MSG_VIDEO && size && 
-            (buffer[0] & 0xf0) >> 4 == 1))
-    {
-        goto skip;
-    }
-    ctx->key_seeking = 0;
-
+    /* prepare input chain */
     ngx_memzero(&in, sizeof(in));
     ngx_memzero(&in_buf, sizeof(in_buf));
     in.buf = &in_buf;
     in_buf.pos = buffer;
     in_buf.last = buffer + size;
+
+    /* skip until keyframe? */
+    if (ctx->key_seeking) {
+        if (h.type != NGX_RTMP_MSG_VIDEO || size == 0 || 
+            ngx_rtmp_get_video_frame_type(&in) != NGX_RTMP_VIDEO_KEY_FRAME)
+        {
+            goto skip;
+        }
+        ctx->key_seeking = 0;
+        ctx->start_timestamp = timestamp;
+    }
+
+    /* create output chain */
     out = ngx_rtmp_append_shared_bufs(cscf, NULL, &in);
     ngx_rtmp_prepare_message(s, &h, ctx->msg_mask & (1 << h.type) ? 
                              &lh : NULL, out);
 
+    /* output chain */
     ngx_rtmp_send_message(s, out, 0); /* TODO: priority */
 
     ngx_rtmp_free_shared_chain(cscf, out);
@@ -347,8 +352,10 @@ ngx_rtmp_play_send(ngx_event_t *e)
 
 next:
     buflen = (s->buflen ? s->buflen : NGX_RTMP_PLAY_DEFAULT_BUFLEN);
-    end_timestamp = (ngx_current_msec - s->epoch) + buflen;
+    end_timestamp = (ngx_current_msec - ctx->epoch) +
+        ctx->start_timestamp + buflen;
 
+    /* too much data sent; schedule timeout */
     if (h.timestamp > end_timestamp) {
         ctx->offset += (size + 4);
         ngx_add_timer(e, h.timestamp - end_timestamp);
@@ -368,6 +375,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ngx_rtmp_play_ctx_t            *ctx;
     u_char                         *p;
     ngx_event_t                    *e;
+    size_t                          len, slen;
     static u_char                   path[NGX_MAX_PATH];
 
     pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
@@ -398,7 +406,12 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ctx->file.log = s->connection->log;
 
     /*TODO: escape*/
-    p = ngx_snprintf(path, sizeof(path), "%V/%s", &pacf->root, v->name);
+    len = ngx_strlen(v->name);
+    slen = sizeof(".flv") - 1;
+    p = ngx_snprintf(path, sizeof(path), "%V/%s%s", &pacf->root, v->name,
+            len > slen && ngx_strncasecmp((u_char *) ".flv", 
+                                           v->name + len - slen, slen) == 0
+            ? "" : ".flv");
     *p = 0;
 
     ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN, 
@@ -417,7 +430,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     e->handler = ngx_rtmp_play_send;
     e->log = s->connection->log;
 
-    ctx->meta_seeking = pacf->seek;
+    ctx->meta_seeking = 1;
 
     ngx_rtmp_play_restart(s, v->start);
 
