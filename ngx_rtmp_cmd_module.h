@@ -78,6 +78,11 @@ typedef struct {
 } ngx_rtmp_play_t;
 
 
+typedef struct {
+    double                          offset;
+} ngx_rtmp_seek_t;
+
+
 typedef ngx_int_t (*ngx_rtmp_connect_pt)(ngx_rtmp_session_t *s, 
         ngx_rtmp_connect_t *v);
 typedef ngx_int_t (*ngx_rtmp_create_stream_pt)(ngx_rtmp_session_t *s,
@@ -101,6 +106,9 @@ typedef ngx_int_t (*ngx_rtmp_fcsubscribe_pt)(ngx_rtmp_session_t *s,
 typedef ngx_int_t (*ngx_rtmp_fcunsubscribe_pt)(ngx_rtmp_session_t *s, 
         ngx_rtmp_fcunsubscribe_t *v);
 
+typedef ngx_int_t (*ngx_rtmp_seek_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_seek_t *v);
+
 
 extern ngx_rtmp_connect_pt          ngx_rtmp_connect;
 extern ngx_rtmp_create_stream_pt    ngx_rtmp_create_stream;
@@ -114,6 +122,8 @@ extern ngx_rtmp_fcunpublish_pt      ngx_rtmp_fcunpublish;
 extern ngx_rtmp_play_pt             ngx_rtmp_play;
 extern ngx_rtmp_fcsubscribe_pt      ngx_rtmp_fcsubscribe;
 extern ngx_rtmp_fcunsubscribe_pt    ngx_rtmp_fcunsubscribe;
+
+extern ngx_rtmp_seek_pt             ngx_rtmp_seek;
 
 
 #endif /*_NGX_RTMP_CMD_H_INCLUDED_ */

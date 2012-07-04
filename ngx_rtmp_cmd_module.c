@@ -26,6 +26,8 @@ ngx_rtmp_play_pt             ngx_rtmp_play;
 ngx_rtmp_fcsubscribe_pt      ngx_rtmp_fcsubscribe;
 ngx_rtmp_fcunsubscribe_pt    ngx_rtmp_fcunsubscribe;
 
+ngx_rtmp_seek_pt             ngx_rtmp_seek;
+
 
 static ngx_int_t ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf);
 
@@ -957,6 +959,53 @@ ngx_rtmp_cmd_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 }
 
 
+static ngx_int_t
+ngx_rtmp_cmd_seek_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    static ngx_rtmp_seek_t         v;
+
+    static ngx_rtmp_amf_elt_t      in_elts[] = {
+
+        /* transaction is always 0 */
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &v.offset, sizeof(v.offset) },
+    };
+
+    ngx_memzero(&v, sizeof(v));
+
+    /* parse input */
+    if (ngx_rtmp_receive_amf(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    {
+        return NGX_ERROR;
+    }
+
+    return ngx_rtmp_seek
+        ? ngx_rtmp_seek(s, &v)
+        : NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_cmd_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
+{
+    ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID);
+    ngx_rtmp_send_user_stream_begin(s, NGX_RTMP_CMD_MSID);
+
+    return NGX_OK;
+}
+
+
 static ngx_rtmp_amf_handler_t ngx_rtmp_cmd_map[] = {
 
     { ngx_string("connect"),            ngx_rtmp_cmd_connect_init           },
@@ -971,6 +1020,8 @@ static ngx_rtmp_amf_handler_t ngx_rtmp_cmd_map[] = {
     { ngx_string("play"),               ngx_rtmp_cmd_play_init              },
     { ngx_string("fcsubscribe"),        ngx_rtmp_cmd_fcsubscribe_init       },
   /*{ ngx_string("fcunsubscribe"),      ngx_rtmp_cmd_fcunsubscribe_init     },*/
+
+    { ngx_string("seek"),               ngx_rtmp_cmd_seek_init              },
 };
 
 
@@ -1015,6 +1066,8 @@ ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf)
     ngx_rtmp_play = ngx_rtmp_cmd_play;
     ngx_rtmp_fcsubscribe = ngx_rtmp_cmd_fcsubscribe;
     /*ngx_rtmp_fcunsubscribe = ngx_rtmp_cmd_fcunsubsrcibe;*/
+
+    ngx_rtmp_seek = ngx_rtmp_cmd_seek;
 
     return NGX_OK;
 }
