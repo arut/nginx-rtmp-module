@@ -9,16 +9,19 @@
 
 static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_close_stream_pt         next_close_stream;
+static ngx_rtmp_seek_pt                 next_seek;
 
 
 static ngx_int_t ngx_rtmp_play_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_play_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, 
         void *parent, void *child);
+static void ngx_rtmp_play_send(ngx_event_t *e);
 
 
 typedef struct {
     ngx_str_t                           root;
+    ngx_flag_t                          seek;
 } ngx_rtmp_play_app_conf_t;
 
 
@@ -30,6 +33,9 @@ typedef struct {
     uint32_t                            last_video;
     ngx_uint_t                          msg_mask;
     uint32_t                            epoch;
+    uint32_t                            start_timestamp;
+    unsigned                            meta_seeking:1;
+    unsigned                            key_seeking:1;
 } ngx_rtmp_play_ctx_t;
 
 
@@ -44,6 +50,13 @@ static ngx_command_t  ngx_rtmp_play_commands[] = {
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_play_app_conf_t, root),
+      NULL },
+
+    { ngx_string("seek"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_play_app_conf_t, seek),
       NULL },
 
       ngx_null_command
@@ -88,6 +101,8 @@ ngx_rtmp_play_create_app_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    pacf->seek = NGX_CONF_UNSET;
+
     return pacf;
 }
 
@@ -99,6 +114,7 @@ ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_play_app_conf_t *conf = child;
 
     ngx_conf_merge_str_value(conf->root, prev->root, "");
+    ngx_conf_merge_value(conf->seek, prev->seek, 1);
 
     return NGX_CONF_OK;
 }
@@ -137,6 +153,70 @@ next:
 }
 
 
+static ngx_int_t
+ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t offset)
+{
+    ngx_rtmp_play_ctx_t            *ctx;
+    ngx_rtmp_play_app_conf_t       *pacf;
+
+    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+    if (pacf == NULL) {
+        return NGX_OK;
+    }
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    if (ctx->write_evt.timer_set) {
+        ngx_del_timer(&ctx->write_evt);
+    }
+
+    if (ctx->write_evt.prev) {
+        ngx_delete_posted_event((&ctx->write_evt));
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: starting at offset=%D", offset);
+
+    ctx->offset = 13; /* header + zero tag size */
+    ctx->epoch = ngx_current_msec - s->epoch;
+    ctx->start_timestamp = offset;
+    ctx->msg_mask = 0;
+    if (offset) {
+        ctx->key_seeking = 1;
+    }
+
+    ngx_post_event((&ctx->write_evt), &ngx_posted_events)
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
+{
+    ngx_rtmp_play_ctx_t            *ctx;
+    ngx_rtmp_play_app_conf_t       *pacf;
+
+    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+    if (pacf == NULL) {
+        goto next;
+    }
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+    if (ctx == NULL) {
+        goto next;
+    }
+
+    ngx_rtmp_play_restart(s, v->offset);
+
+next:
+    return next_seek(s, v);
+}
+
+
 static void
 ngx_rtmp_play_send(ngx_event_t *e)
 {
@@ -144,7 +224,7 @@ ngx_rtmp_play_send(ngx_event_t *e)
     ngx_rtmp_play_ctx_t            *ctx;
     uint8_t                         type;
     uint32_t                        size;
-    uint32_t                        timestamp;
+    uint32_t                        timestamp, last_timestamp;
     ngx_rtmp_header_t               h, lh;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_chain_t                    *out, in;
@@ -171,8 +251,6 @@ ngx_rtmp_play_send(ngx_event_t *e)
 
     ctx->offset += sizeof(header);
 
-    ngx_memzero(&h, sizeof(h));
-
     type = header[0];
 
     size = 0;
@@ -181,35 +259,57 @@ ngx_rtmp_play_send(ngx_event_t *e)
     ngx_rtmp_rmemcpy(&timestamp, header + 4, 3);
     ((u_char *) &timestamp)[3] = header[7];
 
-    if (type != NGX_RTMP_MSG_AUDIO && type != NGX_RTMP_MSG_VIDEO) {
-        /* TODO: make use of metadata */
-        ctx->offset += (size + 4);
-        return;
+    if (ctx->meta_seeking) {
+        if (type != NGX_RTMP_MSG_AMF_META) {
+            goto skip;
+        }
+    } else {
+        if (type != NGX_RTMP_MSG_AUDIO && type != NGX_RTMP_MSG_VIDEO) {
+            goto skip;
+        }
+        if (ctx->start_timestamp && timestamp < ctx->start_timestamp) {
+            goto skip;
+        }
     }
 
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "play: type=%i offset=%ui size=%D timestamp=%D",
                    type, ctx->offset, size, timestamp);
 
-    h.type = type;
-    h.csid = (h.type == NGX_RTMP_MSG_AUDIO
-            ? NGX_RTMP_LIVE_CSID_AUDIO
-            : NGX_RTMP_LIVE_CSID_VIDEO);
-    h.msid = NGX_RTMP_LIVE_MSID;
-    h.timestamp = timestamp + ctx->epoch;
+    ngx_memzero(&h, sizeof(h));
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "play: h.timestamp=%D", h.timestamp);
+    h.type = type;
+    h.msid = NGX_RTMP_LIVE_MSID;
+    h.timestamp = timestamp;
+    last_timestamp = 0;
+
+    switch (h.type) {
+        case NGX_RTMP_MSG_AUDIO:
+            h.csid = NGX_RTMP_LIVE_CSID_AUDIO;
+            last_timestamp = ctx->last_audio;
+            ctx->last_audio = h.timestamp;
+            break;
+
+        case NGX_RTMP_MSG_VIDEO:
+            h.csid = NGX_RTMP_LIVE_CSID_VIDEO;
+            last_timestamp = ctx->last_video;
+            ctx->last_video = h.timestamp;
+            break;
+
+        case NGX_RTMP_MSG_AMF_META:
+            h.csid = NGX_RTMP_LIVE_CSID_META;
+            h.timestamp = 0;
+            last_timestamp = 0;
+            break;
+    }
 
     lh = h;
-    lh.timestamp = (h.type == NGX_RTMP_MSG_AUDIO
-                    ? ctx->last_audio
-                    : ctx->last_video);
+    lh.timestamp = last_timestamp;
 
     if (size > sizeof(buffer)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                "play: too big message: %D", size);
-        return;
+                      "play: too big message: %D>%uz", size, sizeof(buffer));
+        goto next;
     }
 
     n = ngx_read_file(&ctx->file, buffer, size, ctx->offset);
@@ -217,7 +317,13 @@ ngx_rtmp_play_send(ngx_event_t *e)
         return;
     }
 
-    ctx->offset += (size + 4);
+    if (ctx->key_seeking
+       && !(h.type == NGX_RTMP_MSG_VIDEO && size && 
+            (buffer[0] & 0xf0) >> 4 == 1))
+    {
+        goto skip;
+    }
+    ctx->key_seeking = 0;
 
     ngx_memzero(&in, sizeof(in));
     ngx_memzero(&in_buf, sizeof(in_buf));
@@ -233,21 +339,25 @@ ngx_rtmp_play_send(ngx_event_t *e)
     ngx_rtmp_free_shared_chain(cscf, out);
     ctx->msg_mask |= (1 << h.type);
 
-    if (h.type == NGX_RTMP_MSG_AUDIO) {
-        ctx->last_audio = h.timestamp;
-    } else {
-        ctx->last_video = h.timestamp;
-    }
-
-    buflen = (s->buflen ? s->buflen : NGX_RTMP_PLAY_DEFAULT_BUFLEN);
-    end_timestamp = (ngx_current_msec - s->epoch) + buflen;
-
-    if (h.timestamp < end_timestamp) {
-        ngx_post_event(e, &ngx_posted_events);
+    if (ctx->meta_seeking) {
+        ctx->meta_seeking = 0;
+        ngx_rtmp_play_restart(s, ctx->start_timestamp);
         return;
     }
 
-    ngx_add_timer(e, h.timestamp - end_timestamp);
+next:
+    buflen = (s->buflen ? s->buflen : NGX_RTMP_PLAY_DEFAULT_BUFLEN);
+    end_timestamp = (ngx_current_msec - s->epoch) + buflen;
+
+    if (h.timestamp > end_timestamp) {
+        ctx->offset += (size + 4);
+        ngx_add_timer(e, h.timestamp - end_timestamp);
+        return;
+    }
+
+skip:
+    ctx->offset += (size + 4);
+    ngx_post_event(e, &ngx_posted_events);
 }
 
 
@@ -302,15 +412,14 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "play: opened file '%s'", path);
 
-    ctx->offset = 13; /* header 9 bytes + zero tag 4 bytes */
-    ctx->epoch = ngx_current_msec - s->epoch;
-
     e = &ctx->write_evt;
     e->data = s;
     e->handler = ngx_rtmp_play_send;
     e->log = s->connection->log;
 
-    ngx_post_event(e, &ngx_posted_events)
+    ctx->meta_seeking = pacf->seek;
+
+    ngx_rtmp_play_restart(s, v->start);
 
 next:
     return next_play(s, v);
@@ -325,6 +434,9 @@ ngx_rtmp_play_postconfiguration(ngx_conf_t *cf)
 
     next_close_stream = ngx_rtmp_close_stream;
     ngx_rtmp_close_stream = ngx_rtmp_play_close_stream;
+
+    next_seek = ngx_rtmp_seek;
+    ngx_rtmp_seek = ngx_rtmp_play_seek;
 
     return NGX_OK;
 }
