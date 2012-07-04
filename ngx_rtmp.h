@@ -178,6 +178,9 @@ typedef struct {
     ngx_str_t              *addr_text;
     int                     connected;
 
+    /* client buffer time in msec */
+    uint32_t                buflen;
+
     /* connection parameters */
     ngx_str_t               app;
     ngx_str_t               flashver;
