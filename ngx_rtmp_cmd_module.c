@@ -27,6 +27,7 @@ ngx_rtmp_fcsubscribe_pt      ngx_rtmp_fcsubscribe;
 ngx_rtmp_fcunsubscribe_pt    ngx_rtmp_fcunsubscribe;
 
 ngx_rtmp_seek_pt             ngx_rtmp_seek;
+ngx_rtmp_pause_pt            ngx_rtmp_pause;
 
 
 static ngx_int_t ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf);
@@ -950,6 +951,116 @@ ngx_rtmp_cmd_fcsubscribe(ngx_rtmp_session_t *s, ngx_rtmp_fcsubscribe_t *v)
 
 
 static ngx_int_t
+ngx_rtmp_cmd_pause_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    static ngx_rtmp_pause_t     v;
+
+    static ngx_rtmp_amf_elt_t   in_elts[] = {
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_BOOLEAN,
+          ngx_null_string,
+          &v.pause, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &v.position, 0 },
+    };
+
+    ngx_memzero(&v, sizeof(v));
+
+    /* parse input */
+    if (ngx_rtmp_receive_amf(s, in, in_elts, 
+                sizeof(in_elts) / sizeof(in_elts[0]))) 
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "pause: pause=%i position=%i",
+            (ngx_int_t)v.pause, (ngx_int_t)v.position);
+
+    return ngx_rtmp_pause
+        ? ngx_rtmp_pause(s, &v)
+        : NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_cmd_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
+{
+    ngx_rtmp_header_t               h;
+
+    static double                   trans;
+
+    static ngx_rtmp_amf_elt_t      out_inf[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("code"),
+          "NetStream.Pause.Notify", 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("level"),
+          "status", 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("description"),
+          "Paused.", 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t      out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          "onStatus", 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_null_string,
+          &trans, 0 },
+
+        { NGX_RTMP_AMF_NULL, 
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT, 
+          ngx_null_string,
+          out_inf, sizeof(out_inf) },
+    };
+
+    /* send onStatus reply */
+    memset(&h, 0, sizeof(h));
+    h.type = NGX_RTMP_MSG_AMF_CMD;
+    h.csid = NGX_RTMP_CMD_CSID_AMF;
+    h.msid = NGX_RTMP_CMD_MSID;
+
+    if (v->pause) {
+        out_inf[0].data = "NetStream.Pause.Notify";
+        return ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID) != NGX_OK
+            || ngx_rtmp_send_amf(s, &h, out_elts,
+                    sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK
+            ? NGX_ERROR
+            : NGX_OK;
+    }
+
+    out_inf[0].data = "NetStream.Unpause.Notify";
+    return ngx_rtmp_send_user_stream_begin(s, NGX_RTMP_CMD_MSID) != NGX_OK
+        || ngx_rtmp_send_amf(s, &h, out_elts,
+                sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK
+        ? NGX_ERROR
+        : NGX_OK;
+}
+
+
+
+static ngx_int_t
 ngx_rtmp_cmd_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
@@ -1022,6 +1133,7 @@ static ngx_rtmp_amf_handler_t ngx_rtmp_cmd_map[] = {
   /*{ ngx_string("fcunsubscribe"),      ngx_rtmp_cmd_fcunsubscribe_init     },*/
 
     { ngx_string("seek"),               ngx_rtmp_cmd_seek_init              },
+    { ngx_string("pause"),              ngx_rtmp_cmd_pause_init             },
 };
 
 
@@ -1068,6 +1180,7 @@ ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf)
     /*ngx_rtmp_fcunsubscribe = ngx_rtmp_cmd_fcunsubsrcibe;*/
 
     ngx_rtmp_seek = ngx_rtmp_cmd_seek;
+    ngx_rtmp_pause = ngx_rtmp_cmd_pause;
 
     return NGX_OK;
 }
