@@ -18,7 +18,7 @@ static void * ngx_rtmp_play_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, 
         void *parent, void *child);
 static void ngx_rtmp_play_send(ngx_event_t *e);
-static ngx_int_t ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t);
+static ngx_int_t ngx_rtmp_play_restart(ngx_rtmp_session_t *s, ngx_int_t offset);
 static ngx_int_t ngx_rtmp_play_stop(ngx_rtmp_session_t *s);
 
 
@@ -132,6 +132,7 @@ ngx_rtmp_play_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 
     if (ctx->file.fd != NGX_INVALID_FILE) {
         ngx_close_file(ctx->file.fd);
+        ctx->file.fd = NGX_INVALID_FILE;
     }
 
 next:
@@ -140,7 +141,7 @@ next:
 
 
 static ngx_int_t
-ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t offset)
+ngx_rtmp_play_restart(ngx_rtmp_session_t *s, ngx_int_t offset)
 {
     ngx_rtmp_play_ctx_t            *ctx;
 
@@ -152,7 +153,11 @@ ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t offset)
     ngx_rtmp_play_stop(s);
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "play: restart offset=%D", offset);
+                   "play: restart offset=%i", offset);
+
+    if (offset < 0) {
+        offset = 0;
+    }
 
     /*TODO: lookup metadata keyframe map
      * for start_timestamp/ctx->offset */
@@ -494,7 +499,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ngx_rtmp_send_user_recorded(s, 1);
 
-    ngx_rtmp_play_restart(s, v->start < 0 ? 0 : v->start);
+    ngx_rtmp_play_restart(s, v->start);
 
 next:
     return next_play(s, v);
