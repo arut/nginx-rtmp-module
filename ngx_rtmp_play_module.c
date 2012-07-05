@@ -488,7 +488,9 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     e->handler = ngx_rtmp_play_send;
     e->log = s->connection->log;
 
-    ctx->meta_seeking = 1;
+    if (v->start > 0) {
+        ctx->meta_seeking = 1;
+    }
 
     ngx_rtmp_send_user_recorded(s, 1);
 
