@@ -805,10 +805,11 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     };
 
     ngx_log_debug6(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "play: name='%s' args='%s' start=%uD duration=%uD "
-            "reset=%d silent=%d",
-            v->name, v->args, (uint32_t)v->start, 
-            (uint32_t)v->duration, v->reset, v->silent);
+            "cmd: play name='%s' args='%s' start=%i duration=%i "
+            "reset=%i silent=%i",
+            v->name, v->args, (ngx_int_t) v->start, 
+            (ngx_int_t) v->duration, (ngx_int_t) v->reset, 
+            (ngx_int_t) v->silent);
 
     if (v->silent) {
         return NGX_OK;
