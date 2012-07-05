@@ -10,6 +10,7 @@
 static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_close_stream_pt         next_close_stream;
 static ngx_rtmp_seek_pt                 next_seek;
+static ngx_rtmp_pause_pt                next_pause;
 
 
 static ngx_int_t ngx_rtmp_play_postconfiguration(ngx_conf_t *cf);
@@ -17,6 +18,8 @@ static void * ngx_rtmp_play_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, 
         void *parent, void *child);
 static void ngx_rtmp_play_send(ngx_event_t *e);
+static ngx_int_t ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t);
+static ngx_int_t ngx_rtmp_play_stop(ngx_rtmp_session_t *s);
 
 
 typedef struct {
@@ -125,16 +128,10 @@ ngx_rtmp_play_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
         goto next;
     }
 
+    ngx_rtmp_play_stop(s);
+
     if (ctx->file.fd != NGX_INVALID_FILE) {
         ngx_close_file(ctx->file.fd);
-    }
-
-    if (ctx->write_evt.timer_set) {
-        ngx_del_timer(&ctx->write_evt);
-    }
-
-    if (ctx->write_evt.prev) {
-        ngx_delete_posted_event((&ctx->write_evt));
     }
 
 next:
@@ -146,12 +143,38 @@ static ngx_int_t
 ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t offset)
 {
     ngx_rtmp_play_ctx_t            *ctx;
-    ngx_rtmp_play_app_conf_t       *pacf;
 
-    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
-    if (pacf == NULL) {
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+    if (ctx == NULL) {
         return NGX_OK;
     }
+
+    ngx_rtmp_play_stop(s);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: restart offset=%D", offset);
+
+    /*TODO: lookup metadata keyframe map
+     * for start_timestamp/ctx->offset */
+
+    ctx->offset = 13; /* header + zero tag size */
+    ctx->epoch = ngx_current_msec;
+    ctx->start_timestamp = offset;
+    ctx->msg_mask = 0;
+    if (offset) {
+        ctx->key_seeking = 1;
+    }
+
+    ngx_post_event((&ctx->write_evt), &ngx_posted_events)
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_stop(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_play_ctx_t            *ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
     if (ctx == NULL) {
@@ -166,21 +189,8 @@ ngx_rtmp_play_restart(ngx_rtmp_session_t *s, uint32_t offset)
         ngx_delete_posted_event((&ctx->write_evt));
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "play: starting at offset=%D", offset);
-
-    /*TODO: lookup metadata keyframe map
-     * for start_timestamp/ctx->offset */
-
-    ctx->offset = 13; /* header + zero tag size */
-    ctx->epoch = ngx_current_msec;
-    ctx->start_timestamp = offset;
-    ctx->msg_mask = 0;
-    if (offset) {
-        ctx->key_seeking = 1;
-    }
-
-    ngx_post_event((&ctx->write_evt), &ngx_posted_events)
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: stop");
 
     return NGX_OK;
 }
@@ -202,10 +212,48 @@ ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
         goto next;
     }
 
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: seek offset=%i", (ngx_int_t) v->offset);
+
     ngx_rtmp_play_restart(s, v->offset);
 
 next:
     return next_seek(s, v);
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
+{
+    ngx_rtmp_play_ctx_t            *ctx;
+    ngx_rtmp_play_app_conf_t       *pacf;
+
+    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+    if (pacf == NULL) {
+        goto next;
+    }
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+    if (ctx == NULL) {
+        goto next;
+    }
+
+    if (ctx->file.fd == NGX_INVALID_FILE) {
+        goto next;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: pause pause=%i position=%i",
+                   (ngx_int_t) v->pause, (ngx_int_t) v->position);
+
+    if (v->pause) {
+        ngx_rtmp_play_stop(s);
+    } else {
+        ngx_rtmp_play_restart(s, v->position);
+    }
+
+next:
+    return next_pause(s, v);
 }
 
 
@@ -241,6 +289,7 @@ ngx_rtmp_play_send(ngx_event_t *e)
     if (n != sizeof(header)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                       "play: could not read flv tag header");
+        ngx_rtmp_send_user_stream_eof(s, 1);
         if (ctx->msg_mask == 0) {
             ngx_rtmp_play_restart(s, 0);
         }
@@ -358,6 +407,12 @@ next:
     end_timestamp = (ngx_current_msec - ctx->epoch) +
         ctx->start_timestamp + buflen;
 
+    ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "play: %s wait=%D timestamp=%D end_timestamp=%D bufen=%i",
+            h.timestamp > end_timestamp ? "schedule" : "advance",
+            h.timestamp > end_timestamp ? h.timestamp - end_timestamp : 0,
+            h.timestamp, end_timestamp, (ngx_int_t) buflen);
+
     /* too much data sent; schedule timeout */
     if (h.timestamp > end_timestamp) {
         ctx->offset += (size + 4);
@@ -435,7 +490,9 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ctx->meta_seeking = 1;
 
-    ngx_rtmp_play_restart(s, v->start);
+    ngx_rtmp_send_user_recorded(s, 1);
+
+    ngx_rtmp_play_restart(s, v->start < 0 ? 0 : v->start);
 
 next:
     return next_play(s, v);
@@ -453,6 +510,9 @@ ngx_rtmp_play_postconfiguration(ngx_conf_t *cf)
 
     next_seek = ngx_rtmp_seek;
     ngx_rtmp_seek = ngx_rtmp_play_seek;
+
+    next_pause = ngx_rtmp_pause;
+    ngx_rtmp_pause = ngx_rtmp_play_pause;
 
     return NGX_OK;
 }
