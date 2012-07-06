@@ -10,18 +10,20 @@ Features:
 
 * Live streaming of video/audio
 
+* Video on demand (FLV)
+
 * Stream relay support for distributed
   streaming: push & pull models
 
 * Recording published streams in FLV file
 
-* H264 support
+* H264/AAC support
 
 * Online transcoding with FFmpeg 
   (experimental; Linux only)
 
 * HLS (HTTP Live Streaming) support
-  (experimental; H264/AAC/MP3)
+  (experimental; H264/AAC)
 
 * HTTP callbacks on publish/play/record
 
@@ -131,7 +133,12 @@ rtmp {
 
             # Pull all streams from remote machine
             # and play locally
-            pull rtmp3.example.com;
+            pull rtmp://rtmp3.example.com pageUrl=www.example.com/index.html;
+        }
+
+        # video on demand
+        application vod {
+            play /var/flvs;
         }
 
         # Many publishers, many subscribers
