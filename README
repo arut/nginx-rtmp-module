@@ -49,8 +49,12 @@ make
 make install
 
 
-Note the module does not share data between workers
-and only works in one-worker mode. 
+Known issue:
+
+  The module does not share data between workers.
+  Because of this live streaming is only available 
+  in one-worker mode so far. Video-on-demand has no 
+  such limitations.
 
 
 RTMP URL format:
