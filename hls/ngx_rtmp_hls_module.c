@@ -235,11 +235,9 @@ ngx_rtmp_hls_init_video(ngx_rtmp_session_t *s)
 {
     AVStream                       *stream;
     ngx_rtmp_hls_ctx_t             *ctx;
-    ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
 
 
-    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
 
@@ -288,11 +286,9 @@ ngx_rtmp_hls_init_audio(ngx_rtmp_session_t *s)
 {
     AVStream                       *stream;
     ngx_rtmp_hls_ctx_t             *ctx;
-    ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
 
 
-    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
 
@@ -1014,7 +1010,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         *out.pos++ = 1;
 
         /* NAL body */
-        if (out.last - out.pos < len) {
+        if (out.last - out.pos < (ngx_int_t) len) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                     "hls: not enough buffer for NAL");
             return NGX_OK;
