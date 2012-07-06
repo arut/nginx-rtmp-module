@@ -1,10 +1,10 @@
-- add per-client audio/video bias
+- Add per-client audio/video bias to stats;
+  implement synchronization after frames were dropped
 
-- write complete WIKI docs
+- File path checks in record & play modules
+  (check for '/../', maybe smth else)
 
-- global rename: get rid of '_module' suffixes in files && rename netcall to upstream
+- More Wiki docs
 
-- add support for flv file streaming 
-  (NGINX supports streaming flvs via HTTP
-  out-of-the-box with nginx-http-flv-module module)
+- Auto-relays (multi-worker)
 
