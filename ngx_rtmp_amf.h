@@ -50,6 +50,7 @@ typedef ngx_chain_t * (*ngx_rtmp_amf_alloc_pt)(void *arg);
 
 typedef struct {
     ngx_chain_t                        *link, *first;
+    size_t                              offset;
     ngx_rtmp_amf_alloc_pt               alloc;
     void                               *arg;
     ngx_log_t                          *log;
