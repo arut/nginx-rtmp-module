@@ -31,6 +31,7 @@
 /* r/w flags */
 #define NGX_RTMP_AMF_OPTIONAL           0x1000
 #define NGX_RTMP_AMF_TYPELESS           0x2000
+#define NGX_RTMP_AMF_CONTEXT            0x4000
 
 #define NGX_RTMP_AMF_VARIANT            (NGX_RTMP_AMF_VARIANT_\
                                         |NGX_RTMP_AMF_TYPELESS)

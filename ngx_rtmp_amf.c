@@ -291,14 +291,14 @@ ngx_int_t
 ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts, 
         size_t nelts)
 {
-    void                   *data;
-    ngx_int_t               type;
-    uint8_t                 type8;
-    size_t                  n;
-    uint16_t                len;
-    ngx_int_t               rc;
-    u_char                  buf[8];
-    uint32_t                max_index;
+    void                       *data;
+    ngx_int_t                   type;
+    uint8_t                     type8;
+    size_t                      n;
+    uint16_t                    len;
+    ngx_int_t                   rc;
+    u_char                      buf[8];
+    uint32_t                    max_index;
 
     for(n = 0; n < nelts; ++n) {
 
@@ -320,6 +320,13 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                     ngx_rtmp_amf_is_compatible_type(elts->type & 0xff, type))
                 ? elts->data
                 : NULL;
+
+            if (elts && (elts->type & NGX_RTMP_AMF_CONTEXT)) {
+                if (data) {
+                    *(ngx_rtmp_amf_ctx_t *) data = *ctx;
+                }
+                data = NULL;
+            }
         }
 
         switch (type) {
