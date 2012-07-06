@@ -394,7 +394,7 @@ ngx_rtmp_play_read_meta(ngx_rtmp_session_t *s)
     n = ngx_read_file(&ctx->file, ngx_rtmp_play_buffer, 
                       size, sizeof(ngx_rtmp_play_header) + 
                       NGX_RTMP_PLAY_DATA_OFFSET);
-    if (n != size) {
+    if (n != (ssize_t) size) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                       "play: could not read metadata");
         return;
@@ -505,7 +505,7 @@ ngx_rtmp_play_send(ngx_event_t *e)
     /* read tag body */
     n = ngx_read_file(&ctx->file, ngx_rtmp_play_buffer, size, 
                       ctx->offset - size - 4);
-    if (n != size) {
+    if (n != (ssize_t) size) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                      "play: could not read flv tag");
         return;

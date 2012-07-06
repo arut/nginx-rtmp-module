@@ -1205,7 +1205,6 @@ static char *
 ngx_rtmp_relay_push_pull(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t                          *value, v, n;
-    ngx_rtmp_core_app_conf_t           *cacf;
     ngx_rtmp_relay_app_conf_t          *racf;
     ngx_rtmp_relay_target_t            *target;
     ngx_url_t                          *u;
@@ -1214,7 +1213,6 @@ ngx_rtmp_relay_push_pull(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    cacf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_core_module);
     racf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_relay_module);
 
     target = ngx_array_push(value[0].data[3] == 'h' 
