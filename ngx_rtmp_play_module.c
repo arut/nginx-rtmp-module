@@ -704,6 +704,18 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         goto next;
     }
 
+    /* check for double-dot in v->name;
+     * we should not move out of play directory */
+    p = v->name;
+    while (*p) {
+        if (*p == '.' && *(p + 1) == '.') {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                         "play: bad name '%s'", v->name);
+            return NGX_ERROR;
+        }
+        ++p;
+    }
+
     if (ctx == NULL) {
         ctx = ngx_palloc(s->connection->pool, sizeof(ngx_rtmp_play_ctx_t));
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_play_module);
@@ -713,7 +725,6 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ctx->file.log = s->connection->log;
 
     /* make file path */
-    /*TODO: escape*/
     len = ngx_strlen(v->name);
     slen = sizeof(".flv") - 1;
     p = ngx_snprintf(path, sizeof(path), "%V/%s%s", &pacf->root, v->name,
