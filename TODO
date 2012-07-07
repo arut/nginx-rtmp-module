@@ -8,3 +8,10 @@
 
 - Auto-relays (multi-worker)
 
+- Binary search in play module
+
+- Move out & merge stream ids from live & cmd modules
+
+- Clean cmd module:
+  * make shortcuts for status messages
+  * move protocol message sending to live/play modules
