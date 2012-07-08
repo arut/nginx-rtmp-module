@@ -23,7 +23,7 @@ Features:
   (experimental; Linux only)
 
 * HLS (HTTP Live Streaming) support
-  (experimental; H264/AAC)
+  (experimental; libavformat >= 53.31.100)
 
 * HTTP callbacks on publish/play/record
 
