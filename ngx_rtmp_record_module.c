@@ -340,6 +340,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
+    ngx_str_t                      *addr_text;
     size_t                          path_len, name_len, args_len;
     u_char                         *path;
 
@@ -369,9 +370,11 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     path_len = ngx_strlen(path);
     name_len = ngx_strlen(ctx->name);
     args_len = ngx_strlen(ctx->args);
+    addr_text = &s->connection->addr_text;
 
     b = ngx_create_temp_buf(pool,
             sizeof("&call=record_done") +
+            sizeof("&addr=") + addr_text->len +
             sizeof("&name=") + name_len * 3 +
             sizeof("&path=") + path_len * 3 +
             + 1 + args_len);
@@ -383,6 +386,10 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
 
     b->last = ngx_cpymem(b->last, (u_char*)"&call=record_done", 
             sizeof("&call=record_done") - 1);
+
+    b->last = ngx_cpymem(b->last, (u_char*)"&addr=", sizeof("&addr=") -1);
+    b->last = (u_char*)ngx_escape_uri(b->last, addr_text->data, 
+            addr_text->len, 0);
 
     b->last = ngx_cpymem(b->last, (u_char*)"&name=", sizeof("&name=") - 1);
     b->last = (u_char*)ngx_escape_uri(b->last, ctx->name, name_len, 0);
