@@ -64,10 +64,11 @@ readable form</p></li>
 
 <h2>Build:</h2>
 <p>cd to NGINX source directory &amp; run this:</p>
-<code>./configure --add-module=
+<pre>
+./configure --add-module=/path/to.nginx-rtmp-module
 make
 make install
-</code>
+</pre>
 
 <h2>Example nginx.conf</h2>
 
@@ -75,11 +76,8 @@ make install
 
 <pre>
 rtmp {
-
     server {
-
         listen 1935;
-
         application mytv {
 
             # enable live streaming
@@ -99,7 +97,7 @@ rtmp {
 </pre>
 
 <h3>Transcoding</h3>
-<code>
+<pre>
     application big {
         live on;
 
@@ -122,10 +120,10 @@ rtmp {
         live on;
         # Video with reduced resolution comes here from ffmpeg
     }
-</code>
+</pre>
 
 <h3>Pushing stream</h3>
-<code>
+<pre>
     application mypush {
         live on;
 
@@ -135,10 +133,10 @@ rtmp {
         push rtmp1.example.com;
         push rtmp2.example.com:1934;
     }
-</code>
+</pre>
 
 <h3>Pulling stream</h3>
-<code>
+<pre>
     application mypull {
         live on;
 
@@ -146,24 +144,24 @@ rtmp {
         # and play locally
         pull rtmp://rtmp3.example.com pageUrl=www.example.com/index.html;
     }
-</code>
+</pre>
 
 <h3>Video on demand</h3>
-<code>
+<pre>
     application vod {
         play /var/flvs;
     }
-</code>
+</pre>
 
 <h3>HLS (HTTP Live Streaming)</h3>
-<code>
+<pre>
     application hls {
         hls on;
         hls_path /tmp/app;
         hls_fragment 5s;
     }
 }
-</code>
+</pre>
 
 
 <h2>>Donation:</h2>
