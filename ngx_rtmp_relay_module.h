@@ -22,6 +22,8 @@ typedef struct {
     ngx_int_t                       live;
     ngx_int_t                       start;
     ngx_int_t                       stop;
+
+    void                           *tag;
 } ngx_rtmp_relay_target_t;
 
 
