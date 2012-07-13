@@ -70,7 +70,7 @@ make
 make install
 </pre>
 
-<h2>Example nginx.conf</h2>
+<h2>Examples of nginx.conf</h2>
 
 <h3>Simple Live Streaming</h3>
 
@@ -98,73 +98,59 @@ rtmp {
 
 <h3>Transcoding</h3>
 <pre>
-    application big {
-        live on;
+application big {
+    live on;
+    exec /usr/bin/ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name};
+}
 
-        # On every pusblished stream run this command (ffmpeg)
-        # with substitutions: $app/${app}, $name/${name} for application &amp; stream name.
-        #
-        # This ffmpeg call receives stream from this application &amp;
-        # reduces the resolution down to 32x32. The stream is the published to
-        # 'small' application (see below) under the same name.
-        #
-        # ffmpeg can do anything with the stream like video/audio
-        # transcoding, resizing, altering container/codec params etc
-        #
-        # Multiple exec lines can be specified.
-
-        exec /usr/bin/ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name};
-    }
-
-    application small {
-        live on;
-        # Video with reduced resolution comes here from ffmpeg
-    }
+application small {
+    live on;
+    # Video with reduced resolution comes here from ffmpeg
+}
 </pre>
 
 <h3>Pushing stream</h3>
 <pre>
-    application mypush {
-        live on;
+application mypush {
+    live on;
 
-        # Every stream published here
-        # is automatically pushed to 
-        # these two machines
-        push rtmp1.example.com;
-        push rtmp2.example.com:1934;
-    }
+    # Every stream published here
+    # is automatically pushed to 
+    # these two machines
+    push rtmp1.example.com;
+    push rtmp2.example.com:1934;
+}
 </pre>
 
 <h3>Pulling stream</h3>
 <pre>
-    application mypull {
-        live on;
+application mypull {
+    live on;
 
-        # Pull all streams from remote machine
-        # and play locally
-        pull rtmp://rtmp3.example.com pageUrl=www.example.com/index.html;
-    }
+    # Pull all streams from remote machine
+    # and play locally
+    pull rtmp://rtmp3.example.com pageUrl=www.example.com/index.html;
+}
 </pre>
 
 <h3>Video on demand</h3>
 <pre>
-    application vod {
-        play /var/flvs;
-    }
+application vod {
+    play /var/flvs;
+}
 </pre>
 
 <h3>HLS (HTTP Live Streaming)</h3>
 <pre>
-    application hls {
-        hls on;
-        hls_path /tmp/app;
-        hls_fragment 5s;
-    }
+application hls {
+    hls on;
+    hls_path /tmp/app;
+    hls_fragment 5s;
 }
 </pre>
 
 
-<h2>>Donation:</h2>
+<h2>Donation:</h2>
 
 <h3>PayPal</h3>
 <form action="https://www.paypal.com/cgi-bin/webscr" method="post">
