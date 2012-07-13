@@ -31,15 +31,14 @@
         <hr>
 
         <section id="main_content">
-          <p>== nginx-rtmp-module ==</p>
 
 <p>NGINX-based RTMP server</p>
 
-<p>Wiki manual:</p>
+<h2>Wiki manual</h2>
 
 <p><a href="https://github.com/arut/nginx-rtmp-module/wiki">https://github.com/arut/nginx-rtmp-module/wiki</a></p>
 
-<p>Features:</p>
+<h2>Features</h2>
 
 <ul>
 <li><p>Live streaming of video/audio</p></li>
@@ -62,62 +61,47 @@ ffmpeg/rtmpdump/flvstreamer etc
 (see examples in test/ subdir)</p></li>
 <li><p>Statistics in XML/XSL in machine- &amp; human-
 readable form</p></li>
-</ul><p>Build:</p>
+</ul>
 
+
+<h2>Build:</h2>
 <p>cd to NGINX source directory &amp; run this:</p>
-
-<p>./configure --add-module=
+<code>./configure --add-module=
 make
-make install</p>
+make install
+</code>
 
-<p>Known issue:</p>
+<h2>Example nginx.conf</h2>
 
-<p>The module does not share data between workers.
-  Because of this live streaming is only available 
-  in one-worker mode so far. Video-on-demand has no 
-  such limitations.</p>
+<h3>Simple Live Streaming</h3>
 
-<p>RTMP URL format:</p>
+<code>
+rtmp {
 
-<p>rtmp://rtmp.example.com/[/]</p>
+    server {
 
-<p> -  should match one of application {}
-         blocks in config
- - interpreted by each application
-         can be empty</p>
+        listen 1935;
 
-<p>Example nginx.conf:</p>
+        application mytv {
 
-<p>rtmp {</p>
+            # enable live streaming
+            live on;
 
-<pre><code>server {
+            # record first 1K of stream
+            record all;
+            record_path /tmp/av;
+            record_max_size 1K;
 
-    listen 1935;
-
-    chunk_size 4000;
-
-    # TV mode: one publisher, many subscribers
-    application mytv {
-
-        # enable live streaming
-        live on;
-
-        # record first 1K of stream
-        record all;
-        record_path /tmp/av;
-        record_max_size 1K;
-
-        # append current timestamp to each flv
-        record_unique on;
-
-        # publish only from localhost
-        allow publish 127.0.0.1;
-        deny publish all;
-
-        #allow play all;
+            # append current timestamp to each flv
+            record_unique on;
+        }
     }
+}
 
-    # Transcoding (ffmpeg needed)
+</code>
+
+<h3>Transcoding</h3>
+<code>
     application big {
         live on;
 
@@ -140,7 +124,10 @@ make install</p>
         live on;
         # Video with reduced resolution comes here from ffmpeg
     }
+</code>
 
+<h3>Pushing stream</h3>
+<code>
     application mypush {
         live on;
 
@@ -150,7 +137,10 @@ make install</p>
         push rtmp1.example.com;
         push rtmp2.example.com:1934;
     }
+</code>
 
+<h3>Pulling stream</h3>
+<code>
     application mypull {
         live on;
 
@@ -158,120 +148,27 @@ make install</p>
         # and play locally
         pull rtmp://rtmp3.example.com pageUrl=www.example.com/index.html;
     }
+</code>
 
-    # video on demand
+<h3>Video on demand</h3>
+<code>
     application vod {
         play /var/flvs;
     }
+</code>
 
-    # Many publishers, many subscribers
-    # no checks, no recording
-    application videochat {
-
-        live on;
-
-        # The following notifications receive all 
-        # the session variables as well as 
-        # particular call arguments in HTTP POST
-        # request
-
-        # Make HTTP request &amp; use HTTP retcode
-        # to decide whether to allow publishing
-        # from this connection or not
-        on_publish http://localhost:8080/publish;
-
-        # Same with playing
-        on_play http://localhost:8080/play;
-
-        # Publish/play end (repeats on disconnect)
-        on_done http://localhost:8080/done;
-
-        # All above mentioned notifications receive
-        # standard connect() arguments as well as 
-        # play/publish ones. If any arguments are sent
-        # with GET-style syntax to play &amp; publish
-        # these are also included.
-        # Example URL:
-        #   rtmp://localhost/myapp/mystream?a=b&amp;c=d
-
-        # record 10 video keyframes (no audio) every 2 minutes
-        record keyframes;
-        record_path /tmp/vc;
-        record_max_frames 10;
-        record_interval 2m;
-
-        # Async notify about an flv recorded
-        on_record_done http://localhost:8080/record_done;
-
-    }
-
-
-    # HLS (experimental)
-
-    # HLS requires libavformat &amp; should be configured as a separate
-    # NGINX module in addition to nginx-rtmp-module:
-    # ./configure ... --add-module=/path/to/nginx-rtmp-module/hls ...
-
-    # For HLS to work please create a directory in tmpfs (/tmp/app here)
-    # for the fragments. The directory contents is served via HTTP (see
-    # http{} section in config)
-    #
-    # Incoming stream must be in H264/AAC/MP3. For iPhones use baseline H264
-    # profile (see ffmpeg example).
-    # This example creates RTMP stream from movie ready for HLS:
-    #
-    # ffmpeg -loglevel verbose -re -i movie.avi  -vcodec libx264 
-    #    -vprofile baseline -acodec libmp3lame -ar 44100 -ac 1 
-    #    -f flv rtmp://localhost:1935/hls/movie
-    #
-    # If you need to transcode live stream use 'exec' feature.
-    #
+<h3>HLS (HTTP Live Streaming)</h3>
+<code>
     application hls {
         hls on;
         hls_path /tmp/app;
         hls_fragment 5s;
     }
-
 }
-</code></pre>
+</code>
 
-<p>}</p>
 
-<h1>HTTP can be used for accessing RTMP stats</h1>
-
-<p>http {</p>
-
-<pre><code>server {
-
-    listen      8080;
-
-    # This URL provides RTMP statistics in XML
-    location /stat {
-        rtmp_stat all;
-
-        # Use this stylesheet to view XML as web page
-        # in browser
-        rtmp_stat_stylesheet stat.xsl;
-    }
-
-    location /stat.xsl {
-        # XML stylesheet to view RTMP stats.
-        # Copy stat.xsl wherever you want
-        # and put the full directory path here
-        root /path/to/stat.xsl/;
-    }
-
-    location /hls {
-        # Serve HLS fragments
-        alias /tmp/app;
-    }
-
-}
-</code></pre>
-
-<p>}</p>
-
-<p>Donation:</p>
+<h2>>Donation:</h2>
 
 <h3>PayPal</h3>
 <form action="https://www.paypal.com/cgi-bin/webscr" method="post">
