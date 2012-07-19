@@ -36,33 +36,6 @@ static ngx_int_t ngx_rtmp_relay_publish(ngx_rtmp_session_t *s,
  */
 
 
-typedef struct ngx_rtmp_relay_ctx_s ngx_rtmp_relay_ctx_t;
-
-struct ngx_rtmp_relay_ctx_s {
-    ngx_str_t                       name;
-    ngx_str_t                       url;
-    ngx_log_t                       log;
-    ngx_rtmp_session_t             *session;
-    ngx_rtmp_relay_ctx_t           *publish;
-    ngx_rtmp_relay_ctx_t           *play;
-    ngx_rtmp_relay_ctx_t           *next;
-    unsigned                        relay:1;
-
-    ngx_str_t                       app;
-    ngx_str_t                       tc_url;
-    ngx_str_t                       page_url;
-    ngx_str_t                       swf_url;
-    ngx_str_t                       flash_ver;
-    ngx_str_t                       play_path;
-    ngx_int_t                       live;
-    ngx_int_t                       start;
-    ngx_int_t                       stop;
-
-    ngx_event_t                     push_evt;
-    void                           *tag;
-};
-
-
 typedef struct {
     ngx_array_t                     pulls;  /* ngx_rtmp_relay_target_t * */
     ngx_array_t                     pushes; /* ngx_rtmp_relay_target_t * */
@@ -221,7 +194,9 @@ ngx_rtmp_relay_reconnect(ngx_event_t *ev)
         }
 
         for (pctx = ctx->play; pctx; pctx = pctx->next) {
-            if (pctx->tag == target) {
+            if (pctx->tag == &ngx_rtmp_relay_module &&
+                pctx->data == target) 
+            {
                 break;
             }
         }
@@ -318,6 +293,7 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
     }
 
     rctx->tag = target->tag;
+    rctx->data = target->data;
 
 #define NGX_RTMP_RELAY_STR_COPY(to, from)                                     \
     if (ngx_rtmp_relay_copy_str(pool, &rctx->to, &target->from) != NGX_OK) {  \
@@ -1239,7 +1215,9 @@ ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
                 &ctx->app, &ctx->name);
 
         /* push reconnect */
-        if (ctx->relay && ctx->tag && !ctx->publish->push_evt.timer_set) {
+        if (ctx->relay && ctx->tag == &ngx_rtmp_relay_module && 
+            !ctx->publish->push_evt.timer_set) 
+        {
             ngx_add_timer(&ctx->publish->push_evt, racf->push_reconnect);
         }
 
@@ -1326,7 +1304,8 @@ ngx_rtmp_relay_push_pull(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     *t = target;
 
-    target->tag = target;
+    target->tag = &ngx_rtmp_relay_module;
+    target->data = target;
 
     u = &target->url;
     u->default_port = 1935;
