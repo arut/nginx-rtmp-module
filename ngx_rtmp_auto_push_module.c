@@ -25,8 +25,8 @@ typedef struct ngx_rtmp_auto_push_ctx_s ngx_rtmp_auto_push_ctx_t;
 
 struct ngx_rtmp_auto_push_ctx_s {
     ngx_int_t                      *slots; /* NGX_MAX_PROCESSES */
-    ngx_str_t                       name;
-    ngx_str_t                       args;
+    u_char                          name[NGX_RTMP_MAX_NAME];
+    u_char                          args[NGX_RTMP_MAX_ARGS];
     ngx_event_t                     push_evt;
 };
 
@@ -299,6 +299,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     u_char                          flash_ver[sizeof("APSH ,") +
                                               NGX_OFF_T_LEN * 2];
     u_char                          play_path[NGX_RTMP_MAX_NAME];
+    ngx_str_t                       name;
     u_char                         *p;
     ngx_str_t                      *u;
     ngx_pid_t                       pid;
@@ -313,14 +314,17 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
         return;
     }
 
+    name.data = ctx->name;
+    name.len = ngx_strlen(name.data);
+
     ngx_memzero(&at, sizeof(at));
     ngx_str_set(&at.page_url, "nginx-auto-push");
     at.tag = &ngx_rtmp_auto_push_module;
 
-    if (ctx->args.len) {
+    if (ctx->args[0]) {
         at.play_path.data = play_path;
         at.play_path.len = ngx_snprintf(play_path, sizeof(play_path),
-                                        "%V?%V", &ctx->name, &ctx->args) -
+                                        "%s?%s", ctx->name, ctx->args) -
                            play_path;
     }
 
@@ -353,8 +357,8 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
         if (ngx_parse_url(s->connection->pool, &at.url) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "auto_push: auto-push parse_url failed "
-                          "url='%V' name='%V'",
-                          u, &ctx->name);
+                          "url='%V' name='%s'",
+                          u, ctx->name);
             continue;
         }
 
@@ -365,18 +369,18 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
 
         ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                        "auto_push: connect slot=%i pid=%i socket='%s' "
-                       "name='%V'",
-                       n, (ngx_int_t) pid, path, &ctx->name);
+                       "name='%s'",
+                       n, (ngx_int_t) pid, path, ctx->name);
 
-        if (ngx_rtmp_relay_push(s, &ctx->name, &at) == NGX_OK) {
+        if (ngx_rtmp_relay_push(s, &name, &at) == NGX_OK) {
             *slot = 1;
             continue;
         }
 
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                       "auto_push: connect failed: slot=%i pid=%i socket='%s'"
-                      "url='%V' name='%V'",
-                      n, (ngx_int_t) pid, path, u, &ctx->name);
+                      "url='%V' name='%s'",
+                      n, (ngx_int_t) pid, path, u, ctx->name);
 
         if (!ctx->push_evt.timer_set) {
             ngx_add_timer(&ctx->push_evt, apcf->push_reconnect);
@@ -423,19 +427,8 @@ ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-    ctx->name.len = ngx_strlen(v->name);
-    ctx->name.data = ngx_palloc(s->connection->pool, ctx->name.len);
-    if (ctx->name.data == NULL) {
-        goto next;
-    }
-    ngx_memcpy(ctx->name.data, v->name, ctx->name.len);
-
-    ctx->args.len = ngx_strlen(v->args);
-    ctx->args.data = ngx_palloc(s->connection->pool, ctx->args.len);
-    if (ctx->args.data == NULL) {
-        goto next;
-    }
-    ngx_memcpy(ctx->args.data, v->args, ctx->args.len);
+    ngx_memcpy(ctx->name, v->name, sizeof(ctx->name));
+    ngx_memcpy(ctx->args, v->args, sizeof(ctx->args));
 
     ngx_rtmp_auto_push_reconnect(&ctx->push_evt);
 
@@ -479,8 +472,8 @@ ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
     slot = (ngx_process_t *) rctx->data - &ngx_processes[0];
 
     ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                   "auto_push: disconnect slot=%i app='%V' name='%V'",
-                   slot, &rctx->app, &rctx->name);
+                   "auto_push: disconnect slot=%i app='%V' name='%s'",
+                   slot, &rctx->app, rctx->name);
 
     pctx = ngx_rtmp_get_module_ctx(rctx->publish->session, 
                                    ngx_rtmp_auto_push_module);
