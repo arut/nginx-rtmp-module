@@ -913,6 +913,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     uint32_t                        len, rlen;
     ngx_buf_t                       out;
     static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
+    int32_t                         cts;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
@@ -948,9 +949,10 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
     
     /* 3 bytes: decoder delay */
-    if (ngx_rtmp_hls_copy(s, NULL, &p, 3, &in) != NGX_OK) {
+    if (ngx_rtmp_hls_copy(s, &cts, &p, 3, &in) != NGX_OK) {
         return NGX_ERROR;
     }
+    cts = ((cts & 0x00FF0000) >> 16) | ((cts & 0x000000FF) << 16) | (cts & 0x0000FF00);
 
     out.pos = buffer;
     out.last = buffer + sizeof(buffer) - FF_INPUT_BUFFER_PADDING_SIZE;
@@ -1023,7 +1025,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     av_init_packet(&packet);
     packet.dts = h->timestamp * 90;
-    packet.pts = packet.dts;
+    packet.pts = packet.dts + cts * 90;
     packet.stream_index = ctx->out_vstream;
     /*
     if (ftype == 1) {
