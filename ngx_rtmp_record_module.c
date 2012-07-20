@@ -302,6 +302,10 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_rtmp_record_app_conf_t     *racf;
     ngx_rtmp_record_ctx_t          *ctx;
 
+    if (s->auto_pushed) {
+        goto next;
+    }
+
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
 
     if (racf == NULL || racf->flags & NGX_RTMP_RECORD_OFF) {

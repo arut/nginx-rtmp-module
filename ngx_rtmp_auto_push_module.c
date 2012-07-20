@@ -26,6 +26,7 @@ typedef struct ngx_rtmp_auto_push_ctx_s ngx_rtmp_auto_push_ctx_t;
 struct ngx_rtmp_auto_push_ctx_s {
     ngx_int_t                      *slots; /* NGX_MAX_PROCESSES */
     ngx_str_t                       name;
+    ngx_str_t                       args;
     ngx_event_t                     push_evt;
 };
 
@@ -88,7 +89,6 @@ ngx_module_t  ngx_rtmp_auto_push_module = {
 
 
 #define NGX_RTMP_AUTO_PUSH_SOCKNAME         "nginx-rtmp"
-#define NGX_RTMP_AUTO_PUSH_PAGEURL          "nginx-auto-push"
 
 
 static ngx_int_t
@@ -296,8 +296,9 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     ngx_int_t                       n;
     ngx_rtmp_relay_target_t         at;
     u_char                          path[sizeof("unix:") + NGX_MAX_PATH];
-    u_char                          flash_ver[sizeof("APSH.") + 2
-                                              + NGX_OFF_T_LEN * 2];
+    u_char                          flash_ver[sizeof("APSH ,") +
+                                              NGX_OFF_T_LEN * 2];
+    u_char                          play_path[NGX_RTMP_MAX_NAME];
     u_char                         *p;
     ngx_str_t                      *u;
     ngx_pid_t                       pid;
@@ -313,8 +314,15 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     }
 
     ngx_memzero(&at, sizeof(at));
-    ngx_str_set(&at.page_url, NGX_RTMP_AUTO_PUSH_PAGEURL);
+    ngx_str_set(&at.page_url, "nginx-auto-push");
     at.tag = &ngx_rtmp_auto_push_module;
+
+    if (ctx->args.len) {
+        at.play_path.data = play_path;
+        at.play_path.len = ngx_snprintf(play_path, sizeof(play_path),
+                                        "%V?%V", &ctx->name, &ctx->args) -
+                           play_path;
+    }
 
     slot = ctx->slots;
 
@@ -350,7 +358,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
             continue;
         }
 
-        p = ngx_snprintf(flash_ver, sizeof(flash_ver) - 1, "APSH,%i,%i", 
+        p = ngx_snprintf(flash_ver, sizeof(flash_ver) - 1, "APSH %i,%i", 
                          (ngx_int_t) ngx_process_slot, (ngx_int_t) ngx_pid);
         at.flash_ver.data = flash_ver;
         at.flash_ver.len = p - flash_ver;
@@ -383,17 +391,13 @@ ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_rtmp_auto_push_conf_t      *apcf;
     ngx_rtmp_auto_push_ctx_t       *ctx;
 
-    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, 
-                                                    ngx_rtmp_auto_push_module);
-    if (apcf->auto_push == 0) {
+    if (s->auto_pushed) {
         goto next;
     }
 
-    /* auto-push from another worker? */
-    if (s->page_url.len == sizeof(NGX_RTMP_AUTO_PUSH_PAGEURL) - 1 &&
-        ngx_memcmp(s->page_url.data, NGX_RTMP_AUTO_PUSH_PAGEURL, 
-                   s->page_url.len) == 0)
-    {
+    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, 
+                                                    ngx_rtmp_auto_push_module);
+    if (apcf->auto_push == 0) {
         goto next;
     }
 
@@ -425,6 +429,13 @@ ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
     ngx_memcpy(ctx->name.data, v->name, ctx->name.len);
+
+    ctx->args.len = ngx_strlen(v->args);
+    ctx->args.data = ngx_palloc(s->connection->pool, ctx->args.len);
+    if (ctx->args.data == NULL) {
+        goto next;
+    }
+    ngx_memcpy(ctx->args.data, v->args, ctx->args.len);
 
     ngx_rtmp_auto_push_reconnect(&ctx->push_evt);
 
