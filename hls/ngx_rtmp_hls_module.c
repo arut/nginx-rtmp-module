@@ -873,7 +873,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* write to file */
     av_init_packet(&packet);
-    packet.dts = h->timestamp * 90;
+    packet.dts = h->timestamp * 90L;
     packet.pts = packet.dts;
     packet.stream_index = ctx->out_astream;
     packet.data = buffer;
@@ -1024,7 +1024,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     av_init_packet(&packet);
-    packet.dts = h->timestamp * 90;
+    packet.dts = h->timestamp * 90L;
     packet.pts = packet.dts + cts * 90;
     packet.stream_index = ctx->out_vstream;
     /*
