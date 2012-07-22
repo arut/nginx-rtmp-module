@@ -464,6 +464,10 @@ ngx_rtmp_exec_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
+    if (s->auto_pushed) {
+        goto next;
+    }
+
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_exec_module);
     if (ctx == NULL) {
         ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_exec_ctx_t));
