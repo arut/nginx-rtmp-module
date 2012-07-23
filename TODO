@@ -1,14 +1,14 @@
-- Add per-client audio/video bias to stats;
-  implement synchronization after frames were dropped
+- Auto-pushing pulled stream
 
-- File path checks in record & play modules
-  (check for '/../', maybe smth else)
+- Pull secondary address support
+
+- Binary search in play module
 
 - More Wiki docs
 
-- Auto-relays (multi-worker)
 
-- Binary search in play module
+Style:
+======
 
 - Move out & merge stream ids from live & cmd modules
 
