@@ -4,7 +4,10 @@
 
 
 #include "ngx_rtmp_cmd_module.h"
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #ifdef NGX_LINUX
 #include <unistd.h>
