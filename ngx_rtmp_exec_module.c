@@ -20,9 +20,9 @@ static ngx_rtmp_delete_stream_pt        next_delete_stream;
 
 static ngx_int_t ngx_rtmp_exec_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_exec_create_app_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, 
+static char * ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf,
         void *parent, void *child);
-static char * ngx_rtmp_exec_exec(ngx_conf_t *cf, ngx_command_t *cmd, 
+static char * ngx_rtmp_exec_exec(ngx_conf_t *cf, ngx_command_t *cmd,
         void *conf);
 
 
@@ -74,7 +74,7 @@ static ngx_command_t  ngx_rtmp_exec_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       0,
       NULL },
-    
+
     { ngx_string("respawn"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
@@ -134,7 +134,7 @@ ngx_rtmp_exec_create_app_conf(ngx_conf_t *cf)
     eacf->respawn = NGX_CONF_UNSET;
     eacf->respawn_timeout = NGX_CONF_UNSET;
 
-    if (ngx_array_init(&eacf->execs, cf->pool, 1, 
+    if (ngx_array_init(&eacf->execs, cf->pool, 1,
                 sizeof(ngx_rtmp_exec_conf_t)) != NGX_OK)
     {
         return NULL;
@@ -153,7 +153,7 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_exec_conf_t       *ec, *pec;
 
     ngx_conf_merge_value(conf->respawn, prev->respawn, 1);
-    ngx_conf_merge_msec_value(conf->respawn_timeout, prev->respawn_timeout, 
+    ngx_conf_merge_msec_value(conf->respawn_timeout, prev->respawn_timeout,
             5000);
 
     if (prev->execs.nelts) {
@@ -166,12 +166,12 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
             *ec = *pec;
         }
     }
-            
+
     return NGX_CONF_OK;
 }
 
 
-static void 
+static void
 ngx_rtmp_exec_respawn(ngx_event_t *ev)
 {
     ngx_rtmp_exec_t                *e;
@@ -181,7 +181,7 @@ ngx_rtmp_exec_respawn(ngx_event_t *ev)
 }
 
 
-static void 
+void
 ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 {
     ngx_connection_t               *dummy_conn;
@@ -195,7 +195,7 @@ ngx_rtmp_exec_child_dead(ngx_event_t *ev)
     eacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_exec_module);
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "exec: child %ui exited; %s", 
+            "exec: child %ui exited; %s",
             (ngx_int_t)e->pid,
             eacf->respawn ? "respawning" : "ignoring");
 
@@ -223,7 +223,7 @@ static ngx_int_t
 ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
 {
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "exec: terminating child %ui", 
+            "exec: terminating child %ui",
             (ngx_int_t)e->pid);
 
     if (e->respawn_evt.timer_set) {
@@ -273,7 +273,7 @@ ngx_rtmp_exec_append(ngx_str_t *result, u_char *data, size_t len)
 }
 
 
-static char *
+char *
 ngx_rtmp_exec_prepare_arg(ngx_rtmp_session_t *s, ngx_str_t *arg)
 {
     ngx_rtmp_core_app_conf_t       *cacf;
@@ -298,14 +298,14 @@ ngx_rtmp_exec_prepare_arg(ngx_rtmp_session_t *s, ngx_str_t *arg)
             goto dollar;
         }
         if (!ngx_strncmp(p + 1, "app", sizeof("app") - 1)
-            || !ngx_strncmp(p + 1, "{app}", sizeof("{app}") - 1)) 
+            || !ngx_strncmp(p + 1, "{app}", sizeof("{app}") - 1))
         {
             ngx_rtmp_exec_append(&result, cacf->name.data, cacf->name.len);
             pp += (p[1] == '{' ? sizeof("{app}") - 1 : sizeof("app") - 1);
             continue;
         }
         if (!ngx_strncmp(p + 1, "name", sizeof("name") - 1)
-            || !ngx_strncmp(p + 1, "{name}", sizeof("{name}") - 1)) 
+            || !ngx_strncmp(p + 1, "{name}", sizeof("{name}") - 1))
         {
             ngx_rtmp_exec_append(&result, ctx->name, 0);
             pp += (p[1] == '{' ? sizeof("{name}") - 1 : sizeof("name") - 1);
@@ -338,7 +338,7 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
     e = ctx->execs + n;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "exec: starting child '%V'", 
+            "exec: starting child '%V'",
             &ec->cmd);
 
     if (pipe(pipefd) == -1) {
@@ -412,7 +412,7 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
             }
 
             ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                    "exec: child '%V' started pid=%ui", 
+                    "exec: child '%V' started pid=%ui",
                     &ec->cmd, (ngx_uint_t)pid);
             break;
     }
@@ -474,7 +474,7 @@ ngx_rtmp_exec_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
             return NGX_ERROR;
         }
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_exec_module);
-        ctx->execs = ngx_pcalloc(s->connection->pool, eacf->execs.nelts 
+        ctx->execs = ngx_pcalloc(s->connection->pool, eacf->execs.nelts
                 * sizeof(ngx_rtmp_exec_t));
     }
     ngx_memcpy(ctx->name, v->name, NGX_RTMP_MAX_NAME);
@@ -516,7 +516,7 @@ ngx_rtmp_exec_exec(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     nargs = cf->args->nelts - 2;
-    if (ngx_array_init(&ec->args, cf->pool, nargs, 
+    if (ngx_array_init(&ec->args, cf->pool, nargs,
             sizeof(ngx_str_t)) != NGX_OK)
     {
         return NGX_CONF_ERROR;
