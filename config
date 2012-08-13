@@ -6,13 +6,13 @@ CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_cmd_module                         \
                 ngx_rtmp_access_module                      \
                 ngx_rtmp_live_module                        \
+                ngx_rtmp_play_module                        \
                 ngx_rtmp_record_module                      \
                 ngx_rtmp_netcall_module                     \
                 ngx_rtmp_notify_module                      \
                 ngx_rtmp_relay_module                       \
                 ngx_rtmp_exec_module                        \
                 ngx_rtmp_codec_module                       \
-                ngx_rtmp_play_module                        \
                 "
 
 
@@ -34,6 +34,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_cmd_module.c        \
                 $ngx_addon_dir/ngx_rtmp_access_module.c     \
                 $ngx_addon_dir/ngx_rtmp_live_module.c       \
+                $ngx_addon_dir/ngx_rtmp_play_module.c       \
                 $ngx_addon_dir/ngx_rtmp_record_module.c     \
                 $ngx_addon_dir/ngx_rtmp_netcall_module.c    \
                 $ngx_addon_dir/ngx_rtmp_notify_module.c     \
@@ -42,7 +43,6 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_bandwidth.c         \
                 $ngx_addon_dir/ngx_rtmp_exec_module.c       \
                 $ngx_addon_dir/ngx_rtmp_codec_module.c      \
-                $ngx_addon_dir/ngx_rtmp_play_module.c       \
                 "
 CFLAGS="$CFLAGS -I$ngx_addon_dir"
 
