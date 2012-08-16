@@ -495,12 +495,12 @@ ngx_rtmp_cmd_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     static ngx_rtmp_amf_elt_t      out_inf[] = {
 
         { NGX_RTMP_AMF_STRING,
-          ngx_string("code"),
-          "NetStream.Publish.Start", 0 },
-
-        { NGX_RTMP_AMF_STRING,
           ngx_string("level"),
           "status", 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("code"),
+          "NetStream.Publish.Start", 0 },
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("description"),
