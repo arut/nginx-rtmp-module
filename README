@@ -23,11 +23,11 @@ Features:
 
 * H264/AAC support
 
-* Online transcoding with FFmpeg 
-  (experimental; Linux only)
+* Online transcoding with FFmpeg
 
-* HLS (HTTP Live Streaming) support
-  (experimental; libavformat >= 53.31.100)
+* HLS (HTTP Live Streaming) support;
+  experimental; requires recent libavformat 
+  (>= 53.31.100) from ffmpeg (ffmpeg.org)
 
 * HTTP callbacks on publish/play/record
 
@@ -60,6 +60,9 @@ Known issue:
   Because of this live streaming is only available 
   in one-worker mode so far. Video-on-demand has no 
   such limitations.
+
+  You can try auto-push branch with multi-worker
+  support if you really need that.
 
 
 RTMP URL format:
