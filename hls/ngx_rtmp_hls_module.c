@@ -49,6 +49,8 @@ ngx_rtmp_hls_av_log_callback(void* avcl, int level, const char* fmt,
 
 #define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
 
+#define NGX_RTMP_HLS_DIR_ACCESS         0744
+
 
 typedef struct {
     ngx_uint_t                          flags;
@@ -350,17 +352,31 @@ ngx_rtmp_hls_update_playlist(ngx_rtmp_session_t *s)
     ssize_t                         n;
     ngx_int_t                       ffrag;
     ngx_rtmp_hls_app_conf_t        *hacf;
+    ngx_int_t                       nretry;
 
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
+    nretry = 0;
+
+retry:
     fd = ngx_open_file(ctx->playlist_bak.data, NGX_FILE_WRONLY, 
             NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                 "hls: open failed: '%V'", 
                 &ctx->playlist_bak);
+        /* try to create parent folder */
+        if (nretry == 0 && 
+            ngx_create_dir(hacf->path.data, NGX_RTMP_HLS_DIR_ACCESS) != 
+            NGX_INVALID_FILE)
+        {
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                    "hls: creating target folder: '%V'", &hacf->path);
+            ++nretry;
+            goto retry;
+        }
         return NGX_ERROR;
     }
 
