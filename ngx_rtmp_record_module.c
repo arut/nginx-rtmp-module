@@ -9,13 +9,11 @@
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_codec_module.h"
+#include "ngx_rtmp_record_module.h"
 
 
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
-
-static ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s);
-static ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s);
 
 
 static char * ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, 
@@ -223,7 +221,7 @@ ngx_rtmp_record_write_header(ngx_file_t *file)
 
 
 /* This funcion returns pointer to a static buffer */
-static u_char *
+u_char *
 ngx_rtmp_record_make_path(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
@@ -256,7 +254,7 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_record_open(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
@@ -451,7 +449,7 @@ ngx_rtmp_record_notify(ngx_rtmp_session_t *s)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_record_close(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
