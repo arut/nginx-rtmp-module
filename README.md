@@ -1,6 +1,6 @@
-# nginx-rtmp-module
+# NGINX-based RTMP server
+#### nginx-rtmp-module
 
-## NGINX-based RTMP server
 
 ### Project page:
 
@@ -67,11 +67,11 @@ cd to NGINX source directory & run this:
 
 ### RTMP URL format:
 
-    rtmp://rtmp.example.com/<app>[/<name>]
+    rtmp://rtmp.example.com/app[/name]
 
-<app> -  should match one of application {}
+app -  should match one of application {}
          blocks in config
-<name> - interpreted by each application
+name - interpreted by each application
          can be empty
 
 
@@ -224,7 +224,7 @@ cd to NGINX source directory & run this:
         }
     }
 
-# HTTP can be used for accessing RTMP stats
+    # HTTP can be used for accessing RTMP stats
     http {
 
         server {
