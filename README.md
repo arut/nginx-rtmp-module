@@ -1,5 +1,5 @@
 # NGINX-based RTMP server
-#### nginx-rtmp-module
+## nginx-rtmp-module
 
 
 ### Project page:
@@ -71,6 +71,7 @@ cd to NGINX source directory & run this:
 
 app -  should match one of application {}
          blocks in config
+
 name - interpreted by each application
          can be empty
 
