@@ -825,13 +825,22 @@ static ngx_int_t
 ngx_rtmp_mp4_update_offset(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
 {
     ngx_rtmp_mp4_cursor_t          *cr;
+    ngx_uint_t                      chunk;
 
     cr = &t->cursor;
 
     /*TODO: chunks start with 1, not 0 */
 
+    if (cr->chunk < 1) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "mp4: update offset underflow");
+        return NGX_ERROR;
+    }
+
+    chunk = cr->chunk - 1;
+
     if (t->offsets) {
-        if (cr->chunk >= ngx_rtmp_r32(t->offsets->entry_count)) {
+        if (chunk >= ngx_rtmp_r32(t->offsets->entry_count)) {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                            "mp4: update offset overflow: chunk=%ui",
                            cr->chunk);
@@ -839,7 +848,7 @@ ngx_rtmp_mp4_update_offset(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
             return NGX_ERROR;
         }
 
-        cr->offset = ngx_rtmp_r32(t->offsets->entries[cr->chunk]);
+        cr->offset = ngx_rtmp_r32(t->offsets->entries[chunk]);
         cr->size = 0;
 
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -850,7 +859,7 @@ ngx_rtmp_mp4_update_offset(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
     }
 
     if (t->offsets64) {
-        if (cr->chunk >= ngx_rtmp_r32(t->offsets64->entry_count)) {
+        if (chunk >= ngx_rtmp_r32(t->offsets64->entry_count)) {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                            "mp4: update offset64 overflow: chunk=%ui",
                            cr->chunk);
@@ -858,7 +867,7 @@ ngx_rtmp_mp4_update_offset(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
             return NGX_ERROR;
         }
 
-        cr->offset = ngx_rtmp_r32(t->offsets64->entries[cr->chunk]);
+        cr->offset = ngx_rtmp_r32(t->offsets64->entries[chunk]);
         cr->size = 0;
 
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
