@@ -148,7 +148,7 @@ typedef struct {
 
     u_char                             *header;
     size_t                              header_size;
-    ngx_int_t                           header_sent;
+    unsigned                            header_sent:1;
 
     ngx_rtmp_mp4_times_t               *times;
     ngx_rtmp_mp4_delays_t              *delays;
@@ -167,6 +167,8 @@ typedef struct {
     
     void                               *mmaped;
     size_t                              mmaped_size;
+
+    unsigned                            meta_sent:1;
 
     ngx_rtmp_mp4_track_t                tracks[2];
     ngx_rtmp_mp4_track_t               *track;
@@ -1755,6 +1757,119 @@ ngx_rtmp_mp4_to_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
 }
 
 
+static ngx_int_t
+ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_mp4_ctx_t             *ctx;
+    ngx_rtmp_core_srv_conf_t       *cscf;
+    ngx_int_t                       rc;
+    ngx_uint_t                      n;
+    ngx_rtmp_header_t               h;
+    ngx_chain_t                    *out;
+    ngx_rtmp_mp4_track_t           *t;
+    double                          d;
+
+    static struct {
+        double                      width;
+        double                      height;
+        double                      duration;
+        double                      video_codec_id;
+        double                      audio_codec_id;
+    }                               v;
+
+    static ngx_rtmp_amf_elt_t       out_inf[] = {
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("width"),
+          &v.width, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("height"),
+          &v.height, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("displayWidth"),
+          &v.width, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("displayHeight"),
+          &v.height, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("duration"),
+          &v.duration, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("videocodecid"),
+          &v.video_codec_id, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("audiocodecid"),
+          &v.audio_codec_id, 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t       out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_null_string,
+          "onMetaData", 0 },
+
+        { NGX_RTMP_AMF_OBJECT, 
+          ngx_null_string,
+          out_inf, sizeof(out_inf) },
+    };
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
+    ngx_memzero(&v, sizeof(v));
+
+    v.width  = ctx->width;
+    v.height = ctx->height;
+
+    t = &ctx->tracks[0];
+    for (n = 0; n < ctx->ntracks; ++n, ++t) {
+        d = ngx_rtmp_mp4_to_rtmp_timestamp(t, t->duration) / 1000.;
+
+        if (v.duration < d) {
+            v.duration = d;
+        }
+
+        switch (t->type) {
+            case NGX_RTMP_MSG_AUDIO:
+                v.audio_codec_id = t->codec;
+                break;
+            case NGX_RTMP_MSG_VIDEO:
+                v.video_codec_id = t->codec;
+                break;
+        }
+    }
+
+    out = NULL;
+    rc = ngx_rtmp_append_amf(s, &out, NULL, out_elts, 
+                             sizeof(out_elts) / sizeof(out_elts[0]));
+    if (rc != NGX_OK || out == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memzero(&h, sizeof(h));
+
+    h.csid = NGX_RTMP_LIVE_CSID_META;
+    h.msid = NGX_RTMP_LIVE_MSID;
+    h.type = NGX_RTMP_MSG_AMF_META;
+
+    ngx_rtmp_prepare_message(s, &h, NULL, out);
+    ngx_rtmp_send_message(s, out, 0);
+    ngx_rtmp_free_shared_chain(cscf, out);
+
+    return NGX_OK;
+}
+
+
 static void
 ngx_rtmp_mp4_send(ngx_event_t *e)
 {
@@ -1781,6 +1896,13 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
 
     if (ctx == NULL) {
         return;
+    }
+
+    if (!ctx->meta_sent) {
+        ngx_rtmp_mp4_send_meta(s);
+        ctx->meta_sent = 1;
+        active = 1;
+        goto again;
     }
 
     buflen = (s->buflen ? s->buflen : NGX_RTMP_MP4_DEFAULT_BUFLEN);
@@ -1922,6 +2044,7 @@ next:
         return;
     }
 
+again:
     if (active) {
         ngx_post_event(e, &ngx_posted_events);
     }
