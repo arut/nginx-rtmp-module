@@ -10,17 +10,11 @@
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_bandwidth.h"
+#include "ngx_rtmp_streams.h"
 
 
 /* session flags */
 #define NGX_RTMP_LIVE_PUBLISHING        0x01
-
-
-/* Chunk stream ids for output */
-#define NGX_RTMP_LIVE_CSID_META         5
-#define NGX_RTMP_LIVE_CSID_AUDIO        6
-#define NGX_RTMP_LIVE_CSID_VIDEO        7
-#define NGX_RTMP_LIVE_MSID              1
 
 
 typedef struct ngx_rtmp_live_ctx_s ngx_rtmp_live_ctx_t;

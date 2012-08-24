@@ -3,14 +3,11 @@
  */
 
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_streams.h"
 
 
 #define NGX_RTMP_FMS_VERSION        "FMS/3,0,1,123"
 #define NGX_RTMP_CAPABILITIES       31
-
-#define NGX_RTMP_CMD_CSID_AMF_INI   3
-#define NGX_RTMP_CMD_CSID_AMF       5
-#define NGX_RTMP_CMD_MSID           1
 
 
 ngx_rtmp_connect_pt          ngx_rtmp_connect;

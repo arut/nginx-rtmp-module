@@ -453,7 +453,8 @@ ngx_rtmp_play_send(ngx_event_t *e)
     if (n != sizeof(ngx_rtmp_play_header)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                      "play: could not read flv tag header");
-        ngx_rtmp_send_user_stream_eof(s, 1);
+        ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_MSID);
+        ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status", "Stopped");
         return;
     }
 
