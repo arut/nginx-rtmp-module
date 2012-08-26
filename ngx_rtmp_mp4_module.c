@@ -244,6 +244,8 @@ static ngx_int_t ngx_rtmp_mp4_parse_avcC(ngx_rtmp_session_t *s, u_char *pos,
        u_char *last);
 static ngx_int_t ngx_rtmp_mp4_parse_mp4a(ngx_rtmp_session_t *s, u_char *pos, 
        u_char *last);
+static ngx_int_t ngx_rtmp_mp4_parse_mp4v(ngx_rtmp_session_t *s, u_char *pos, 
+       u_char *last);
 static ngx_int_t ngx_rtmp_mp4_parse_esds(ngx_rtmp_session_t *s, u_char *pos, 
        u_char *last);
 static ngx_int_t ngx_rtmp_mp4_parse_mp3(ngx_rtmp_session_t *s, u_char *pos, 
@@ -282,6 +284,7 @@ static ngx_rtmp_mp4_box_t                       ngx_rtmp_mp4_boxes[] = {
     { ngx_rtmp_mp4_make_tag('a','v','c','1'),   ngx_rtmp_mp4_parse_avc1   }, 
     { ngx_rtmp_mp4_make_tag('a','v','c','C'),   ngx_rtmp_mp4_parse_avcC   }, 
     { ngx_rtmp_mp4_make_tag('m','p','4','a'),   ngx_rtmp_mp4_parse_mp4a   }, 
+    { ngx_rtmp_mp4_make_tag('m','p','4','v'),   ngx_rtmp_mp4_parse_mp4v   }, 
     { ngx_rtmp_mp4_make_tag('e','s','d','s'),   ngx_rtmp_mp4_parse_esds   }, 
     { ngx_rtmp_mp4_make_tag('.','m','p','3'),   ngx_rtmp_mp4_parse_mp3    }, 
     { ngx_rtmp_mp4_make_tag('n','m','o','s'),   ngx_rtmp_mp4_parse_nmos   }, 
@@ -642,6 +645,13 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
 
 static ngx_int_t
 ngx_rtmp_mp4_parse_avc1(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
+{
+    return ngx_rtmp_mp4_parse_video(s, pos, last, NGX_RTMP_VIDEO_H264);
+}
+
+
+static ngx_int_t
+ngx_rtmp_mp4_parse_mp4v(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
 {
     return ngx_rtmp_mp4_parse_video(s, pos, last, NGX_RTMP_VIDEO_H264);
 }
@@ -2039,6 +2049,7 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
     ssize_t                         ret;
     u_char                          fhdr[5];
     size_t                          fhdr_size;
+    ngx_int_t                       rc;
     ngx_uint_t                      n, abs_frame, active;
 
     s = e->data;
@@ -2129,8 +2140,12 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
             ngx_rtmp_append_shared_bufs(cscf, out, &in);
 
             ngx_rtmp_prepare_message(s, &h, NULL, out);
-            ngx_rtmp_send_message(s, out, 0);
+            rc = ngx_rtmp_send_message(s, out, 0);
             ngx_rtmp_free_shared_chain(cscf, out);
+
+            if (rc == NGX_AGAIN) {
+                goto full;
+            }
 
             t->header_sent = 1;
 
@@ -2192,8 +2207,12 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
         out = ngx_rtmp_append_shared_bufs(cscf, NULL, &in);
         
         ngx_rtmp_prepare_message(s, &h, abs_frame ? NULL : &lh, out);
-        ngx_rtmp_send_message(s, out, 0);
+        rc = ngx_rtmp_send_message(s, out, 0);
         ngx_rtmp_free_shared_chain(cscf, out);
+
+        if (rc == NGX_AGAIN) {
+            goto full;
+        }
 
         if (ngx_rtmp_mp4_next(s, t) != NGX_OK) {
             continue;
@@ -2225,6 +2244,14 @@ again:
     ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_MSID);
 
     ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status", "Stopped");
+
+    return;
+
+full:
+    ngx_post_event(e, &s->posted_dry_events);
+
+    return;
+
 }
 
 

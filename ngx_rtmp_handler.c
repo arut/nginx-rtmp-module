@@ -537,6 +537,8 @@ ngx_rtmp_send(ngx_event_t *wev)
     if (wev->active) {
         ngx_del_event(wev, NGX_WRITE_EVENT, 0);
     }
+
+    ngx_event_process_posted((ngx_cycle_t *) ngx_cycle, &s->posted_dry_events);
 }
 
 
