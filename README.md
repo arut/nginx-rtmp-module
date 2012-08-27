@@ -14,7 +14,7 @@
 
 * Live streaming of video/audio
 
-* Video on demand (FLV)
+* Video on demand FLV/MP4
 
 * Stream relay support for distributed
   streaming: push & pull models
@@ -152,6 +152,10 @@ name - interpreted by each application
             # video on demand
             application vod {
                 play /var/flvs;
+            }
+
+            application vod2 {
+                play /var/mp4s;
             }
 
             # Many publishers, many subscribers
