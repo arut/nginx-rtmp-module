@@ -3,29 +3,18 @@
  */
 
 
-#include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_codec_module.h"
 #include "ngx_rtmp_streams.h"
 
 
-static ngx_rtmp_play_pt                 next_play;
-static ngx_rtmp_close_stream_pt         next_close_stream;
-static ngx_rtmp_seek_pt                 next_seek;
-static ngx_rtmp_pause_pt                next_pause;
-
-
 static ngx_int_t ngx_rtmp_mp4_postconfiguration(ngx_conf_t *cf);
-static void * ngx_rtmp_mp4_create_app_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_mp4_merge_app_conf(ngx_conf_t *cf, 
-       void *parent, void *child);
-static void ngx_rtmp_mp4_send(ngx_event_t *e);
-static ngx_int_t ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_int_t offset);
-static ngx_int_t ngx_rtmp_mp4_stop(ngx_rtmp_session_t *s);
-
-
-typedef struct {
-    ngx_str_t                           root;
-} ngx_rtmp_mp4_app_conf_t;
+static ngx_int_t ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_done(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f,
+       ngx_uint_t offset);
+static ngx_int_t ngx_rtmp_mp4_stop(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f);
 
 
 #pragma pack(push,4)
@@ -165,8 +154,6 @@ typedef struct {
 
 
 typedef struct {
-    ngx_file_t                          file;
-    
     void                               *mmaped;
     size_t                              mmaped_size;
 
@@ -183,8 +170,6 @@ typedef struct {
     ngx_uint_t                          sample_rate;
 
     uint32_t                            start_timestamp, epoch;
-
-    ngx_event_t                         write_evt;
 } ngx_rtmp_mp4_ctx_t;
 
 
@@ -312,22 +297,9 @@ typedef struct {
 
 
 static ngx_rtmp_mp4_descriptor_t        ngx_rtmp_mp4_descriptors[] = {
-    { 0x03,   ngx_rtmp_mp4_parse_es   }, /* MPEG ES Descriptor */
-    { 0x04,   ngx_rtmp_mp4_parse_dc   }, /* MPEG DecoderConfig Descriptor */
-    { 0x05,   ngx_rtmp_mp4_parse_ds   }  /* MPEG DecoderSpecific Descriptor */
-};
-
-
-static ngx_command_t  ngx_rtmp_mp4_commands[] = {
-
-    { ngx_string("play_mp4"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_str_slot,
-      NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_mp4_app_conf_t, root),
-      NULL },
-
-      ngx_null_command
+    { 0x03,   ngx_rtmp_mp4_parse_es   },    /* MPEG ES Descriptor */
+    { 0x04,   ngx_rtmp_mp4_parse_dc   },    /* MPEG DecoderConfig Descriptor */
+    { 0x05,   ngx_rtmp_mp4_parse_ds   }     /* MPEG DecoderSpec Descriptor */
 };
 
 
@@ -338,15 +310,15 @@ static ngx_rtmp_module_t  ngx_rtmp_mp4_module_ctx = {
     NULL,                                   /* init main configuration */
     NULL,                                   /* create server configuration */
     NULL,                                   /* merge server configuration */
-    ngx_rtmp_mp4_create_app_conf,           /* create app configuration */
-    ngx_rtmp_mp4_merge_app_conf             /* merge app configuration */
+    NULL,                                   /* create app configuration */
+    NULL                                    /* merge app configuration */
 };
 
 
 ngx_module_t  ngx_rtmp_mp4_module = {
     NGX_MODULE_V1,
     &ngx_rtmp_mp4_module_ctx,               /* module context */
-    ngx_rtmp_mp4_commands,                  /* module directives */
+    NULL,                                   /* module directives */
     NGX_RTMP_MODULE,                        /* module type */
     NULL,                                   /* init master */
     NULL,                                   /* init module */
@@ -357,33 +329,6 @@ ngx_module_t  ngx_rtmp_mp4_module = {
     NULL,                                   /* exit master */
     NGX_MODULE_V1_PADDING
 };
-
-
-static void *
-ngx_rtmp_mp4_create_app_conf(ngx_conf_t *cf)
-{
-    ngx_rtmp_mp4_app_conf_t    *pacf;
-
-    pacf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_mp4_app_conf_t));
-
-    if (pacf == NULL) {
-        return NULL;
-    }
-
-    return pacf;
-}
-
-
-static char *
-ngx_rtmp_mp4_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
-{
-    ngx_rtmp_mp4_app_conf_t *prev = parent;
-    ngx_rtmp_mp4_app_conf_t *conf = child;
-
-    ngx_conf_merge_str_value(conf->root, prev->root, "");
-
-    return NGX_CONF_OK;
-} 
 
 
 static ngx_int_t
@@ -1219,97 +1164,6 @@ ngx_rtmp_mp4_parse(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
 
 
 static ngx_int_t
-ngx_rtmp_mp4_init(ngx_rtmp_session_t *s)
-{
-    ngx_rtmp_mp4_ctx_t         *ctx;
-    uint32_t                    hdr[2];
-    ssize_t                     n;
-    size_t                      offset, page_offset, size;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
-
-    if (ctx == NULL || ctx->mmaped || ctx->file.fd == NGX_INVALID_FILE) {
-        return NGX_OK;
-    }
-
-    offset = 0;
-    size   = 0;
-
-    for ( ;; ) {
-        n = ngx_read_file(&ctx->file, (u_char *) &hdr, sizeof(hdr), offset);
-
-        if (n != sizeof(hdr)) {
-            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                          "mp4: error reading file at offset=%uz "
-                          "while searching for moov box", offset);
-            return NGX_ERROR;
-        }
-
-        size = ngx_rtmp_r32(hdr[0]);
-
-        if (hdr[1] == ngx_rtmp_mp4_make_tag('m','o','o','v')) {
-            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "mp4: found moov box");
-            break;
-        }
-
-        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "mp4: skipping box '%*s'", 4, hdr + 1);
-
-        offset += size;
-    }
-
-    if (size < 8) {
-        return NGX_ERROR;
-    }
-
-    size   -= 8;
-    offset += 8;
-
-    page_offset = offset & (ngx_pagesize - 1);
-    ctx->mmaped_size = page_offset + size;
-
-    ctx->mmaped = mmap(NULL, ctx->mmaped_size, PROT_READ, MAP_SHARED,
-                       ctx->file.fd, offset - page_offset);
-
-    if (ctx->mmaped == MAP_FAILED) {
-        ctx->mmaped = NULL;
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "mp4: mmap failed at offset=%ui, size=%uz",
-                      offset, size);
-        return NGX_ERROR;
-    }
-
-    return ngx_rtmp_mp4_parse(s, (u_char *) ctx->mmaped + page_offset, 
-                                 (u_char *) ctx->mmaped + page_offset + size);
-}
-
-
-static ngx_int_t
-ngx_rtmp_mp4_done(ngx_rtmp_session_t *s)
-{
-    ngx_rtmp_mp4_ctx_t            *ctx;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
-
-    if (ctx == NULL || ctx->mmaped == NULL) {
-        return NGX_OK;
-    }
-
-    if (munmap(ctx->mmaped, ctx->mmaped_size)) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "mp4: munmap failed");
-        return NGX_ERROR;
-    }
-
-    ctx->mmaped = NULL;
-    ctx->mmaped_size = 0;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
 ngx_rtmp_mp4_next_time(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
 {
     ngx_rtmp_mp4_cursor_t      *cr;
@@ -2026,17 +1880,40 @@ ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
     h.type = NGX_RTMP_MSG_AMF_META;
 
     ngx_rtmp_prepare_message(s, &h, NULL, out);
-    ngx_rtmp_send_message(s, out, 0);
+    rc = ngx_rtmp_send_message(s, out, 0);
     ngx_rtmp_free_shared_chain(cscf, out);
 
+    return rc;
+}
+
+
+static ngx_int_t
+ngx_rtmp_mp4_seek_track(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t,
+                        ngx_int_t timestamp)
+{
+    ngx_rtmp_mp4_cursor_t          *cr;
+
+    cr = &t->cursor;
+    ngx_memzero(cr, sizeof(*cr));
+
+    if (ngx_rtmp_mp4_seek_time(s, t, ngx_rtmp_mp4_from_rtmp_timestamp(
+                          t, timestamp)) != NGX_OK ||
+        ngx_rtmp_mp4_seek_key(s, t)   != NGX_OK ||
+        ngx_rtmp_mp4_seek_chunk(s, t) != NGX_OK ||
+        ngx_rtmp_mp4_seek_size(s, t)  != NGX_OK ||
+        ngx_rtmp_mp4_seek_delay(s, t) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    cr->valid = 1;
     return NGX_OK;
 }
 
 
-static void
-ngx_rtmp_mp4_send(ngx_event_t *e)
+static ngx_int_t
+ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
 {
-    ngx_rtmp_session_t             *s;
     ngx_rtmp_mp4_ctx_t             *ctx;
     ngx_buf_t                       in_buf;
     ngx_rtmp_header_t               h, lh;
@@ -2052,21 +1929,22 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
     ngx_int_t                       rc;
     ngx_uint_t                      n, abs_frame, active;
 
-    s = e->data;
-
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     ctx  = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
 
     if (ctx == NULL) {
-        return;
+        return NGX_ERROR;
     }
 
     if (!ctx->meta_sent) {
-        ngx_rtmp_mp4_send_meta(s);
-        ctx->meta_sent = 1;
-        active = 1;
-        goto again;
+        rc = ngx_rtmp_mp4_send_meta(s);
+
+        if (rc == NGX_OK) {
+            ctx->meta_sent = 1;
+        }
+
+        return rc;
     }
 
     buflen = (s->buflen ? s->buflen : NGX_RTMP_MP4_DEFAULT_BUFLEN);
@@ -2144,7 +2022,7 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
             ngx_rtmp_free_shared_chain(cscf, out);
 
             if (rc == NGX_AGAIN) {
-                goto full;
+                return NGX_AGAIN;
             }
 
             t->header_sent = 1;
@@ -2191,7 +2069,7 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
             continue;
         }
 
-        ret = ngx_read_file(&ctx->file, ngx_rtmp_mp4_buffer + fhdr_size, 
+        ret = ngx_read_file(f, ngx_rtmp_mp4_buffer + fhdr_size, 
                             cr->size, cr->offset);
 
         if (ret != (ssize_t) cr->size) {
@@ -2211,7 +2089,7 @@ ngx_rtmp_mp4_send(ngx_event_t *e)
         ngx_rtmp_free_shared_chain(cscf, out);
 
         if (rc == NGX_AGAIN) {
-            goto full;
+            return NGX_AGAIN;
         }
 
         if (ngx_rtmp_mp4_next(s, t) != NGX_OK) {
@@ -2229,58 +2107,114 @@ next:
     }
 
     if (sched) {
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "mp4: scheduling %uD", sched);
-        ngx_add_timer(e, sched);
-        return;
+        return sched;
     }
 
-again:
-    if (active) {
-        ngx_post_event(e, &ngx_posted_events);
-        return;
-    }
-
-    ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_MSID);
-
-    ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status", "Stopped");
-
-    return;
-
-full:
-    ngx_post_event(e, &s->posted_dry_events);
-
-    return;
-
+    return active ? NGX_OK : NGX_DONE;
 }
 
 
 static ngx_int_t
-ngx_rtmp_mp4_seek_track(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t,
-                        ngx_int_t timestamp)
+ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f)
 {
-    ngx_rtmp_mp4_cursor_t          *cr;
+    ngx_rtmp_mp4_ctx_t         *ctx;
+    uint32_t                    hdr[2];
+    ssize_t                     n;
+    size_t                      offset, page_offset, size;
 
-    cr = &t->cursor;
-    ngx_memzero(cr, sizeof(*cr));
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
 
-    if (ngx_rtmp_mp4_seek_time(s, t, ngx_rtmp_mp4_from_rtmp_timestamp(
-                          t, timestamp)) != NGX_OK ||
-        ngx_rtmp_mp4_seek_key(s, t)   != NGX_OK ||
-        ngx_rtmp_mp4_seek_chunk(s, t) != NGX_OK ||
-        ngx_rtmp_mp4_seek_size(s, t)  != NGX_OK ||
-        ngx_rtmp_mp4_seek_delay(s, t) != NGX_OK)
-    {
+    if (ctx == NULL) {
+        ctx = ngx_palloc(s->connection->pool, sizeof(ngx_rtmp_mp4_ctx_t));
+
+        if (ctx == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_mp4_module);
+    }
+
+    ngx_memzero(ctx, sizeof(*ctx));
+
+    offset = 0;
+    size   = 0;
+
+    for ( ;; ) {
+        n = ngx_read_file(f, (u_char *) &hdr, sizeof(hdr), offset);
+
+        if (n != sizeof(hdr)) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                          "mp4: error reading file at offset=%uz "
+                          "while searching for moov box", offset);
+            return NGX_ERROR;
+        }
+
+        size = ngx_rtmp_r32(hdr[0]);
+
+        if (hdr[1] == ngx_rtmp_mp4_make_tag('m','o','o','v')) {
+            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "mp4: found moov box");
+            break;
+        }
+
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "mp4: skipping box '%*s'", 4, hdr + 1);
+
+        offset += size;
+    }
+
+    if (size < 8) {
         return NGX_ERROR;
     }
 
-    cr->valid = 1;
+    size   -= 8;
+    offset += 8;
+
+    page_offset = offset & (ngx_pagesize - 1);
+    ctx->mmaped_size = page_offset + size;
+
+    ctx->mmaped = mmap(NULL, ctx->mmaped_size, PROT_READ, MAP_SHARED,
+                       f->fd, offset - page_offset);
+
+    if (ctx->mmaped == MAP_FAILED) {
+        ctx->mmaped = NULL;
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "mp4: mmap failed at offset=%ui, size=%uz",
+                      offset, size);
+        return NGX_ERROR;
+    }
+
+    return ngx_rtmp_mp4_parse(s, (u_char *) ctx->mmaped + page_offset, 
+                                 (u_char *) ctx->mmaped + page_offset + size);
+}
+
+
+static ngx_int_t
+ngx_rtmp_mp4_done(ngx_rtmp_session_t *s, ngx_file_t *f)
+{
+    ngx_rtmp_mp4_ctx_t            *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
+
+    if (ctx == NULL || ctx->mmaped == NULL) {
+        return NGX_OK;
+    }
+
+    if (munmap(ctx->mmaped, ctx->mmaped_size)) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "mp4: munmap failed");
+        return NGX_ERROR;
+    }
+
+    ctx->mmaped = NULL;
+    ctx->mmaped_size = 0;
+
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_int_t timestamp)
+ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
 {
     ngx_rtmp_mp4_ctx_t     *ctx;
     ngx_uint_t              n;
@@ -2292,13 +2226,7 @@ ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_int_t timestamp)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: start timestamp=%i", timestamp);
-
-    ngx_rtmp_mp4_stop(s);
-
-    if (timestamp < 0) {
-        timestamp = 0;
-    }
+                   "mp4: start timestamp=%ui", timestamp);
 
     for (n = 0; n < ctx->ntracks; ++n) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -2310,225 +2238,52 @@ ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_int_t timestamp)
     ctx->epoch = ngx_current_msec;
     ctx->start_timestamp = timestamp;
 
-    ngx_post_event((&ctx->write_evt), &ngx_posted_events)
-
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_rtmp_mp4_stop(ngx_rtmp_session_t *s)
+ngx_rtmp_mp4_stop(ngx_rtmp_session_t *s, ngx_file_t *f)
 {
-    ngx_rtmp_mp4_ctx_t            *ctx;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
-
-    if (ctx == NULL) {
-        return NGX_OK;
-    }
-
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "mp4: stop");
 
-    if (ctx->write_evt.timer_set) {
-        ngx_del_timer(&ctx->write_evt);
-    }
-
-    if (ctx->write_evt.prev) {
-        ngx_delete_posted_event((&ctx->write_evt));
-    }
-
     return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_rtmp_mp4_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
-{
-    ngx_rtmp_mp4_ctx_t            *ctx;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
-
-    if (ctx == NULL) {
-        goto next;
-    }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: close_stream");
-
-    ngx_rtmp_mp4_stop(s);
-
-    ngx_rtmp_mp4_done(s);
-
-    if (ctx->file.fd != NGX_INVALID_FILE) {
-        ngx_close_file(ctx->file.fd);
-        ctx->file.fd = NGX_INVALID_FILE;
-    }
-
-next:
-    return next_close_stream(s, v);
-}
-
-
-static ngx_int_t
-ngx_rtmp_mp4_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
-{
-    ngx_rtmp_mp4_ctx_t            *ctx;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
-
-    if (ctx == NULL || ctx->file.fd == NGX_INVALID_FILE) {
-        goto next;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: seek timestamp=%i", (ngx_int_t) v->offset);
-
-    ngx_rtmp_mp4_start(s, v->offset);
-
-next:
-    return next_seek(s, v);
-}
-
-
-static ngx_int_t
-ngx_rtmp_mp4_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
-{
-    ngx_rtmp_mp4_ctx_t            *ctx;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
-
-    if (ctx == NULL || ctx->file.fd == NGX_INVALID_FILE) {
-        goto next;
-    }
-
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: pause=%i timestamp=%i",
-                   (ngx_int_t) v->pause, (ngx_int_t) v->position);
-
-    if (v->pause) {
-        ngx_rtmp_mp4_stop(s);
-    } else {
-        ngx_rtmp_mp4_start(s, v->position);
-    }
-
-next:
-    return next_pause(s, v);
-}
-
-
-static ngx_int_t
-ngx_rtmp_mp4_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
-{
-    ngx_rtmp_mp4_app_conf_t        *pacf;
-    ngx_rtmp_mp4_ctx_t             *ctx;
-    u_char                         *p;
-    ngx_event_t                    *e;
-    size_t                          len;
-    static u_char                   path[NGX_MAX_PATH];
-    u_char                         *name;
-
-    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_mp4_module);
-
-    if (pacf == NULL || pacf->root.len == 0) {
-        goto next;
-    }
-
-    if (ngx_strncasecmp(v->name, (u_char *) "mp4:", sizeof("mp4:") - 1) == 0) {
-        name = v->name + sizeof("mp4:") - 1;
-        goto ok;
-    }
-
-    len = ngx_strlen(v->name);
-
-    if (len >= sizeof(".mp4") && 
-        ngx_strncasecmp(v->name + len - sizeof(".mp4") + 1, (u_char *) ".mp4",
-                        sizeof(".mp4") - 1))
-    {
-        name = v->name;
-        goto ok;
-    }
-
-    goto next;
-ok:
-
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: play name='%s' timestamp=%i",
-                    name, (ngx_int_t) v->start);
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
-
-    if (ctx && ctx->file.fd != NGX_INVALID_FILE) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                      "mp4: already playing");
-        goto next;
-    }
-
-    /* check for double-dot in name;
-     * we should not move out of play directory */
-    for (p = name; *p; ++p) {
-        if (ngx_path_separator(p[0]) &&
-            p[1] == '.' && p[2] == '.' && 
-            ngx_path_separator(p[3])) 
-        {
-            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                          "mp4: bad name '%s'", name);
-            return NGX_ERROR;
-        }
-    }
-
-    if (ctx == NULL) {
-        ctx = ngx_palloc(s->connection->pool, sizeof(ngx_rtmp_mp4_ctx_t));
-        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_mp4_module);
-    }
-    ngx_memzero(ctx, sizeof(*ctx));
-
-    ctx->file.log = s->connection->log;
-
-    p = ngx_snprintf(path, sizeof(path), "%V/%s", &pacf->root, name);
-    *p = 0;
-
-    ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN, 
-                                 NGX_FILE_DEFAULT_ACCESS);
-    if (ctx->file.fd == NGX_INVALID_FILE) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                      "mp4: error opening file %s", path);
-        goto next;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: opened file '%s'", path);
-
-    e = &ctx->write_evt;
-    e->data = s;
-    e->handler = ngx_rtmp_mp4_send;
-    e->log = s->connection->log;
-
-    ngx_rtmp_send_user_recorded(s, 1);
-
-    ngx_rtmp_mp4_init(s);
-
-    ngx_rtmp_mp4_start(s, v->start);
-
-next:
-    return next_play(s, v);
 }
 
 
 static ngx_int_t
 ngx_rtmp_mp4_postconfiguration(ngx_conf_t *cf)
 {
-    next_play = ngx_rtmp_play;
-    ngx_rtmp_play = ngx_rtmp_mp4_play;
+    ngx_rtmp_play_main_conf_t      *pmcf;
+    ngx_rtmp_play_fmt_t           **pfmt, *fmt;
 
-    next_close_stream = ngx_rtmp_close_stream;
-    ngx_rtmp_close_stream = ngx_rtmp_mp4_close_stream;
+    pmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_play_module);
 
-    next_seek = ngx_rtmp_seek;
-    ngx_rtmp_seek = ngx_rtmp_mp4_seek;
+    pfmt = ngx_array_push(&pmcf->fmts);
 
-    next_pause = ngx_rtmp_pause;
-    ngx_rtmp_pause = ngx_rtmp_mp4_pause;
+    if (pfmt == NULL) {
+        return NGX_ERROR;
+    }
+
+    fmt = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_play_fmt_t));
+    
+    if (fmt == NULL) {
+        return NGX_ERROR;
+    }
+
+    *pfmt = fmt;
+
+    ngx_str_set(&fmt->name, "mp4-format");
+
+    ngx_str_set(&fmt->pfx, "mp4:");
+    ngx_str_set(&fmt->sfx, ".mp4");
+
+    fmt->init  = ngx_rtmp_mp4_init;
+    fmt->done  = ngx_rtmp_mp4_done;
+    fmt->start = ngx_rtmp_mp4_start;
+    fmt->stop  = ngx_rtmp_mp4_stop;
+    fmt->send  = ngx_rtmp_mp4_send;
 
     return NGX_OK;
 }

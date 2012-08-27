@@ -7,6 +7,7 @@ CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_access_module                      \
                 ngx_rtmp_live_module                        \
                 ngx_rtmp_play_module                        \
+                ngx_rtmp_flv_module                         \
                 ngx_rtmp_mp4_module                         \
                 ngx_rtmp_record_module                      \
                 ngx_rtmp_netcall_module                     \
@@ -36,6 +37,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_access_module.c     \
                 $ngx_addon_dir/ngx_rtmp_live_module.c       \
                 $ngx_addon_dir/ngx_rtmp_play_module.c       \
+                $ngx_addon_dir/ngx_rtmp_flv_module.c        \
                 $ngx_addon_dir/ngx_rtmp_mp4_module.c        \
                 $ngx_addon_dir/ngx_rtmp_record_module.c     \
                 $ngx_addon_dir/ngx_rtmp_netcall_module.c    \
