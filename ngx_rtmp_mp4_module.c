@@ -1116,13 +1116,10 @@ ngx_rtmp_mp4_parse_co64(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
 static ngx_int_t
 ngx_rtmp_mp4_parse(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
 {
-    ngx_rtmp_mp4_ctx_t         *ctx;
     uint32_t                   *hdr, tag;
     size_t                      size, nboxes;
     ngx_uint_t                  n;
     ngx_rtmp_mp4_box_t         *b;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
 
     while (pos != last) {
         if (pos + 8 > last) {
