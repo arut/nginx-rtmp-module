@@ -113,8 +113,8 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
         }
     }
 
-    /*ngx_log_error(NGX_LOG_INFO, c->log, 0, "*%ui client connected",
-                  c->number, &c->addr_text);*/
+    ngx_log_error(NGX_LOG_INFO, c->log, 0, "*%ui client connected '%V'",
+                  c->number, &c->addr_text);
 
     s = ngx_rtmp_init_session(c, addr_conf);
 

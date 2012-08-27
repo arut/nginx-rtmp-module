@@ -145,6 +145,11 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
 
     *ls = *lss;
 
+    /* Disable unix socket client address extraction
+     * from accept call
+     * Nginx generates bad addr_text with this enabled */
+    ls->addr_ntop = 0; 
+
     ls->socklen = sizeof(struct sockaddr_un);
     sun = ngx_pcalloc(cycle->pool, ls->socklen);
     ls->sockaddr = (struct sockaddr *) sun;
