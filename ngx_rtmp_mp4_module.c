@@ -1436,7 +1436,7 @@ ngx_rtmp_mp4_seek_chunk(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
 
     cr->chunk = ngx_rtmp_r32(ce->first_chunk) + dchunk;
     cr->chunk_pos = (ngx_uint_t) (ce - t->chunks->entries);
-    cr->chunk_count = (ngx_uint_t) (cr->pos - dchunk * 
+    cr->chunk_count = (ngx_uint_t) (cr->pos - pos - dchunk * 
                                     ngx_rtmp_r32(ce->samples_per_chunk));
 
     ngx_log_debug7(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -1792,6 +1792,7 @@ ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
         double                      duration;
         double                      video_codec_id;
         double                      audio_codec_id;
+        double                      audio_sample_rate;
     }                               v;
 
     static ngx_rtmp_amf_elt_t       out_inf[] = {
@@ -1823,6 +1824,10 @@ ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
         { NGX_RTMP_AMF_NUMBER, 
           ngx_string("audiocodecid"),
           &v.audio_codec_id, 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_string("audiosamplerate"),
+          &v.audio_sample_rate, 0 },
     };
 
     static ngx_rtmp_amf_elt_t       out_elts[] = {
@@ -1855,6 +1860,8 @@ ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
         if (v.duration < d) {
             v.duration = d;
         }
+
+        v.audio_sample_rate = ctx->sample_rate;
 
         switch (t->type) {
             case NGX_RTMP_MSG_AUDIO:
