@@ -560,6 +560,9 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
     }
 
     switch (ctx->sample_rate) {
+        case 5512:
+            break;
+
         case 11025:
             *p |= 0x04;
             break;
@@ -568,7 +571,7 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
             *p |= 0x08;
             break;
 
-        case 44100:
+        default: /* 44100, 4800 etc */
             *p |= 0x0c;
             break;
     }
