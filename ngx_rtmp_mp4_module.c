@@ -101,12 +101,13 @@ typedef struct {
 
 typedef struct {
     uint32_t                            timestamp;
-    uint32_t                            duration;
+    uint32_t                            last_timestamp;
     off_t                               offset;
     size_t                              size;
     ngx_int_t                           key;
     uint32_t                            delay;
 
+    unsigned                            not_first:1;
     unsigned                            valid:1;
 
     ngx_uint_t                          pos;
@@ -551,7 +552,7 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
 
     *p = 0;
 
-    if (ctx->nchannels) {
+    if (ctx->nchannels == 2) {
         *p |= 0x01;
     }
 
@@ -571,7 +572,7 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
             *p |= 0x08;
             break;
 
-        default: /* 44100, 4800 etc */
+        default:  /*44100 etc */
             *p |= 0x0c;
             break;
     }
@@ -1186,8 +1187,10 @@ ngx_rtmp_mp4_next_time(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
 
     te = &t->times->entries[cr->time_pos];
 
-    cr->duration = ngx_rtmp_r32(te->sample_delta);
-    cr->timestamp += cr->duration;
+    cr->last_timestamp = cr->timestamp;
+    cr->timestamp += ngx_rtmp_r32(te->sample_delta);
+
+    cr->not_first = 1;
 
     ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "mp4: track#%ui time[%ui] [%ui/%uD][%ui/%uD]=%uD t=%uD",
@@ -1852,6 +1855,7 @@ ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
 
     v.width  = ctx->width;
     v.height = ctx->height;
+    v.audio_sample_rate = ctx->sample_rate;
 
     t = &ctx->tracks[0];
     for (n = 0; n < ctx->ntracks; ++n, ++t) {
@@ -1860,8 +1864,6 @@ ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
         if (v.duration < d) {
             v.duration = d;
         }
-
-        v.audio_sample_rate = ctx->sample_rate;
 
         switch (t->type) {
             case NGX_RTMP_MSG_AUDIO:
@@ -1929,12 +1931,12 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
     ngx_rtmp_mp4_track_t           *t;
     ngx_rtmp_mp4_cursor_t          *cr;
     uint32_t                        buflen, end_timestamp, sched,
-                                    timestamp, duration;
+                                    timestamp, last_timestamp;
     ssize_t                         ret;
     u_char                          fhdr[5];
     size_t                          fhdr_size;
     ngx_int_t                       rc;
-    ngx_uint_t                      n, abs_frame, active;
+    ngx_uint_t                      n, active;
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
@@ -1980,8 +1982,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
             goto next;
         }
 
-        duration = ngx_rtmp_mp4_to_rtmp_timestamp(t, cr->duration);
-        abs_frame = (duration == 0);
+        last_timestamp = ngx_rtmp_mp4_to_rtmp_timestamp(t, cr->last_timestamp);
 
         ngx_memzero(&h, sizeof(h));
 
@@ -1991,7 +1992,8 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
 
         lh = h;
 
-        h.timestamp = (abs_frame ? timestamp : duration);
+        h.timestamp  = timestamp;
+        lh.timestamp = last_timestamp;
 
         ngx_memzero(&in, sizeof(in));
         ngx_memzero(&in_buf, sizeof(in_buf));
@@ -2038,9 +2040,10 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
         }
 
         ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "mp4: track#%ui read frame "
-                       "offset=%O, size=%uz, timestamp=%uD, duration=%uD", 
-                       t->id, cr->offset, cr->size, timestamp, duration);
+                       "mp4: track#%ui read frame offset=%O, size=%uz, "
+                       "timestamp=%uD, last_timestamp=%uD", 
+                       t->id, cr->offset, cr->size, timestamp, 
+                       last_timestamp);
 
         ngx_rtmp_mp4_buffer[0] = t->fhdr;
         fhdr_size = 1;
@@ -2091,7 +2094,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
 
         out = ngx_rtmp_append_shared_bufs(cscf, NULL, &in);
         
-        ngx_rtmp_prepare_message(s, &h, abs_frame ? NULL : &lh, out);
+        ngx_rtmp_prepare_message(s, &h, cr->not_first ? &lh : NULL, out);
         rc = ngx_rtmp_send_message(s, out, 0);
         ngx_rtmp_free_shared_chain(cscf, out);
 
