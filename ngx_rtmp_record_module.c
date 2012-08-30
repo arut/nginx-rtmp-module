@@ -26,29 +26,6 @@ static ngx_int_t ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 
-typedef struct {
-    ngx_uint_t                          flags;
-    ngx_str_t                           path;
-    size_t                              max_size;
-    size_t                              max_frames;
-    ngx_msec_t                          interval;
-    ngx_str_t                           suffix;
-    ngx_flag_t                          unique;
-    ngx_url_t                          *url;
-} ngx_rtmp_record_app_conf_t;
-
-
-typedef struct {
-    ngx_file_t                          file;
-    ngx_uint_t                          nframes;
-    uint32_t                            epoch;
-    ngx_time_t                          last;
-    time_t                              timestamp;
-    u_char                              name[NGX_RTMP_MAX_NAME];
-    u_char                              args[NGX_RTMP_MAX_ARGS];
-} ngx_rtmp_record_ctx_t;
-
-
 #define NGX_RTMP_RECORD_OFF             0x01
 #define NGX_RTMP_RECORD_AUDIO           0x02
 #define NGX_RTMP_RECORD_VIDEO           0x04
