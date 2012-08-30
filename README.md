@@ -54,17 +54,6 @@ cd to NGINX source directory & run this:
     make install
 
 
-### Known issue:
-
-  The module does not share data between workers.
-  Because of this live streaming is only available 
-  in one-worker mode so far. Video-on-demand has no 
-  such limitations.
-
-  You can try auto-push branch with multi-worker
-  support if you really need that.
-
-
 ### RTMP URL format:
 
     rtmp://rtmp.example.com/app[/name]
@@ -74,6 +63,14 @@ app -  should match one of application {}
 
 name - interpreted by each application
          can be empty
+
+
+### Multi-worker live streaming
+
+Module supports multi-worker live
+streaming through automatic stream pushing
+to nginx workers. This option is toggled with
+rtmp_auto_push directive.
 
 
 ### Example nginx.conf:
@@ -260,3 +257,22 @@ name - interpreted by each application
         }
     }
 
+
+
+    # Multi-worker streaming
+    rtmp_auto_push on;
+
+    rtmp {
+
+        server {
+
+            listen 1935;
+
+            chunk_size 4000;
+
+            # TV mode: one publisher, many subscribers
+            application mytv {
+                live on;
+            }
+        }
+    }
