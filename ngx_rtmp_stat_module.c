@@ -458,6 +458,7 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     size_t                          n;
     off_t                           len;
     static u_char                   tbuf[NGX_TIME_T_LEN + 1];
+    static u_char                   nbuf[NGX_OFF_T_LEN + 1];
 
     r->keepalive = 0;
     slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
@@ -491,6 +492,11 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     NGX_RTMP_STAT_L("<compiler>" NGX_COMPILER "</compiler>\r\n");
 #endif
     NGX_RTMP_STAT_L("<built>" __DATE__ " " __TIME__ "</built>\r\n");
+
+    NGX_RTMP_STAT_L("<pid>");
+    NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                  "%ui", (ngx_uint_t) ngx_getpid()) - nbuf);
+    NGX_RTMP_STAT_L("</pid>\r\n");
 
     NGX_RTMP_STAT_L("<uptime>");
     NGX_RTMP_STAT(tbuf, ngx_snprintf(tbuf, sizeof(tbuf),
