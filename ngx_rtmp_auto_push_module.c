@@ -199,7 +199,7 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
         }
     }
 
-    if (bind(s, sun, sizeof(*sun)) == -1) {
+    if (bind(s, (struct sockaddr *) sun, sizeof(*sun)) == -1) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
                       ngx_nonblocking_n " worker_socket bind failed");
         goto sock_error;
