@@ -431,8 +431,8 @@ ngx_rtmp_notify_save_name_args(ngx_rtmp_session_t *s,
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_notify_module);
     }
 
-    ngx_memcpy(ctx->name, name, sizeof(name));
-    ngx_memcpy(ctx->args, args, sizeof(args));
+    ngx_memcpy(ctx->name, name, NGX_RTMP_MAX_NAME);
+    ngx_memcpy(ctx->args, args, NGX_RTMP_MAX_ARGS);
 }
 
 
