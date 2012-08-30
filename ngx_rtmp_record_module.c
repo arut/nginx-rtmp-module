@@ -9,13 +9,11 @@
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_codec_module.h"
+#include "ngx_rtmp_record_module.h"
 
 
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
-
-static ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s);
-static ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s);
 
 
 static char * ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, 
@@ -26,29 +24,6 @@ static char * ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf,
         void *parent, void *child);
 static ngx_int_t ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s, 
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-
-
-typedef struct {
-    ngx_uint_t                          flags;
-    ngx_str_t                           path;
-    size_t                              max_size;
-    size_t                              max_frames;
-    ngx_msec_t                          interval;
-    ngx_str_t                           suffix;
-    ngx_flag_t                          unique;
-    ngx_url_t                          *url;
-} ngx_rtmp_record_app_conf_t;
-
-
-typedef struct {
-    ngx_file_t                          file;
-    ngx_uint_t                          nframes;
-    uint32_t                            epoch;
-    ngx_time_t                          last;
-    time_t                              timestamp;
-    u_char                              name[NGX_RTMP_MAX_NAME];
-    u_char                              args[NGX_RTMP_MAX_ARGS];
-} ngx_rtmp_record_ctx_t;
 
 
 #define NGX_RTMP_RECORD_OFF             0x01
@@ -223,7 +198,7 @@ ngx_rtmp_record_write_header(ngx_file_t *file)
 
 
 /* This funcion returns pointer to a static buffer */
-static u_char *
+u_char *
 ngx_rtmp_record_make_path(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
@@ -256,7 +231,7 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_record_open(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
@@ -455,7 +430,7 @@ ngx_rtmp_record_notify(ngx_rtmp_session_t *s)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_record_close(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_record_ctx_t          *ctx;
