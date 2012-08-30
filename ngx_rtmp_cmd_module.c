@@ -404,9 +404,7 @@ ngx_rtmp_cmd_delete_stream_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_ERROR;
     }
 
-    return ngx_rtmp_delete_stream
-        ? ngx_rtmp_delete_stream(s, &v)
-        : NGX_OK;
+    return NGX_OK;
 }
 
 
