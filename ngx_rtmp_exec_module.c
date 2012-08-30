@@ -4,7 +4,10 @@
 
 
 #include "ngx_rtmp_cmd_module.h"
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #ifdef NGX_LINUX
 #include <unistd.h>
@@ -317,7 +320,7 @@ dollar:
 static ngx_int_t
 ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 {
-#ifdef NGX_LINUX
+#ifndef NGX_WIN32
     ngx_rtmp_exec_app_conf_t       *eacf;
     ngx_rtmp_exec_ctx_t            *ctx;
     int                             pid;
@@ -413,7 +416,7 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
                     &ec->cmd, (ngx_uint_t)pid);
             break;
     }
-#endif /* NGX_LINUX */
+#endif /* NGX_WIN32 */
     return NGX_OK;
 }
 

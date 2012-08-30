@@ -301,6 +301,7 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     ngx_rtmp_record_app_conf_t     *racf;
     ngx_rtmp_record_ctx_t          *ctx;
+    u_char                         *p;
 
     if (s->auto_pushed) {
         goto next;
@@ -326,6 +327,17 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ngx_memcpy(ctx->name, v->name, sizeof(ctx->name));
     ngx_memcpy(ctx->args, v->args, sizeof(ctx->args));
+
+    /* terminate name on /../ */
+    for (p = ctx->name; *p; ++p) {
+        if (ngx_path_separator(p[0]) &&
+            p[1] == '.' && p[2] == '.' && 
+            ngx_path_separator(p[3])) 
+        {
+            *p = 0;
+            break;
+        }
+    }
 
     if (ngx_rtmp_record_open(s) != NGX_OK) {
         return NGX_ERROR;

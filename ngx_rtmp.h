@@ -178,6 +178,8 @@ typedef struct {
     ngx_str_t              *addr_text;
     int                     connected;
 
+    ngx_event_t            *posted_dry_events;
+
     /* client buffer time in msec */
     uint32_t                buflen;
 
@@ -378,6 +380,27 @@ void * ngx_rtmp_rmemcpy(void *dst, const void* src, size_t n);
     (((u_char*)ngx_rtmp_rmemcpy(dst, src, n)) + (n))
 
 
+static inline uint16_t
+ngx_rtmp_r16(uint16_t n)
+{
+    return (n << 8) | (n >> 8);
+}
+
+
+static inline uint32_t
+ngx_rtmp_r32(uint32_t n)
+{
+    return (n << 24) | ((n << 8) & 0xff0000) | ((n >> 8) & 0xff00) | (n >> 24);
+}
+
+
+static inline uint64_t
+ngx_rtmp_r64(uint64_t n)
+{
+    return (uint64_t) ngx_rtmp_r32(n) << 32 | ngx_rtmp_r32(n >> 32);
+}
+
+
 /* Receiving messages */
 ngx_int_t ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
@@ -471,6 +494,10 @@ ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
 ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in, 
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
+
+/* AMF status sender */
+ngx_int_t ngx_rtmp_send_status(ngx_rtmp_session_t *s, char *code,
+        char* level, char *desc);
 
 
 /* Frame types */

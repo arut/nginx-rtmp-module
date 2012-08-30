@@ -5,6 +5,7 @@
 
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_amf.h"
+#include "ngx_rtmp_streams.h"
 
 
 #define NGX_RTMP_USER_START(s, tp)                                          \
@@ -262,7 +263,9 @@ ngx_rtmp_append_amf(ngx_rtmp_session_t *s,
     return rc;
 }
 
-ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+
+ngx_int_t
+ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
     ngx_chain_t                *first;
@@ -287,3 +290,59 @@ done:
     return rc;
 }
 
+
+ngx_int_t
+ngx_rtmp_send_status(ngx_rtmp_session_t *s, char *code, char* level, char *desc)
+{
+    ngx_rtmp_header_t               h;
+    static double                   trans;
+
+    static ngx_rtmp_amf_elt_t       out_inf[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("code"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("level"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_string("description"),
+          NULL, 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t       out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_null_string,
+          "onStatus", 0 },
+
+        { NGX_RTMP_AMF_NUMBER, 
+          ngx_null_string,
+          &trans, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          out_inf,
+          sizeof(out_inf) },
+    };
+
+
+    out_inf[0].data = code;
+    out_inf[1].data = level;
+    out_inf[2].data = desc;
+
+    memset(&h, 0, sizeof(h));
+
+    h.type = NGX_RTMP_MSG_AMF_CMD;
+    h.csid = NGX_RTMP_CSID_AMF;
+    h.msid = NGX_RTMP_MSID;
+
+    return ngx_rtmp_send_amf(s, &h, out_elts, 
+                             sizeof(out_elts) / sizeof(out_elts[0]));
+}
