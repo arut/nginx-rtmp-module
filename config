@@ -15,6 +15,7 @@ CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_relay_module                       \
                 ngx_rtmp_exec_module                        \
                 ngx_rtmp_codec_module                       \
+                ngx_rtmp_auto_push_module                   \
                 "
 
 
