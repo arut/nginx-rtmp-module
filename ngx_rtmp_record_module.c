@@ -584,26 +584,37 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
 
-    if (racf == NULL || ctx == NULL || racf->flags & NGX_RTMP_RECORD_OFF) {
+    if (racf == NULL || ctx == NULL) {
+        return NGX_OK;
+    }
+
+    if (racf->flags & NGX_RTMP_RECORD_OFF) {
+        if (ctx->file.fd != NGX_INVALID_FILE) {
+            ngx_rtmp_record_close(s);
+        }
         return NGX_OK;
     }
 
     keyframe = (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME);
 
-    if (keyframe && racf->interval != (ngx_msec_t)NGX_CONF_UNSET) {
-        next = ctx->last;
-        next.msec += racf->interval;
-        next.sec += (next.msec / 1000);
-        next.msec %= 1000;
-        if (ngx_cached_time->sec > next.sec
-                || (ngx_cached_time->sec == next.sec
-                    && ngx_cached_time->msec > next.msec))
-        {
-            ngx_rtmp_record_close(s);
-            if (ngx_rtmp_record_open(s) != NGX_OK) {
-                ngx_log_error(NGX_LOG_CRIT, s->connection->log, 0,
-                        "record: failed");
+    if (keyframe) {
+        if (racf->interval != (ngx_msec_t)NGX_CONF_UNSET) {
+            next = ctx->last;
+            next.msec += racf->interval;
+            next.sec += (next.msec / 1000);
+            next.msec %= 1000;
+            if (ngx_cached_time->sec > next.sec
+                    || (ngx_cached_time->sec == next.sec
+                        && ngx_cached_time->msec > next.msec))
+            {
+                ngx_rtmp_record_close(s);
+                if (ngx_rtmp_record_open(s) != NGX_OK) {
+                    ngx_log_error(NGX_LOG_CRIT, s->connection->log, 0,
+                            "record: failed");
+                }
             }
+        } else if (ctx->file.fd == NGX_INVALID_FILE) {
+            ngx_rtmp_record_open(s);
         }
     }
 
