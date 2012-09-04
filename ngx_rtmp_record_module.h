@@ -11,6 +11,7 @@
 
 
 typedef struct {
+    void                               *tag;
     ngx_uint_t                          flags;
     ngx_str_t                           path;
     size_t                              max_size;
@@ -19,25 +20,44 @@ typedef struct {
     ngx_str_t                           suffix;
     ngx_flag_t                          unique;
     ngx_url_t                          *url;
-} ngx_rtmp_record_app_conf_t;
+} ngx_rtmp_record_node_conf_t;
 
 
-typedef struct {
+typedef ngx_rtmp_record_node_conf_t ngx_rtmp_record_app_conf_t;
+
+
+typedef struct ngx_rtmp_record_node_ctx_s ngx_rtmp_record_node_ctx_t;
+
+
+struct ngx_rtmp_record_node_ctx_s {
+    ngx_rtmp_record_node_conf_t        *conf;
     ngx_file_t                          file;
     ngx_uint_t                          nframes;
     uint32_t                            epoch;
     ngx_time_t                          last;
     time_t                              timestamp;
+    ngx_rtmp_record_node_ctx_t         *next;
+};
+
+
+typedef struct {
+    ngx_rtmp_record_node_ctx_t         *rctx;
     u_char                              name[NGX_RTMP_MAX_NAME];
     u_char                              args[NGX_RTMP_MAX_ARGS];
 } ngx_rtmp_record_ctx_t;
 
- 
-u_char * ngx_rtmp_record_make_path(ngx_rtmp_session_t *s);
 
-ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s);
+ngx_int_t ngx_rtmp_record_add(ngx_rtmp_session_t *s, 
+          ngx_rtmp_record_node_conf_t *rc);
 
-ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s);
+u_char *  ngx_rtmp_record_make_path(ngx_rtmp_session_t *s, 
+          ngx_rtmp_record_node_ctx_t *rctx);
+
+ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s,
+          ngx_rtmp_record_node_ctx_t *rctx);
+
+ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s,
+          ngx_rtmp_record_node_ctx_t *rctx);
 
 
 extern ngx_module_t                     ngx_rtmp_record_module;
