@@ -166,6 +166,7 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     racf->def.max_frames = NGX_CONF_UNSET;
     racf->def.interval   = NGX_CONF_UNSET;
     racf->def.unique     = NGX_CONF_UNSET;
+    racf->def.url        = NGX_CONF_UNSET_PTR;
 
     ngx_str_set(&racf->def.id, "default");
 
@@ -195,6 +196,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->def.interval, prev->def.interval, 
                               (ngx_msec_t) NGX_CONF_UNSET);
     ngx_conf_merge_bitmask_value(conf->def.flags, prev->def.flags, 0);
+    ngx_conf_merge_ptr_value(conf->def.url, prev->def.url, NULL);
 
     if (conf->def.flags) {
         node = ngx_array_push(&conf->nodes);
@@ -418,6 +420,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
                               ngx_pool_t *pool)
 {
     ngx_rtmp_record_node_ctx_t     *rctx = arg;
+    ngx_rtmp_record_node_t         *rc;
 
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_chain_t                    *hl, *cl, *pl;
@@ -427,6 +430,8 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     u_char                         *path;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+
+    rc = rctx->conf;
 
     /* common variables */
     cl = ngx_rtmp_netcall_http_format_session(s, pool);
@@ -451,6 +456,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
 
     b = ngx_create_temp_buf(pool,
                             sizeof("&call=record_done") +
+                            sizeof("&recorder=") + rc->id.len + 
                             sizeof("&addr=") + addr_text->len +
                             sizeof("&name=") + name_len * 3 +
                             sizeof("&path=") + path_len * 3 +
@@ -463,6 +469,10 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
 
     b->last = ngx_cpymem(b->last, (u_char*)"&call=record_done", 
                          sizeof("&call=record_done") - 1);
+
+    b->last = ngx_cpymem(b->last, (u_char *)"&recorder=", 
+                         sizeof("&recorder=") - 1);
+    b->last = (u_char*)ngx_escape_uri(b->last, rc->id.data, rc->id.len, 0);
 
     b->last = ngx_cpymem(b->last, (u_char*)"&addr=", sizeof("&addr=") -1);
     b->last = (u_char*)ngx_escape_uri(b->last, addr_text->data, 
