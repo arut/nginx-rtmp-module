@@ -38,6 +38,7 @@ static ngx_conf_bitmask_t  ngx_rtmp_record_mask[] = {
     { ngx_string("audio"),              NGX_RTMP_RECORD_AUDIO       },
     { ngx_string("video"),              NGX_RTMP_RECORD_VIDEO       },
     { ngx_string("keyframes"),          NGX_RTMP_RECORD_KEYFRAMES   },
+    { ngx_string("manual"),             NGX_RTMP_RECORD_MANUAL      },
     { ngx_null_string,                  0                           }
 };
 
@@ -268,8 +269,6 @@ ngx_rtmp_record_open(ngx_rtmp_session_t *s, ngx_rtmp_record_node_ctx_t *rctx)
     rc = rctx->conf;
 
     if (rctx->file.fd != NGX_INVALID_FILE) {
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                       "record: %V already opened", &rc->id);
         return NGX_OK;
     }
 
@@ -384,7 +383,7 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     rctx = ctx->nodes.elts;
 
     for (n = 0; n < ctx->nodes.nelts; ++n, ++rctx) {
-        if (rctx->conf->flags & NGX_RTMP_RECORD_OFF) {
+        if (rctx->conf->flags & (NGX_RTMP_RECORD_OFF|NGX_RTMP_RECORD_MANUAL)) {
             continue;
         }
 
@@ -530,7 +529,7 @@ ngx_rtmp_record_close(ngx_rtmp_session_t *s, ngx_rtmp_record_node_ctx_t *rctx)
 
 static ngx_int_t
 ngx_rtmp_record_delete_stream(ngx_rtmp_session_t *s, 
-        ngx_rtmp_delete_stream_t *v)
+                              ngx_rtmp_delete_stream_t *v)
 {
     ngx_rtmp_record_ctx_t      *ctx;
     ngx_rtmp_record_node_ctx_t *rctx;
@@ -705,7 +704,8 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_node_ctx_t *rctx,
 
     keyframe = (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME);
 
-    if (keyframe) {
+    if (keyframe && (rc->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
+
         if (rc->interval != (ngx_msec_t) NGX_CONF_UNSET) {
 
             next = rctx->last;
@@ -713,7 +713,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_node_ctx_t *rctx,
             next.sec  += (next.msec / 1000);
             next.msec %= 1000;
 
-            if (ngx_cached_time->sec > next.sec ||
+            if (ngx_cached_time->sec  > next.sec ||
                (ngx_cached_time->sec == next.sec &&
                 ngx_cached_time->msec > next.msec))
             {
@@ -721,7 +721,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_node_ctx_t *rctx,
                 ngx_rtmp_record_open(s, rctx);
             }
 
-        } else if (rctx->file.fd == NGX_INVALID_FILE) {
+        } else {
             ngx_rtmp_record_open(s, rctx);
         }
     }
@@ -860,14 +860,12 @@ ngx_rtmp_record_postconfiguration(ngx_conf_t *cf)
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
-    /* register event handlers */
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
     *h = ngx_rtmp_record_av;
 
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_VIDEO]);
     *h = ngx_rtmp_record_av;
 
-    /* chain handlers */
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_record_publish;
 
