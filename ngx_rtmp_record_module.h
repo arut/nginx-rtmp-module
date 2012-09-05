@@ -53,14 +53,14 @@ typedef struct {
 } ngx_rtmp_record_ctx_t;
 
 
-u_char *  ngx_rtmp_record_make_path(ngx_rtmp_session_t *s, 
-          ngx_rtmp_record_node_ctx_t *rctx);
+/* Manual recording control,
+ * 'n' is record node index in config array.
+ * Note: these functions return path as pointer to a static buffer */
 
-ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s,
-          ngx_rtmp_record_node_ctx_t *rctx);
-
-ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s,
-          ngx_rtmp_record_node_ctx_t *rctx);
+ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s, ngx_uint_t n, 
+          u_char **path);
+ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s, ngx_uint_t n,
+          u_char **path);
 
 
 extern ngx_module_t                     ngx_rtmp_record_module;
