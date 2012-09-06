@@ -45,6 +45,12 @@ typedef struct {
 } ngx_rtmp_notify_ctx_t;
 
 
+typedef struct {
+    u_char                                     *cbname;
+    ngx_url_t                                  *url;
+} ngx_rtmp_notify_done_t;
+
+
 static ngx_command_t  ngx_rtmp_notify_commands[] = {
 
     { ngx_string("on_publish"),
@@ -305,7 +311,7 @@ static ngx_chain_t *
 ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg, 
         ngx_pool_t *pool)
 {
-    u_char                         *cbname = arg;
+    ngx_rtmp_notify_done_t         *ds = arg;
 
     ngx_rtmp_notify_app_conf_t     *nacf;
     ngx_chain_t                    *hl, *cl, *pl;
@@ -330,7 +336,7 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
         return NULL;
     }
 
-    cbname_len = ngx_strlen(cbname);
+    cbname_len = ngx_strlen(ds->cbname);
     name_len = ctx ? ngx_strlen(ctx->name) : 0;
     args_len = ctx ? ngx_strlen(ctx->args) : 0;
     addr_text = &s->connection->addr_text;
@@ -346,8 +352,8 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
 
     pl->buf = b;
 
-    b->last = ngx_cpymem(b->last, (u_char*)"&call=done", 
-            sizeof("&call=done") - 1);
+    b->last = ngx_cpymem(b->last, (u_char*)"&call=", sizeof("&call=") - 1);
+    b->last = ngx_cpymem(b->last, ds->cbname, cbname_len);
 
     b->last = ngx_cpymem(b->last, (u_char*)"&addr=", sizeof("&addr=") -1);
     b->last = (u_char*)ngx_escape_uri(b->last, addr_text->data, 
@@ -364,7 +370,7 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(nacf->done_url, pool,
+    hl = ngx_rtmp_netcall_http_format_header(ds->url, pool,
             cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
             &ngx_rtmp_netcall_content_type_urlencoded);
 
@@ -594,14 +600,18 @@ static ngx_int_t
 ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, ngx_url_t *url)
 {
     ngx_rtmp_netcall_init_t         ci;
+    ngx_rtmp_notify_done_t          ds;
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "notify: %s '%V'", cbname, &url->url);
 
+    ds.cbname = (u_char *) cbname;
+    ds.url = url;
+
     ngx_memzero(&ci, sizeof(ci));
 
     ci.url = url;
-    ci.arg = cbname;
+    ci.arg = &ds;
     ci.create = ngx_rtmp_notify_done_create;
 
     return ngx_rtmp_netcall_create(s, &ci);
