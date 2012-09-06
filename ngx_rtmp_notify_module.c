@@ -528,6 +528,10 @@ ngx_rtmp_notify_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ngx_rtmp_notify_app_conf_t     *nacf;
     ngx_rtmp_netcall_init_t         ci;
 
+    if (s->auto_pushed) {
+        goto next;
+    }
+
     nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
     if (nacf == NULL) {
@@ -564,6 +568,10 @@ ngx_rtmp_notify_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t
 {
     ngx_rtmp_notify_ctx_t          *ctx;
     ngx_rtmp_notify_app_conf_t     *nacf;
+
+    if (s->auto_pushed) {
+        goto next;
+    }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
 
