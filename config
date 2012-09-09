@@ -15,6 +15,7 @@ CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_exec_module                        \
                 ngx_rtmp_codec_module                       \
                 ngx_rtmp_auto_push_module                   \
+                ngx_rtmp_enotify_module                     \
                 ngx_rtmp_notify_module                      \
                 "
 
@@ -48,6 +49,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_exec_module.c       \
                 $ngx_addon_dir/ngx_rtmp_codec_module.c      \
                 $ngx_addon_dir/ngx_rtmp_auto_push_module.c  \
+                $ngx_addon_dir/ngx_rtmp_enotify_module.c    \
                 $ngx_addon_dir/ngx_rtmp_notify_module.c     \
                 "
 CFLAGS="$CFLAGS -I$ngx_addon_dir"
