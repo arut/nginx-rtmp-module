@@ -382,7 +382,7 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
                 args[n + 1] = ngx_rtmp_exec_prepare_arg(s, arg);
             }
             args[n + 1] = NULL;
-            if (execv((char *)ec->cmd.data, args) == -1) {
+            if (execvp((char *)ec->cmd.data, args) == -1) {
                 exit(1);
             }
             break;
