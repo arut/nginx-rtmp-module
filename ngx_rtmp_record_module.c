@@ -16,20 +16,28 @@ static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
 
 
+static char *ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd,
+       void *conf);
 static char * ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, 
-        ngx_command_t *cmd, void *conf);
+       ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_rtmp_record_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_record_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, 
-        void *parent, void *child);
+       void *parent, void *child);
 static ngx_int_t ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s, 
-        ngx_rtmp_header_t *h, ngx_chain_t *in);
-
-
-#define NGX_RTMP_RECORD_OFF             0x01
-#define NGX_RTMP_RECORD_AUDIO           0x02
-#define NGX_RTMP_RECORD_VIDEO           0x04
-#define NGX_RTMP_RECORD_KEYFRAMES       0x08
+       ngx_rtmp_record_node_ctx_t *rctx,
+       ngx_rtmp_header_t *h, ngx_chain_t *in);
+static ngx_int_t ngx_rtmp_record_av(ngx_rtmp_session_t *s,
+       ngx_rtmp_header_t *h, ngx_chain_t *in);
+static ngx_int_t ngx_rtmp_record_node_av(ngx_rtmp_session_t *s,
+       ngx_rtmp_record_node_ctx_t *rctx, ngx_rtmp_header_t *h, ngx_chain_t *in);
+static ngx_int_t ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
+       ngx_rtmp_record_node_ctx_t *rctx);
+static ngx_int_t ngx_rtmp_record_node_close(ngx_rtmp_session_t *s,
+       ngx_rtmp_record_node_ctx_t *rctx);
+static u_char *  ngx_rtmp_record_make_path(ngx_rtmp_session_t *s, 
+       ngx_rtmp_record_node_ctx_t *rctx);
+static ngx_int_t ngx_rtmp_record_init(ngx_rtmp_session_t *s);
 
 
 static ngx_conf_bitmask_t  ngx_rtmp_record_mask[] = {
@@ -39,6 +47,7 @@ static ngx_conf_bitmask_t  ngx_rtmp_record_mask[] = {
     { ngx_string("audio"),              NGX_RTMP_RECORD_AUDIO       },
     { ngx_string("video"),              NGX_RTMP_RECORD_VIDEO       },
     { ngx_string("keyframes"),          NGX_RTMP_RECORD_KEYFRAMES   },
+    { ngx_string("manual"),             NGX_RTMP_RECORD_MANUAL      },
     { ngx_null_string,                  0                           }
 };
 
@@ -46,60 +55,76 @@ static ngx_conf_bitmask_t  ngx_rtmp_record_mask[] = {
 static ngx_command_t  ngx_rtmp_record_commands[] = {
 
     { ngx_string("record"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_1MORE,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_1MORE,
       ngx_conf_set_bitmask_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_record_app_conf_t, flags),
+      offsetof(ngx_rtmp_record_app_conf_t, def.flags),
       ngx_rtmp_record_mask },
 
     { ngx_string("record_path"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_record_app_conf_t, path),
+      offsetof(ngx_rtmp_record_app_conf_t, def.path),
       NULL },
 
     { ngx_string("record_suffix"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_record_app_conf_t, suffix),
+      offsetof(ngx_rtmp_record_app_conf_t, def.suffix),
       NULL },
 
     { ngx_string("record_unique"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_record_app_conf_t, unique),
+      offsetof(ngx_rtmp_record_app_conf_t, def.unique),
       NULL },
 
     { ngx_string("record_max_size"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_record_app_conf_t, max_size),
+      offsetof(ngx_rtmp_record_app_conf_t, def.max_size),
       NULL },
 
     { ngx_string("record_max_frames"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_record_app_conf_t, max_frames),
+      offsetof(ngx_rtmp_record_app_conf_t, def.max_frames),
       NULL },
 
     { ngx_string("record_interval"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_record_app_conf_t, interval),
+      offsetof(ngx_rtmp_record_app_conf_t, def.interval),
       NULL },
 
     { ngx_string("on_record_done"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
       ngx_rtmp_notify_on_record_done,
       NGX_RTMP_APP_CONF_OFFSET,
       0,
       NULL },
+
+    { ngx_string("recorder"),
+      NGX_RTMP_APP_CONF|NGX_CONF_BLOCK|NGX_CONF_TAKE1,
+      ngx_rtmp_record_recorder,
+      NGX_RTMP_APP_CONF_OFFSET,
+      0,
+      NULL },
+
 
       ngx_null_command
 };
@@ -139,14 +164,25 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     ngx_rtmp_record_app_conf_t      *racf;
 
     racf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_record_app_conf_t));
+
     if (racf == NULL) {
         return NULL;
     }
 
-    racf->max_size = NGX_CONF_UNSET;
-    racf->max_frames = NGX_CONF_UNSET;
-    racf->interval = NGX_CONF_UNSET;
-    racf->unique = NGX_CONF_UNSET;
+    racf->def.max_size   = NGX_CONF_UNSET;
+    racf->def.max_frames = NGX_CONF_UNSET;
+    racf->def.interval   = NGX_CONF_UNSET;
+    racf->def.unique     = NGX_CONF_UNSET;
+    racf->def.url        = NGX_CONF_UNSET_PTR;
+
+    ngx_str_set(&racf->def.id, "default");
+
+    if (ngx_array_init(&racf->nodes, cf->pool, 1, 
+                       sizeof(ngx_rtmp_record_node_t *))
+        != NGX_OK)
+    {
+        return NULL;
+    }
 
     return racf;
 }
@@ -157,16 +193,26 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_rtmp_record_app_conf_t *prev = parent;
     ngx_rtmp_record_app_conf_t *conf = child;
+    ngx_rtmp_record_node_t    **node;
 
-    ngx_conf_merge_bitmask_value(conf->flags, prev->flags, 
-            (NGX_CONF_BITMASK_SET|NGX_RTMP_RECORD_OFF));
-    ngx_conf_merge_str_value(conf->path, prev->path, "");
-    ngx_conf_merge_str_value(conf->suffix, prev->suffix, ".flv");
-    ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
-    ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
-    ngx_conf_merge_value(conf->unique, prev->unique, 0);
-    ngx_conf_merge_msec_value(conf->interval, prev->interval, 
-            (ngx_msec_t)NGX_CONF_UNSET);
+    ngx_conf_merge_str_value(conf->def.path, prev->def.path, "");
+    ngx_conf_merge_str_value(conf->def.suffix, prev->def.suffix, ".flv");
+    ngx_conf_merge_size_value(conf->def.max_size, prev->def.max_size, 0);
+    ngx_conf_merge_size_value(conf->def.max_frames, prev->def.max_frames, 0);
+    ngx_conf_merge_value(conf->def.unique, prev->def.unique, 0);
+    ngx_conf_merge_msec_value(conf->def.interval, prev->def.interval, 
+                              (ngx_msec_t) NGX_CONF_UNSET);
+    ngx_conf_merge_bitmask_value(conf->def.flags, prev->def.flags, 0);
+    ngx_conf_merge_ptr_value(conf->def.url, prev->def.url, NULL);
+
+    if (conf->def.flags) {
+        node = ngx_array_push(&conf->nodes);
+        if (node == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        *node = &conf->def;
+    }
 
     return NGX_CONF_OK;
 }
@@ -192,80 +238,228 @@ ngx_rtmp_record_write_header(ngx_file_t *file)
     };
 
     return ngx_write_file(file, flv_header, sizeof(flv_header), 0) == NGX_ERROR
-        ? NGX_ERROR
-        : NGX_OK;
+           ? NGX_ERROR
+           : NGX_OK;
+}
+
+
+static ngx_rtmp_record_node_ctx_t *
+ngx_rtmp_record_get_node_ctx(ngx_rtmp_session_t *s, ngx_uint_t n)
+{
+    ngx_rtmp_record_ctx_t          *ctx;
+    ngx_rtmp_record_node_ctx_t     *nodes;
+
+    if (ngx_rtmp_record_init(s) != NGX_OK) {
+        return NULL;
+    }
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+
+    if (n >= ctx->nodes.nelts) {
+        return NULL;
+    }
+
+    nodes = ctx->nodes.elts;
+
+    return &nodes[n];
+}
+
+
+ngx_int_t
+ngx_rtmp_record_open(ngx_rtmp_session_t *s, ngx_uint_t n, u_char **path)
+{
+    ngx_rtmp_record_node_ctx_t     *rctx;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "record: #%ui manual open", n);
+
+    rctx = ngx_rtmp_record_get_node_ctx(s, n);
+
+    if (rctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_record_node_open(s, rctx) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (path) {
+        *path = ngx_rtmp_record_make_path(s, rctx);
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_rtmp_record_close(ngx_rtmp_session_t *s, ngx_uint_t n, u_char **path)
+{
+    ngx_rtmp_record_node_ctx_t     *rctx;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "record: #%ui manual close", n);
+
+    rctx = ngx_rtmp_record_get_node_ctx(s, n);
+
+    if (rctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_record_node_close(s, rctx) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (path) {
+        *path = ngx_rtmp_record_make_path(s, rctx);
+    }
+
+    return NGX_OK;
 }
 
 
 /* This funcion returns pointer to a static buffer */
-u_char *
-ngx_rtmp_record_make_path(ngx_rtmp_session_t *s)
+static u_char *
+ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
+                          ngx_rtmp_record_node_ctx_t *rctx)
 {
     ngx_rtmp_record_ctx_t          *ctx;
-    ngx_rtmp_record_app_conf_t     *racf;
     u_char                         *p, *l;
+    ngx_rtmp_record_node_t         *rc;
+
     static u_char                   buf[NGX_TIME_T_LEN + 1];
     static u_char                   path[NGX_MAX_PATH + 1];
 
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+
+    rc = rctx->conf;
 
     /* create file path */
     p = path;
     l = path + sizeof(path) - 1;
-    p = ngx_cpymem(p, racf->path.data, 
-                ngx_min(racf->path.len, (size_t)(l - p - 1)));
+
+    p = ngx_cpymem(p, rc->path.data, 
+                ngx_min(rc->path.len, (size_t)(l - p - 1)));
     *p++ = '/';
     p = (u_char *)ngx_escape_uri(p, ctx->name, ngx_min(ngx_strlen(ctx->name),
                 (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
-    if (racf->unique) {
-        /* append timestamp */
+
+    /* append timestamp */
+    if (rc->unique) {
         p = ngx_cpymem(p, buf, ngx_min(ngx_sprintf(buf, "-%T", 
-                        ctx->timestamp) - buf, l - p));
+                       rctx->timestamp) - buf, l - p));
     }
-    p = ngx_cpymem(p, racf->suffix.data, 
-            ngx_min(racf->suffix.len, (size_t)(l - p)));
+
+    p = ngx_cpymem(p, rc->suffix.data, 
+                   ngx_min(rc->suffix.len, (size_t)(l - p)));
     *p = 0;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "record: %V path: '%s'", &rc->id, path);
 
     return path;
 }
 
 
-ngx_int_t
-ngx_rtmp_record_open(ngx_rtmp_session_t *s)
+static ngx_int_t
+ngx_rtmp_record_node_open(ngx_rtmp_session_t *s, 
+                          ngx_rtmp_record_node_ctx_t *rctx)
 {
-    ngx_rtmp_record_ctx_t          *ctx;
-    ngx_err_t                       err;
-    u_char                         *path;
+    ngx_rtmp_record_node_t     *rc;
+    ngx_err_t                   err;
+    u_char                     *path;
 
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
-    if (ctx == NULL || ctx->file.fd != NGX_INVALID_FILE) {
-        return NGX_ERROR;
-    }
-    ctx->timestamp = ngx_cached_time->sec;
-    path = ngx_rtmp_record_make_path(s);
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-            "record: path '%s'", path);
+    rc = rctx->conf;
 
-    /* open file */
-    ctx->nframes = 0;
-    ngx_memzero(&ctx->file, sizeof(ctx->file));
-    ctx->file.offset = 0;
-    ctx->file.log = s->connection->log;
-    ctx->file.fd = ngx_open_file(path, NGX_FILE_WRONLY, 
-            NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
-    ctx->last = *ngx_cached_time;
-    if (ctx->file.fd == NGX_INVALID_FILE) {
-        err = ngx_errno;
-        if (err != NGX_ENOENT) {
-            ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
-                    "record: failed to open file '%s'", path);
-        }
+    if (rctx->file.fd != NGX_INVALID_FILE) {
         return NGX_OK;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-            "record: opened '%s'", path);
+                   "record: %V opening", &rc->id);
+
+    rctx->timestamp = ngx_cached_time->sec;
+
+    path = ngx_rtmp_record_make_path(s, rctx);
+
+    rctx->nframes = 0;
+
+    ngx_memzero(&rctx->file, sizeof(rctx->file));
+
+    rctx->last = *ngx_cached_time;
+    rctx->file.offset = 0;
+    rctx->file.log = s->connection->log;
+    rctx->file.fd = ngx_open_file(path, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE,
+                                  NGX_FILE_DEFAULT_ACCESS);
+
+    if (rctx->file.fd == NGX_INVALID_FILE) {
+        err = ngx_errno;
+
+        if (err != NGX_ENOENT) {
+            ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
+                          "record: %V failed to open file '%s'",
+                          &rc->id, path);
+        }
+
+        return NGX_OK;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "record: %V opened '%s'", &rc->id, path);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_record_init(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_record_app_conf_t     *racf;
+    ngx_rtmp_record_ctx_t          *ctx;
+    ngx_rtmp_record_node_ctx_t     *rctx;
+    ngx_rtmp_record_node_t        **node;
+    ngx_uint_t                      n;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+
+    if (ctx) {
+        return NGX_OK;
+    }
+
+    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
+
+    if (racf == NULL || racf->nodes.nelts == 0) {
+        return NGX_OK;
+    }
+
+    ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_record_ctx_t));
+
+    if (ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_record_module);
+
+    if (ngx_array_init(&ctx->nodes, s->connection->pool, racf->nodes.nelts,
+                sizeof(ngx_rtmp_record_node_ctx_t))
+            != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    node = racf->nodes.elts;
+
+    rctx = ngx_array_push_n(&ctx->nodes, racf->nodes.nelts);
+
+    if (rctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    for (n = 0; n < racf->nodes.nelts; ++n, ++node, ++rctx) {
+        ngx_memzero(rctx, sizeof(*rctx));
+
+        rctx->conf = *node;
+        rctx->file.fd = NGX_INVALID_FILE;
+    }
 
     return NGX_OK;
 }
@@ -277,6 +471,8 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_rtmp_record_app_conf_t     *racf;
     ngx_rtmp_record_ctx_t          *ctx;
     u_char                         *p;
+    ngx_uint_t                      n;
+    ngx_rtmp_record_node_ctx_t     *rctx;
 
     if (s->auto_pushed) {
         goto next;
@@ -284,21 +480,19 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
 
-    if (racf == NULL || racf->flags & NGX_RTMP_RECORD_OFF) {
+    if (racf == NULL || racf->nodes.nelts == 0) {
         goto next;
     }
 
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
-
-    if (ctx == NULL) {
-        ctx = ngx_pcalloc(s->connection->pool, 
-                sizeof(ngx_rtmp_record_ctx_t));
-        if (ctx == NULL) {
-            return NGX_ERROR;
-        }
-        ctx->file.fd = NGX_INVALID_FILE;
-        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_record_module);
+    if (ngx_rtmp_record_init(s) != NGX_OK) {
+        return NGX_ERROR;
     }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "record: publish %ui nodes",
+                   racf->nodes.nelts);
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
 
     ngx_memcpy(ctx->name, v->name, sizeof(ctx->name));
     ngx_memcpy(ctx->args, v->args, sizeof(ctx->args));
@@ -314,8 +508,14 @@ ngx_rtmp_record_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         }
     }
 
-    if (ngx_rtmp_record_open(s) != NGX_OK) {
-        return NGX_ERROR;
+    rctx = ctx->nodes.elts;
+
+    for (n = 0; n < ctx->nodes.nelts; ++n, ++rctx) {
+        if (rctx->conf->flags & (NGX_RTMP_RECORD_OFF|NGX_RTMP_RECORD_MANUAL)) {
+            continue;
+        }
+
+        ngx_rtmp_record_node_open(s, rctx);
     }
 
 next:
@@ -325,9 +525,11 @@ next:
 
 static ngx_chain_t *
 ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg, 
-        ngx_pool_t *pool)
+                              ngx_pool_t *pool)
 {
-    ngx_rtmp_record_app_conf_t     *racf;
+    ngx_rtmp_record_node_ctx_t     *rctx = arg;
+    ngx_rtmp_record_node_t         *rc;
+
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
@@ -335,12 +537,9 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     size_t                          path_len, name_len, args_len;
     u_char                         *path;
 
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
-
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
-    if (ctx == NULL) {
-        return NULL;
-    }
+
+    rc = rctx->conf;
 
     /* common variables */
     cl = ngx_rtmp_netcall_http_format_session(s, pool);
@@ -356,19 +555,20 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
         return NULL;
     }
 
-    path = ngx_rtmp_record_make_path(s);
+    path = ngx_rtmp_record_make_path(s, rctx);
 
-    path_len = ngx_strlen(path);
-    name_len = ngx_strlen(ctx->name);
-    args_len = ngx_strlen(ctx->args);
+    path_len  = ngx_strlen(path);
+    name_len  = ngx_strlen(ctx->name);
+    args_len  = ngx_strlen(ctx->args);
     addr_text = &s->connection->addr_text;
 
     b = ngx_create_temp_buf(pool,
-            sizeof("&call=record_done") +
-            sizeof("&addr=") + addr_text->len +
-            sizeof("&name=") + name_len * 3 +
-            sizeof("&path=") + path_len * 3 +
-            + 1 + args_len);
+                            sizeof("&call=record_done") +
+                            sizeof("&recorder=") + rc->id.len + 
+                            sizeof("&addr=") + addr_text->len +
+                            sizeof("&name=") + name_len * 3 +
+                            sizeof("&path=") + path_len * 3 +
+                            + 1 + args_len);
     if (b == NULL) {
         return NULL;
     }
@@ -376,11 +576,15 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     pl->buf = b;
 
     b->last = ngx_cpymem(b->last, (u_char*)"&call=record_done", 
-            sizeof("&call=record_done") - 1);
+                         sizeof("&call=record_done") - 1);
+
+    b->last = ngx_cpymem(b->last, (u_char *)"&recorder=", 
+                         sizeof("&recorder=") - 1);
+    b->last = (u_char*)ngx_escape_uri(b->last, rc->id.data, rc->id.len, 0);
 
     b->last = ngx_cpymem(b->last, (u_char*)"&addr=", sizeof("&addr=") -1);
     b->last = (u_char*)ngx_escape_uri(b->last, addr_text->data, 
-            addr_text->len, 0);
+                                      addr_text->len, 0);
 
     b->last = ngx_cpymem(b->last, (u_char*)"&name=", sizeof("&name=") - 1);
     b->last = (u_char*)ngx_escape_uri(b->last, ctx->name, name_len, 0);
@@ -394,7 +598,7 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(racf->url, pool,
+    hl = ngx_rtmp_netcall_http_format_header(rctx->conf->url, pool,
             cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
             &ngx_rtmp_netcall_content_type_urlencoded);
 
@@ -411,77 +615,99 @@ ngx_rtmp_record_notify_create(ngx_rtmp_session_t *s, void *arg,
 
 
 static ngx_int_t
-ngx_rtmp_record_notify(ngx_rtmp_session_t *s)
+ngx_rtmp_record_notify(ngx_rtmp_session_t *s, ngx_rtmp_record_node_ctx_t *rctx)
 {
-    ngx_rtmp_record_app_conf_t     *racf;
-    ngx_rtmp_netcall_init_t         ci;
+    ngx_rtmp_netcall_init_t     ci;
+    ngx_rtmp_record_node_t     *rc;
 
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
-    if (racf == NULL || racf->url == NULL) {
+    rc = rctx->conf;
+
+    if (rc->url == NULL) {
         return NGX_OK;
     }
 
     ngx_memzero(&ci, sizeof(ci));
 
-    ci.url = racf->url;
+    ci.url    = rc->url;
     ci.create = ngx_rtmp_record_notify_create;
+    ci.arg    = rctx;
 
     return ngx_rtmp_netcall_create(s, &ci);
 }
 
 
-ngx_int_t
-ngx_rtmp_record_close(ngx_rtmp_session_t *s)
+static ngx_int_t
+ngx_rtmp_record_node_close(ngx_rtmp_session_t *s,
+                           ngx_rtmp_record_node_ctx_t *rctx)
 {
-    ngx_rtmp_record_ctx_t          *ctx;
-    ngx_err_t                       err;
+    ngx_rtmp_record_node_t     *rc;
+    ngx_err_t                   err;
 
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+    rc = rctx->conf;
 
-    if (ctx == NULL || ctx->file.fd == NGX_INVALID_FILE) {
+    if (rctx->file.fd == NGX_INVALID_FILE) {
         return NGX_OK;
     }
 
-    if (ngx_close_file(ctx->file.fd) == NGX_FILE_ERROR) {
+    if (ngx_close_file(rctx->file.fd) == NGX_FILE_ERROR) {
         err = ngx_errno;
         ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
-                "record: error closing file");
+                      "record: %V error closing file", &rc->id);
     }
-    ctx->file.fd = NGX_INVALID_FILE;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-            "record: closed");
+    rctx->file.fd = NGX_INVALID_FILE;
 
-    return ngx_rtmp_record_notify(s);
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "record: %V closed", &rc->id);
+
+    return ngx_rtmp_record_notify(s, rctx);
 }
 
 
 static ngx_int_t
 ngx_rtmp_record_delete_stream(ngx_rtmp_session_t *s, 
-        ngx_rtmp_delete_stream_t *v)
+                              ngx_rtmp_delete_stream_t *v)
 {
-    ngx_rtmp_record_close(s);
+    ngx_rtmp_record_ctx_t      *ctx;
+    ngx_rtmp_record_node_ctx_t *rctx;
+    ngx_uint_t                  n;
 
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+
+    if (ctx == NULL) {
+        goto next;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "record: delete_stream %ui nodes",
+                   ctx->nodes.nelts);
+
+    rctx = ctx->nodes.elts;
+
+    for (n = 0; n < ctx->nodes.nelts; ++n, ++rctx) {
+        ngx_rtmp_record_node_close(s, rctx);
+    }
+
+next:
     return next_delete_stream(s, v);
 }
 
 
 static ngx_int_t
-ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
-        ngx_chain_t *in)
+ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s, 
+                            ngx_rtmp_record_node_ctx_t *rctx,
+                            ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
-    u_char                          hdr[11], *p, *ph;
-    uint32_t                        timestamp, tag_size;
-    ngx_rtmp_record_ctx_t          *ctx;
-    ngx_rtmp_record_app_conf_t     *racf;
+    u_char                      hdr[11], *p, *ph;
+    uint32_t                    timestamp, tag_size;
+    ngx_rtmp_record_node_t     *rc;
 
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+    rc = rctx->conf;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "record: av: mlen=%uD", h->mlen);
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "record: %V frame: mlen=%uD", &rc->id, h->mlen);
 
-    timestamp = h->timestamp - ctx->epoch;
+    timestamp = h->timestamp - rctx->epoch;
 
     /* write tag header */
     ph = hdr;
@@ -505,8 +731,8 @@ ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     tag_size = (ph - hdr) + h->mlen;
 
-    if (ngx_write_file(&ctx->file, hdr, ph - hdr, 
-                ctx->file.offset) == NGX_ERROR) 
+    if (ngx_write_file(&rctx->file, hdr, ph - hdr, rctx->file.offset)
+        == NGX_ERROR) 
     {
         return NGX_ERROR;
     }
@@ -521,8 +747,10 @@ ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         if (in->buf->pos == in->buf->last) {
             continue;
         }
-        if (ngx_write_file(&ctx->file, in->buf->pos, in->buf->last 
-                    - in->buf->pos, ctx->file.offset) == NGX_ERROR) 
+
+        if (ngx_write_file(&rctx->file, in->buf->pos, in->buf->last 
+                           - in->buf->pos, rctx->file.offset)
+            == NGX_ERROR)
         {
             return NGX_ERROR;
         }
@@ -531,26 +759,26 @@ ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /* write tag size */
     ph = hdr;
     p = (u_char*)&tag_size;
+
     *ph++ = p[3];
     *ph++ = p[2];
     *ph++ = p[1];
     *ph++ = p[0];
 
-    if (ngx_write_file(&ctx->file, hdr, ph - hdr, 
-                ctx->file.offset) == NGX_ERROR) 
+    if (ngx_write_file(&rctx->file, hdr, ph - hdr, 
+                       rctx->file.offset)
+        == NGX_ERROR) 
     {
         return NGX_ERROR;
     }
 
-    ++ctx->nframes;
+    ++rctx->nframes;
 
     /* watch max size */
-    if ((racf->max_size && ctx->file.offset >= (ngx_int_t)racf->max_size)
-        || (racf->max_frames && ctx->nframes >= racf->max_frames))
+    if ((rc->max_size && rctx->file.offset >= (ngx_int_t) rc->max_size) ||
+        (rc->max_frames && rctx->nframes >= rc->max_frames))
     {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                "record: closed");
-        ngx_rtmp_record_close(s);
+        ngx_rtmp_record_node_close(s, rctx);
     }
 
     return NGX_OK;
@@ -572,64 +800,91 @@ ngx_rtmp_record_get_chain_mlen(ngx_chain_t *in)
 
 static ngx_int_t
 ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
-        ngx_chain_t *in)
+                   ngx_chain_t *in)
 {
     ngx_rtmp_record_ctx_t          *ctx;
-    ngx_rtmp_record_app_conf_t     *racf;
+    ngx_rtmp_record_node_ctx_t     *rctx;
+    ngx_uint_t                      n;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    rctx = ctx->nodes.elts;
+
+    for (n = 0; n < ctx->nodes.nelts; ++n, ++rctx) {
+        ngx_rtmp_record_node_av(s, rctx, h, in);
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_node_ctx_t *rctx,
+                        ngx_rtmp_header_t *h, ngx_chain_t *in)
+{
     ngx_time_t                      next;
     ngx_rtmp_header_t               ch;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     ngx_int_t                       keyframe;
+    ngx_rtmp_record_node_t         *rc;
 
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_record_module);
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+    rc = rctx->conf;
 
-    if (racf == NULL || ctx == NULL || racf->flags & NGX_RTMP_RECORD_OFF) {
+    if (rc->flags & NGX_RTMP_RECORD_OFF) {
+        ngx_rtmp_record_node_close(s, rctx);
         return NGX_OK;
     }
 
     keyframe = (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME);
 
-    if (keyframe && racf->interval != (ngx_msec_t)NGX_CONF_UNSET) {
-        next = ctx->last;
-        next.msec += racf->interval;
-        next.sec += (next.msec / 1000);
-        next.msec %= 1000;
-        if (ngx_cached_time->sec > next.sec
-                || (ngx_cached_time->sec == next.sec
-                    && ngx_cached_time->msec > next.msec))
-        {
-            ngx_rtmp_record_close(s);
-            if (ngx_rtmp_record_open(s) != NGX_OK) {
-                ngx_log_error(NGX_LOG_CRIT, s->connection->log, 0,
-                        "record: failed");
+    if (keyframe && (rc->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
+
+        if (rc->interval != (ngx_msec_t) NGX_CONF_UNSET) {
+
+            next = rctx->last;
+            next.msec += rc->interval;
+            next.sec  += (next.msec / 1000);
+            next.msec %= 1000;
+
+            if (ngx_cached_time->sec  > next.sec ||
+               (ngx_cached_time->sec == next.sec &&
+                ngx_cached_time->msec > next.msec))
+            {
+                ngx_rtmp_record_node_close(s, rctx);
+                ngx_rtmp_record_node_open(s, rctx);
             }
+
+        } else {
+            ngx_rtmp_record_node_open(s, rctx);
         }
     }
 
-    if (ctx->file.fd == NGX_INVALID_FILE) {
+    if (rctx->file.fd == NGX_INVALID_FILE) {
         return NGX_OK;
     }
 
-    /* filter frames */
     if (h->type == NGX_RTMP_MSG_AUDIO &&
-       (racf->flags & NGX_RTMP_RECORD_AUDIO) == 0)
+       (rc->flags & NGX_RTMP_RECORD_AUDIO) == 0)
     {
         return NGX_OK;
     }
 
     if (h->type == NGX_RTMP_MSG_VIDEO &&
-       (racf->flags & NGX_RTMP_RECORD_VIDEO) == 0 &&
-       ((racf->flags & NGX_RTMP_RECORD_KEYFRAMES) == 0 || !keyframe))
+       (rc->flags & NGX_RTMP_RECORD_VIDEO) == 0 &&
+       ((rc->flags & NGX_RTMP_RECORD_KEYFRAMES) == 0 || !keyframe))
     {
         return NGX_OK;
     }
 
-    if (ctx->file.offset == 0) {
-        ctx->epoch = h->timestamp;
+    if (rctx->file.offset == 0) {
+        rctx->epoch = h->timestamp;
 
-        if (ngx_rtmp_record_write_header(&ctx->file) != NGX_OK) {
-            ngx_rtmp_record_close(s);
+        if (ngx_rtmp_record_write_header(&rctx->file) != NGX_OK) {
+            ngx_rtmp_record_node_close(s, rctx);
             return NGX_OK;
         }
 
@@ -652,29 +907,33 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
 #endif
             /* AAC header */
-            if (codec_ctx->aac_header && (racf->flags & NGX_RTMP_RECORD_AUDIO)) 
+            if (codec_ctx->aac_header && (rc->flags & NGX_RTMP_RECORD_AUDIO)) 
             {
-                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                        "record: writing AAC header");
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                               "record: %V writing AAC header", &rc->id);
+
                 ch.type = NGX_RTMP_MSG_AUDIO;
                 ch.mlen = ngx_rtmp_record_get_chain_mlen(codec_ctx->aac_header);
-                if (ngx_rtmp_record_write_frame(s, &ch, codec_ctx->aac_header)
-                        != NGX_OK) 
+
+                if (ngx_rtmp_record_write_frame(s, rctx, &ch, codec_ctx->aac_header)
+                    != NGX_OK) 
                 {
                     return NGX_OK;
                 }
             }
 
             /* AVC header */
-            if (codec_ctx->avc_header && (racf->flags 
-                & (NGX_RTMP_RECORD_VIDEO|NGX_RTMP_RECORD_KEYFRAMES))) 
+            if (codec_ctx->avc_header && 
+                (rc->flags & (NGX_RTMP_RECORD_VIDEO|NGX_RTMP_RECORD_KEYFRAMES)))
             {
-                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                        "record: writing AVC header");
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                               "record: %V writing AVC header", &rc->id);
+
                 ch.type = NGX_RTMP_MSG_VIDEO;
                 ch.mlen = ngx_rtmp_record_get_chain_mlen(codec_ctx->avc_header);
-                if (ngx_rtmp_record_write_frame(s, &ch, codec_ctx->avc_header)
-                        != NGX_OK) 
+
+                if (ngx_rtmp_record_write_frame(s, rctx, &ch, codec_ctx->avc_header)
+                    != NGX_OK) 
                 {
                     return NGX_OK;
                 }
@@ -682,7 +941,7 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
     }
 
-    return ngx_rtmp_record_write_frame(s, h, in);
+    return ngx_rtmp_record_write_frame(s, rctx, h, in);
 }
 
 
@@ -724,9 +983,85 @@ ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     racf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_record_module);
 
-    racf->url = u;
+    racf->def.url = u;
 
     return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char                       *rv, *rvm;
+    ngx_int_t                   i;
+    ngx_str_t                  *value;
+    ngx_conf_t                  save;
+    ngx_rtmp_module_t          *module;
+    ngx_rtmp_record_app_conf_t *racf, *rracf;
+    ngx_rtmp_record_node_t    **prc, *rc;
+    ngx_rtmp_conf_ctx_t        *ctx, *pctx;
+
+    racf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_record_module);
+
+    ctx = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_conf_ctx_t));
+    if (ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    pctx = cf->ctx;
+
+    ctx->main_conf = pctx->main_conf;
+    ctx->srv_conf  = pctx->srv_conf;
+
+    ctx->app_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_rtmp_max_module);
+    if (ctx->app_conf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    for (i = 0; ngx_modules[i]; i++) {
+        if (ngx_modules[i]->type != NGX_RTMP_MODULE) {
+            continue;
+        }
+
+        module = ngx_modules[i]->ctx;
+
+        if (module->create_app_conf) {
+            ctx->app_conf[ngx_modules[i]->ctx_index] = 
+                                module->create_app_conf(cf);
+            if (ctx->app_conf[ngx_modules[i]->ctx_index] == NULL) {
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
+    prc = ngx_array_push(&racf->nodes);
+    if (prc == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    rracf = ctx->app_conf[ngx_rtmp_record_module.ctx_index];
+
+    rc = &rracf->def;
+
+    value = cf->args->elts;
+    rc->id = value[1];
+
+    *prc = rc;
+
+    save = *cf;
+    cf->ctx = ctx;
+    cf->cmd_type = NGX_RTMP_REC_CONF;
+
+    rv = ngx_conf_parse(cf, NULL);
+
+    rvm = ngx_rtmp_record_merge_app_conf(cf, racf, rracf);
+    if (rvm != NGX_CONF_OK) {
+        return rvm;
+    }
+
+    *cf= save;
+
+    return rv;
 }
 
 
@@ -738,14 +1073,12 @@ ngx_rtmp_record_postconfiguration(ngx_conf_t *cf)
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
-    /* register event handlers */
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
     *h = ngx_rtmp_record_av;
 
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_VIDEO]);
     *h = ngx_rtmp_record_av;
 
-    /* chain handlers */
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_record_publish;
 
