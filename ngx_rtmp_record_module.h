@@ -27,27 +27,24 @@ typedef struct {
     ngx_str_t                           suffix;
     ngx_flag_t                          unique;
     ngx_url_t                          *url;
-} ngx_rtmp_record_node_t;
 
-
-typedef struct {
-    ngx_rtmp_record_node_t              def;
-    ngx_array_t                         nodes; /* ngx_rtmp_record_node_t * */
+    void                              **rec_conf;
+    ngx_array_t                         rec; /* ngx_rtmp_record_app_conf_t * */
 } ngx_rtmp_record_app_conf_t;
 
 
 typedef struct {
-    ngx_rtmp_record_node_t             *conf;
+    ngx_rtmp_record_app_conf_t         *conf;
     ngx_file_t                          file;
     ngx_uint_t                          nframes;
     uint32_t                            epoch;
     ngx_time_t                          last;
     time_t                              timestamp;
-} ngx_rtmp_record_node_ctx_t;
+} ngx_rtmp_record_rec_ctx_t;
 
 
 typedef struct {
-    ngx_array_t                         nodes; /* ngx_rtmp_record_node_ctx_t */
+    ngx_array_t                         rec; /* ngx_rtmp_record_rec_ctx_t */
     u_char                              name[NGX_RTMP_MAX_NAME];
     u_char                              args[NGX_RTMP_MAX_ARGS];
 } ngx_rtmp_record_ctx_t;
@@ -55,12 +52,25 @@ typedef struct {
 
 /* Manual recording control,
  * 'n' is record node index in config array.
- * Note: these functions return path as pointer to a static buffer */
+ * Note: these functions allocate path in static buffer */
 
 ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s, ngx_uint_t n, 
-          u_char **path);
+          ngx_str_t *path);
 ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s, ngx_uint_t n,
-          u_char **path);
+          ngx_str_t *path);
+
+
+typedef struct {
+    ngx_str_t                           recorder;
+    ngx_str_t                           path;
+} ngx_rtmp_record_done_t;
+
+
+typedef ngx_int_t (*ngx_rtmp_record_done_pt)(ngx_rtmp_session_t *s, 
+        ngx_rtmp_record_done_t *v);
+
+
+extern ngx_rtmp_record_done_pt          ngx_rtmp_record_done;
 
 
 extern ngx_module_t                     ngx_rtmp_record_module;
