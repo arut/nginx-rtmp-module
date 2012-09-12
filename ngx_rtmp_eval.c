@@ -80,24 +80,27 @@ ngx_rtmp_eval_append(ngx_rtmp_session_t *s, ngx_buf_t *b,
 
 static void
 ngx_rtmp_eval_append_var(ngx_rtmp_session_t *s, ngx_buf_t *b,
-                         ngx_rtmp_eval_t *e, ngx_str_t *name)
+                         ngx_rtmp_eval_t **e, ngx_str_t *name)
 {
-    ngx_uint_t  k;
-    ngx_str_t   v;
+    ngx_uint_t          k;
+    ngx_str_t           v;
+    ngx_rtmp_eval_t    *ee;
 
-    for (k = 0; e->handler; ++k, ++e) {
-        if (e->name.len == name->len &&
-            ngx_memcmp(e->name.data, name->data, name->len) == 0)
-        {
-            e->handler(s, e, &v);
-            ngx_rtmp_eval_append(s, b, v.data, v.len);
+    for (; *e; ++e) {
+        for (k = 0, ee = *e; ee->handler; ++k, ++ee) {
+            if (ee->name.len == name->len &&
+                    ngx_memcmp(ee->name.data, name->data, name->len) == 0)
+            {
+                ee->handler(s, ee, &v);
+                ngx_rtmp_eval_append(s, b, v.data, v.len);
+            }
         }
     }
 }
 
 
 ngx_int_t
-ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in, ngx_rtmp_eval_t *e,
+ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in, ngx_rtmp_eval_t **e,
               ngx_str_t *out)
 {
     u_char      c, *p;;

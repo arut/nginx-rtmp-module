@@ -4,6 +4,7 @@
 
 
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_eval.h"
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
@@ -118,6 +119,40 @@ ngx_module_t  ngx_rtmp_exec_module = {
     NULL,                                   /* exit process */
     NULL,                                   /* exit master */
     NGX_MODULE_V1_PADDING
+};
+
+
+static void
+ngx_rtmp_exec_eval_cstr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
+                           ngx_str_t *ret)
+{
+    ngx_rtmp_exec_ctx_t     *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_exec_module);
+    if (ctx == NULL) {
+        ret->len = 0;
+        return;
+    }
+
+    ret->data = *(u_char **) ((u_char *) ctx + e->offset);
+    ret->len = ngx_strlen(ret->data);
+}
+
+
+static ngx_rtmp_eval_t ngx_rtmp_exec_eval[] = {
+
+    { ngx_string("name"),
+      ngx_rtmp_exec_eval_cstr,
+      offsetof(ngx_rtmp_exec_ctx_t, name) },
+
+    ngx_rtmp_null_eval
+};
+
+
+static ngx_rtmp_eval_t * ngx_rtmp_exec_eval_p[] = {
+    ngx_rtmp_eval_session,
+    ngx_rtmp_exec_eval,
+    NULL
 };
 
 
@@ -250,73 +285,6 @@ ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
 }
 
 
-static void
-ngx_rtmp_exec_append(ngx_str_t *result, u_char *data, size_t len)
-{
-    if (len == 0) {
-        len = ngx_strlen(data);
-    }
-
-    /* use malloc in child */
-    if (result->len == 0) {
-        result->data = malloc(len + 1);
-        result->len = len;
-        ngx_memcpy(result->data, data, len);
-        result->data[len] = 0;
-        return;
-    }
-
-    result->data = realloc(result->data, result->len + len + 1);
-    ngx_memcpy(result->data + result->len, data, len);
-    result->len += len;
-    result->data[result->len] = 0;
-}
-
-
-static char *
-ngx_rtmp_exec_prepare_arg(ngx_rtmp_session_t *s, ngx_str_t *arg)
-{
-    ngx_rtmp_core_app_conf_t       *cacf;
-    ngx_rtmp_exec_ctx_t            *ctx;
-    u_char                         *p, *pp;
-    ngx_str_t                       result;
-
-    cacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_core_module);
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_exec_module);
-
-    /* substitute $app/${app} & $name/${name} */
-    ngx_str_set(&result, "");
-    pp = arg->data;
-    for ( ;; ) {
-        p = (u_char *)ngx_strchr(pp, '$');
-        ngx_rtmp_exec_append(&result, pp, p ? p - pp : 0);
-        if (p == NULL) {
-            return (char *)result.data;
-        }
-        pp = p + 1;
-        if (p != arg->data && p[-1] == '\\') {
-            goto dollar;
-        }
-        if (!ngx_strncmp(p + 1, "app", sizeof("app") - 1)
-            || !ngx_strncmp(p + 1, "{app}", sizeof("{app}") - 1)) 
-        {
-            ngx_rtmp_exec_append(&result, cacf->name.data, cacf->name.len);
-            pp += (p[1] == '{' ? sizeof("{app}") - 1 : sizeof("app") - 1);
-            continue;
-        }
-        if (!ngx_strncmp(p + 1, "name", sizeof("name") - 1)
-            || !ngx_strncmp(p + 1, "{name}", sizeof("{name}") - 1)) 
-        {
-            ngx_rtmp_exec_append(&result, ctx->name, 0);
-            pp += (p[1] == '{' ? sizeof("{name}") - 1 : sizeof("name") - 1);
-            continue;
-        }
-dollar:
-        ngx_rtmp_exec_append(&result, (u_char *)"$", 1);
-    }
-}
-
-
 static ngx_int_t
 ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 {
@@ -328,7 +296,7 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
     int                             ret;
     ngx_rtmp_exec_conf_t           *ec;
     ngx_rtmp_exec_t                *e;
-    ngx_str_t                      *arg;
+    ngx_str_t                      *arg, a;
     char                          **args;
 
     eacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_exec_module);
@@ -379,7 +347,8 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
             arg = ec->args.elts;
             args[0] = (char *)ec->cmd.data;
             for (n = 0; n < ec->args.nelts; ++n, ++arg) {
-                args[n + 1] = ngx_rtmp_exec_prepare_arg(s, arg);
+                ngx_rtmp_eval(s, arg, ngx_rtmp_exec_eval_p, &a);
+                args[n + 1] = (char *) a.data;
             }
             args[n + 1] = NULL;
             if (execvp((char *)ec->cmd.data, args) == -1) {

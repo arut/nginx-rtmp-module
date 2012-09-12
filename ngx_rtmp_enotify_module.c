@@ -65,6 +65,9 @@ typedef struct {
     ngx_uint_t                                  flags;
     u_char                                      name[NGX_RTMP_MAX_NAME];
     u_char                                      args[NGX_RTMP_MAX_ARGS];
+    ngx_str_t                                   path;
+    ngx_str_t                                   filename;
+    ngx_str_t                                   recorder;
 } ngx_rtmp_enotify_ctx_t;
 
 
@@ -138,6 +141,72 @@ ngx_module_t  ngx_rtmp_enotify_module = {
 };
 
 
+static void
+ngx_rtmp_enotify_eval_cstr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
+                           ngx_str_t *ret)
+{
+    ngx_rtmp_enotify_ctx_t     *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_enotify_module);
+    if (ctx == NULL) {
+        ret->len = 0;
+        return;
+    }
+
+    ret->data = *(u_char **) ((u_char *) ctx + e->offset);
+    ret->len = ngx_strlen(ret->data);
+}
+
+
+static void
+ngx_rtmp_enotify_eval_str(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
+                          ngx_str_t *ret)
+{
+    ngx_rtmp_enotify_ctx_t     *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_enotify_module);
+    if (ctx == NULL) {
+        ret->len = 0;
+        return;
+    }
+
+    *ret = *(ngx_str_t *) ((u_char *) ctx + e->offset);
+}
+
+
+static ngx_rtmp_eval_t ngx_rtmp_enotify_eval[] = {
+
+    { ngx_string("name"),
+      ngx_rtmp_enotify_eval_cstr,
+      offsetof(ngx_rtmp_enotify_ctx_t, name) },
+
+    { ngx_string("args"),
+      ngx_rtmp_enotify_eval_cstr,
+      offsetof(ngx_rtmp_enotify_ctx_t, args) },
+
+    { ngx_string("path"),
+      ngx_rtmp_enotify_eval_str,
+      offsetof(ngx_rtmp_enotify_ctx_t, path) },
+
+    { ngx_string("filename"),
+      ngx_rtmp_enotify_eval_str,
+      offsetof(ngx_rtmp_enotify_ctx_t, filename) },
+
+    { ngx_string("recorder"),
+      ngx_rtmp_enotify_eval_str,
+      offsetof(ngx_rtmp_enotify_ctx_t, recorder) },
+
+    ngx_rtmp_null_eval
+};
+
+
+static ngx_rtmp_eval_t * ngx_rtmp_enotify_eval_p[] = {
+    ngx_rtmp_eval_session,
+    ngx_rtmp_enotify_eval,
+    NULL
+};
+
+
 static void *
 ngx_rtmp_enotify_create_app_conf(ngx_conf_t *cf)
 {
@@ -199,7 +268,7 @@ ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
             arg = ec->args.elts;
             args[0] = (char *)ec->cmd.data;
             for (n = 0; n < ec->args.nelts; ++n, ++arg) {
-                ngx_rtmp_eval(s, arg, ngx_rtmp_eval_session, &a);
+                ngx_rtmp_eval(s, arg, ngx_rtmp_enotify_eval_p, &a);
                 args[n + 1] = (char *) a.data;
             }
             args[n + 1] = NULL;
@@ -382,6 +451,8 @@ ngx_rtmp_enotify_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
 {
     ngx_rtmp_enotify_app_conf_t    *enacf;
     ngx_rtmp_enotify_conf_t        *ec;
+    ngx_rtmp_enotify_ctx_t         *ctx;
+    ngx_int_t                       n;
 
     if (s->auto_pushed) {
         goto next;
@@ -397,6 +468,22 @@ ngx_rtmp_enotify_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
     ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "enotify: record_done %V recorder=%V path='%V'",
                    &ec->cmd, &v->recorder, &v->path);
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_enotify_module);
+    if (ctx == NULL) {
+        goto next;
+    }
+
+    ctx->recorder = v->recorder;
+    ctx->path = v->path;
+    ctx->filename = v->path;
+
+    for (n = ctx->filename.len;
+         n > 0 && !ngx_path_separator(ctx->filename.data[n - 1]);
+         --n);
+
+    ctx->filename.data += n;
+    ctx->filename.len  -= n;
 
     ngx_rtmp_enotify_exec(s, ec);
 
