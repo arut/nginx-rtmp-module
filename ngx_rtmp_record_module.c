@@ -904,15 +904,18 @@ ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    char                       *rv, *rvm;
+    char                       *rv;
     ngx_int_t                   i;
     ngx_str_t                  *value;
     ngx_conf_t                  save;
     ngx_rtmp_module_t          *module;
+    ngx_rtmp_core_app_conf_t   *cacf, **pcacf, *rcacf;
     ngx_rtmp_record_app_conf_t *racf, **pracf, *rracf;
     ngx_rtmp_conf_ctx_t        *ctx, *pctx;
 
     value = cf->args->elts;
+
+    cacf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_core_module);
 
     racf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_record_module);
 
@@ -947,42 +950,32 @@ ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
+    /* add to sub-applications */
+    rcacf = ctx->app_conf[ngx_rtmp_core_module.ctx_index];
+    rcacf->app_conf = ctx->app_conf;
+    pcacf = ngx_array_push(&cacf->applications);
+    if (pcacf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+    *pcacf = rcacf;
+
+    /* add to recorders */
     rracf = ctx->app_conf[ngx_rtmp_record_module.ctx_index];
     rracf->rec_conf = ctx->app_conf;
-    rracf->id = value[1];
-
     pracf = ngx_array_push(&racf->rec);
-
     if (pracf == NULL) {
         return NGX_CONF_ERROR;
     }
-
     *pracf = rracf;
+
+    rracf->id = value[1];
+
 
     save = *cf;
     cf->ctx = ctx;
     cf->cmd_type = NGX_RTMP_REC_CONF;
 
     rv = ngx_conf_parse(cf, NULL);
-
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_RTMP_MODULE) {
-            continue;
-        }
-
-        module = ngx_modules[i]->ctx;
-
-        if (module->merge_app_conf) {
-            rvm = module->merge_app_conf(cf, 
-                                 pctx->app_conf[ngx_modules[i]->ctx_index],
-                                 ctx->app_conf[ngx_modules[i]->ctx_index]);
-
-            if (rvm != NGX_CONF_OK) {
-                return NGX_CONF_ERROR;
-            }
-        }
-    }
-
     *cf= save;
 
     return rv;

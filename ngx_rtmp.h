@@ -294,6 +294,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
 
 
 typedef struct {
+    ngx_array_t             applications; /* ngx_rtmp_core_app_conf_t */
     ngx_str_t               name;
     void                  **app_conf;
 } ngx_rtmp_core_app_conf_t;
