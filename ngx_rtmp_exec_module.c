@@ -123,7 +123,7 @@ ngx_module_t  ngx_rtmp_exec_module = {
 
 
 static void
-ngx_rtmp_exec_eval_cstr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
+ngx_rtmp_exec_eval_astr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
                            ngx_str_t *ret)
 {
     ngx_rtmp_exec_ctx_t     *ctx;
@@ -134,7 +134,7 @@ ngx_rtmp_exec_eval_cstr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
         return;
     }
 
-    ret->data = *(u_char **) ((u_char *) ctx + e->offset);
+    ret->data = (u_char *) ctx + e->offset;
     ret->len = ngx_strlen(ret->data);
 }
 
@@ -142,7 +142,7 @@ ngx_rtmp_exec_eval_cstr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
 static ngx_rtmp_eval_t ngx_rtmp_exec_eval[] = {
 
     { ngx_string("name"),
-      ngx_rtmp_exec_eval_cstr,
+      ngx_rtmp_exec_eval_astr,
       offsetof(ngx_rtmp_exec_ctx_t, name) },
 
     ngx_rtmp_null_eval

@@ -173,6 +173,7 @@ ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in, ngx_rtmp_eval_t **e,
     }
 
     if (state == NAME) {
+        p = &in->data[n];
         name.len = p - name.data;
         ngx_rtmp_eval_append_var(s, &b, e, &name);
     }
