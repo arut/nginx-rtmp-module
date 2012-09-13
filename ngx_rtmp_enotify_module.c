@@ -12,10 +12,6 @@
 #include "ngx_rtmp_record_module.h"
 
 #include <stdlib.h>
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
-
 #ifdef NGX_LINUX
 #include <unistd.h>
 #endif
@@ -261,7 +257,8 @@ ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 
         case 0:
             /* child */
-            args = malloc((ec->args.nelts + 2) * sizeof(char *));
+            args = ngx_palloc(s->connection->pool, 
+                              (ec->args.nelts + 2) * sizeof(char *));
             if (args == NULL) {
                 exit(1);
             }

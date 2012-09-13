@@ -6,9 +6,6 @@
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_eval.h"
 #include <stdlib.h>
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
 
 #ifdef NGX_LINUX
 #include <unistd.h>
@@ -340,7 +337,8 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 
         case 0:
             /* child */
-            args = malloc((ec->args.nelts + 2) * sizeof(char *));
+            args = ngx_palloc(s->connection->pool, 
+                              (ec->args.nelts + 2) * sizeof(char *));
             if (args == NULL) {
                 exit(1);
             }
