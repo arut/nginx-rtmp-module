@@ -231,6 +231,10 @@ ngx_rtmp_enotify_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
+    if (conf->active) {
+        prev->active = 1;
+    }
+
     return NGX_CONF_OK;
 }
 
