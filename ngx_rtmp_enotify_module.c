@@ -243,13 +243,10 @@ static ngx_int_t
 ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 {
 #ifndef NGX_WIN32
-    ngx_rtmp_enotify_ctx_t     *ctx;
     int                         pid;
     ngx_str_t                   a, *arg;
     char                      **args;
     ngx_uint_t                  n;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_enotify_module);
 
     pid = fork();
 

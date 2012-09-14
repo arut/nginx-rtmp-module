@@ -341,14 +341,12 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
 {
     ngx_rtmp_notify_done_t         *ds = arg;
 
-    ngx_rtmp_notify_app_conf_t     *nacf;
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
     size_t                          cbname_len, name_len, args_len;
     ngx_str_t                      *addr_text;
     ngx_rtmp_notify_ctx_t          *ctx;
 
-    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
 
     /* common variables */
