@@ -615,9 +615,9 @@ ngx_rtmp_notify_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "notify: publish '%V'", 
-                   &nacf->url[NGX_RTMP_NOTIFY_PUBLISH]);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: publish '%V'", 
+                  &nacf->url[NGX_RTMP_NOTIFY_PUBLISH]);
 
     ngx_memzero(&ci, sizeof(ci));
 
@@ -656,9 +656,9 @@ ngx_rtmp_notify_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         goto next;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "notify: play '%V'",
-                   &nacf->url[NGX_RTMP_NOTIFY_PLAY]);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: play '%V'",
+                  &nacf->url[NGX_RTMP_NOTIFY_PLAY]);
 
     ngx_memzero(&ci, sizeof(ci));
 
@@ -738,10 +738,10 @@ ngx_rtmp_notify_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
         goto next;
     }
 
-    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "notify: record_done recorder=%V path='%V' url='%V'",
-                   &v->recorder, &v->path,
-                   &nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE]);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: record_done recorder=%V path='%V' url='%V'",
+                  &v->recorder, &v->path,
+                  &nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE]);
 
     ngx_memzero(&ci, sizeof(ci));
 
@@ -762,8 +762,8 @@ ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, ngx_url_t *url)
     ngx_rtmp_netcall_init_t         ci;
     ngx_rtmp_notify_done_t          ds;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "notify: %s '%V'", cbname, &url->url);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: %s '%V'", cbname, &url->url);
 
     ds.cbname = (u_char *) cbname;
     ds.url = url;

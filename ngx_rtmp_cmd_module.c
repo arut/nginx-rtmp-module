@@ -200,7 +200,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
-    ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
             "connect: app='%s' flashver='%s' swf_url='%s' "
             "tc_url='%s' page_url='%s' acodecs=%uD vcodecs=%uD "
             "object_encoding=%ui", 
@@ -327,7 +327,7 @@ ngx_rtmp_cmd_create_stream(ngx_rtmp_session_t *s, ngx_rtmp_create_stream_t *v)
     h.csid = NGX_RTMP_CMD_CSID_AMF_INI;
     h.type = NGX_RTMP_MSG_AMF_CMD;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
             "createStream");
 
     /* send result with standard stream */
@@ -414,6 +414,9 @@ static ngx_int_t
 ngx_rtmp_cmd_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 {
     ngx_rtmp_close_stream_t         cv;
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "deleteStream");
 
     /* chain close_stream */
     cv.stream = 0;
@@ -523,7 +526,7 @@ ngx_rtmp_cmd_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
           out_inf, sizeof(out_inf) },
     };
 
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
             "publish: name='%s' args='%s' type=%s silent=%d",
             v->name, v->args, v->type, v->silent);
 
@@ -621,7 +624,7 @@ ngx_rtmp_cmd_fcpublish(ngx_rtmp_session_t *s, ngx_rtmp_fcpublish_t *v)
           out_inf, sizeof(out_inf) },
     };
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
             "fcpublish: name='%s'", v->name);
 
     /* send onFCPublish reply */
@@ -801,8 +804,8 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
           out4_inf, sizeof(out4_inf) },
     };
 
-    ngx_log_debug6(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "cmd: play name='%s' args='%s' start=%i duration=%i "
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "play name='%s' args='%s' start=%i duration=%i "
             "reset=%i silent=%i",
             v->name, v->args, (ngx_int_t) v->start, 
             (ngx_int_t) v->duration, (ngx_int_t) v->reset, 
@@ -934,7 +937,7 @@ ngx_rtmp_cmd_fcsubscribe(ngx_rtmp_session_t *s, ngx_rtmp_fcsubscribe_t *v)
           sizeof(out_inf) },
     };
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
             "fcsubscribe: name='%s'", v->name);
 
     /* send onFCSubscribe reply */
@@ -1038,6 +1041,10 @@ ngx_rtmp_cmd_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
           out_inf, sizeof(out_inf) },
     };
 
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "pause: state='%i' position=%i",
+            v->pause, (ngx_int_t) v->position);
+
     /* send onStatus reply */
     ngx_memzero(&h, sizeof(h));
     h.type = NGX_RTMP_MSG_AMF_CMD;
@@ -1068,6 +1075,9 @@ static ngx_int_t
 ngx_rtmp_cmd_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "disconnect");
+
     return ngx_rtmp_delete_stream
         ? ngx_rtmp_delete_stream(s, NULL)
         : NGX_OK;
@@ -1151,6 +1161,9 @@ ngx_rtmp_cmd_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
           ngx_null_string,
           out_inf, sizeof(out_inf) },
     };
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "seek: offset=%i", (ngx_int_t) v->offset);
 
     /* send onStatus reply */
     ngx_memzero(&h, sizeof(h));

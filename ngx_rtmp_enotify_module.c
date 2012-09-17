@@ -62,7 +62,6 @@ typedef struct {
     u_char                                      name[NGX_RTMP_MAX_NAME];
     u_char                                      args[NGX_RTMP_MAX_ARGS];
     ngx_str_t                                   path;
-    ngx_str_t                                   filename;
     ngx_str_t                                   recorder;
 } ngx_rtmp_enotify_ctx_t;
 
@@ -183,10 +182,6 @@ static ngx_rtmp_eval_t ngx_rtmp_enotify_eval[] = {
     { ngx_string("path"),
       ngx_rtmp_enotify_eval_str,
       offsetof(ngx_rtmp_enotify_ctx_t, path) },
-
-    { ngx_string("filename"),
-      ngx_rtmp_enotify_eval_str,
-      offsetof(ngx_rtmp_enotify_ctx_t, filename) },
 
     { ngx_string("recorder"),
       ngx_rtmp_enotify_eval_str,
@@ -344,8 +339,8 @@ ngx_rtmp_enotify_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "enotify: publish '%V'", &ec->cmd);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "enotify: publish '%V'", &ec->cmd);
 
     ngx_rtmp_enotify_exec(s, ec);
 
@@ -378,8 +373,8 @@ ngx_rtmp_enotify_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         goto next;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "enotify: play '%V'", &ec->cmd);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "enotify: play '%V'", &ec->cmd);
 
     ngx_rtmp_enotify_exec(s, ec);
 
@@ -411,17 +406,14 @@ ngx_rtmp_enotify_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t
     if (enacf == NULL) {
         goto next;
     }
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "enotify: delete_stream %ui", 
-                       ctx->flags);
 
     if (enacf->event[NGX_RTMP_ENOTIFY_PUBLISH_DONE] &&
        (ctx->flags & NGX_RTMP_ENOTIFY_PUBLISHING)) 
     {
         ec = enacf->event[NGX_RTMP_ENOTIFY_PUBLISH_DONE];
 
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "enotify: publish_done '%V'", &ec->cmd);
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "enotify: publish_done '%V'", &ec->cmd);
 
         ngx_rtmp_enotify_exec(s, ec);
     }
@@ -431,8 +423,8 @@ ngx_rtmp_enotify_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t
     {
         ec = enacf->event[NGX_RTMP_ENOTIFY_PLAY_DONE];
 
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "enotify: play_done '%V'", &ec->cmd);
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "enotify: play_done '%V'", &ec->cmd);
 
         ngx_rtmp_enotify_exec(s, ec);
     }
@@ -450,7 +442,6 @@ ngx_rtmp_enotify_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
     ngx_rtmp_enotify_app_conf_t    *enacf;
     ngx_rtmp_enotify_conf_t        *ec;
     ngx_rtmp_enotify_ctx_t         *ctx;
-    ngx_int_t                       n;
 
     if (s->auto_pushed) {
         goto next;
@@ -463,9 +454,9 @@ ngx_rtmp_enotify_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
 
     ec = enacf->event[NGX_RTMP_ENOTIFY_RECORD_DONE];
 
-    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "enotify: record_done %V recorder=%V path='%V'",
-                   &ec->cmd, &v->recorder, &v->path);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "enotify: record_done %V recorder=%V path='%V'",
+                  &ec->cmd, &v->recorder, &v->path);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_enotify_module);
     if (ctx == NULL) {
@@ -474,14 +465,6 @@ ngx_rtmp_enotify_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
 
     ctx->recorder = v->recorder;
     ctx->path = v->path;
-    ctx->filename = v->path;
-
-    for (n = ctx->filename.len;
-         n > 0 && !ngx_path_separator(ctx->filename.data[n - 1]);
-         --n);
-
-    ctx->filename.data += n;
-    ctx->filename.len  -= n;
 
     ngx_rtmp_enotify_exec(s, ec);
 
