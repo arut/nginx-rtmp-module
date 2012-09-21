@@ -745,7 +745,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
 
     keyframe = (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME);
 
-    if (keyframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
+    if (NGX_RTMP_RECORD_VIDEO == 0 || (keyframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL)) == 0) {
 
         if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
 
