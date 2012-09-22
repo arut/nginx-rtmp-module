@@ -70,7 +70,7 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, path),
       NULL },
-      
+
     { ngx_string("record_suffix"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
                          NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
@@ -740,7 +740,6 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
     brkframe = (h->type == NGX_RTMP_MSG_VIDEO)
              ? keyframe
              : (rracf->flags & NGX_RTMP_RECORD_VIDEO) == 0;
-    /* break frame only if video keyframe or if we are not recording video*/
 
     if (brkframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
 
