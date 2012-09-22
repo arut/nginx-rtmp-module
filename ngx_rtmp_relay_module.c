@@ -396,6 +396,7 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
         return NULL;
     }
     rs->app_conf = s->app_conf;
+    rs->relay = 1;
     rctx->session = rs;
     ngx_rtmp_set_ctx(rs, rctx, ngx_rtmp_relay_module);
     ngx_str_set(&rs->flashver, "ngx-local-relay");
@@ -535,6 +536,10 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_str_t                       name;
     size_t                          n;
     ngx_rtmp_relay_ctx_t           *ctx;
+
+    if (s->auto_pushed) {
+        goto next;
+    }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx && ctx->relay) {

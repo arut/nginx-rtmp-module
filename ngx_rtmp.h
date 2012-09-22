@@ -209,6 +209,7 @@ typedef struct {
 
     /* auto-pushed? */
     unsigned                auto_pushed:1;
+    unsigned                relay:1;
 
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */
