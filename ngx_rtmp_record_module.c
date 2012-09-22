@@ -733,7 +733,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
     ngx_time_t                      next;
     ngx_rtmp_header_t               ch;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
-    ngx_int_t                       keyframe;
+    ngx_int_t                       keyframe, brkframe;
     ngx_rtmp_record_app_conf_t     *rracf;
 
     rracf = rctx->conf;
@@ -743,9 +743,15 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
         return NGX_OK;
     }
 
-    keyframe = (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME);
+    keyframe = (h->type == NGX_RTMP_MSG_VIDEO)
+             ? (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME)
+             : 0;
 
-    if (keyframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
+    brkframe = (h->type == NGX_RTMP_MSG_VIDEO)
+             ? keyframe
+             : (rracf->flags & NGX_RTMP_RECORD_VIDEO) == 0;
+
+    if (brkframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
 
         if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
 
