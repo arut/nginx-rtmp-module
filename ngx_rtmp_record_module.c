@@ -740,6 +740,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
     brkframe = (h->type == NGX_RTMP_MSG_VIDEO)
              ? keyframe
              : (rracf->flags & NGX_RTMP_RECORD_VIDEO) == 0;
+    /* break frame only if video keyframe or if we are not recording video*/
 
     if (brkframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
 
