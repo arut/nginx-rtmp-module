@@ -142,11 +142,16 @@ ngx_module_t  ngx_rtmp_notify_module = {
 static void *
 ngx_rtmp_notify_create_app_conf(ngx_conf_t *cf)
 {
-    ngx_rtmp_notify_app_conf_t      *nacf;
+    ngx_rtmp_notify_app_conf_t     *nacf;
+    ngx_uint_t                      n;
 
     nacf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_notify_app_conf_t));
     if (nacf == NULL) {
         return NULL;
+    }
+
+    for (n = 0; n < NGX_RTMP_NOTIFY_MAX; ++n) {
+        nacf->url[n] = NGX_CONF_UNSET_PTR;
     }
 
     return nacf;
@@ -161,7 +166,7 @@ ngx_rtmp_notify_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_uint_t                  n;
 
     for (n = 0; n < NGX_RTMP_NOTIFY_MAX; ++n) {
-        ngx_conf_merge_ptr_value(conf->url[n], prev->url[n], 0);
+        ngx_conf_merge_ptr_value(conf->url[n], prev->url[n], NULL);
         if (conf->url[n]) {
             conf->active = 1;
         }
@@ -484,7 +489,8 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE],
+    hl = ngx_rtmp_netcall_http_format_header(
+            nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE],
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
             &ngx_rtmp_netcall_content_type_urlencoded);
 
@@ -617,7 +623,7 @@ ngx_rtmp_notify_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "notify: publish '%V'", 
-                  &nacf->url[NGX_RTMP_NOTIFY_PUBLISH]);
+                  &nacf->url[NGX_RTMP_NOTIFY_PUBLISH]->url);
 
     ngx_memzero(&ci, sizeof(ci));
 
@@ -658,7 +664,7 @@ ngx_rtmp_notify_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "notify: play '%V'",
-                  &nacf->url[NGX_RTMP_NOTIFY_PLAY]);
+                  &nacf->url[NGX_RTMP_NOTIFY_PLAY]->url);
 
     ngx_memzero(&ci, sizeof(ci));
 
@@ -741,7 +747,7 @@ ngx_rtmp_notify_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "notify: record_done recorder=%V path='%V' url='%V'",
                   &v->recorder, &v->path,
-                  &nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE]);
+                  &nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE]->url);
 
     ngx_memzero(&ci, sizeof(ci));
 
