@@ -70,7 +70,7 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, path),
       NULL },
-
+      
     { ngx_string("record_suffix"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
                          NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
