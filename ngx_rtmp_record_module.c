@@ -21,8 +21,6 @@ static ngx_rtmp_delete_stream_pt    next_delete_stream;
 
 static char *ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
-static char * ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, 
-       ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_rtmp_record_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_record_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, 
@@ -111,14 +109,6 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, interval),
-      NULL },
-
-    { ngx_string("on_record_done"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
-                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
-      ngx_rtmp_notify_on_record_done,
-      NGX_RTMP_APP_CONF_OFFSET,
-      0,
       NULL },
 
     { ngx_string("recorder"),
@@ -860,50 +850,6 @@ static ngx_int_t
 ngx_rtmp_record_done_init(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
 {
     return NGX_OK;
-}
-
-
-static char *
-ngx_rtmp_notify_on_record_done(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_rtmp_record_app_conf_t     *racf;
-    ngx_str_t                      *url;
-    ngx_url_t                      *u;
-    size_t                          add;
-    ngx_str_t                      *value;
-
-    value = cf->args->elts;
-    url = &value[1];
-
-    add = 0;
-
-    u = ngx_pcalloc(cf->pool, sizeof(ngx_url_t));
-    if (u == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    if (ngx_strncasecmp(url->data, (u_char *) "http://", 7) == 0) {
-        add = 7;
-    }
-
-    u->url.len = url->len - add;
-    u->url.data = url->data + add;
-    u->default_port = 80;
-    u->uri_part = 1;
-    
-    if (ngx_parse_url(cf->pool, u) != NGX_OK) {
-        if (u->err) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                    "%s in url \"%V\"", u->err, &u->url);
-        }
-        return NGX_CONF_ERROR;
-    }
-
-    racf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_record_module);
-
-    racf->url = u;
-
-    return NGX_CONF_OK;
 }
 
 

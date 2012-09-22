@@ -201,11 +201,16 @@ static ngx_rtmp_eval_t * ngx_rtmp_enotify_eval_p[] = {
 static void *
 ngx_rtmp_enotify_create_app_conf(ngx_conf_t *cf)
 {
-    ngx_rtmp_enotify_app_conf_t     *enacf;
+    ngx_rtmp_enotify_app_conf_t    *enacf;
+    ngx_uint_t                      n;
 
     enacf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_enotify_app_conf_t));
     if (enacf == NULL) {
         return NULL;
+    }
+
+    for (n = 0; n < NGX_RTMP_ENOTIFY_MAX; ++n) {
+        enacf->event[n] = NGX_CONF_UNSET_PTR;
     }
 
     return enacf;
@@ -220,7 +225,7 @@ ngx_rtmp_enotify_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_uint_t                      n;
 
     for (n = 0; n < NGX_RTMP_ENOTIFY_MAX; ++n) {
-        ngx_conf_merge_ptr_value(conf->event[n], prev->event[n], 0);
+        ngx_conf_merge_ptr_value(conf->event[n], prev->event[n], NULL);
         if (conf->event[n]) {
             conf->active = 1;
         }
