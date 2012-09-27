@@ -86,22 +86,23 @@ ngx_module_t  ngx_rtmp_control_module = {
 
 
 static ngx_int_t
-ngx_rtmp_control_record(ngx_http_request_t *r)
+ngx_rtmp_control_record(ngx_http_request_t *r, ngx_str_t *method)
 {
+    ngx_rtmp_record_app_conf_t     *racf;
     ngx_rtmp_core_main_conf_t      *cmcf;
     ngx_rtmp_core_srv_conf_t      **pcscf, *cscf;
     ngx_rtmp_core_app_conf_t      **pcacf, *cacf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_live_stream_t         *ls;
     ngx_rtmp_live_ctx_t            *lctx;
-    ngx_rtmp_record_app_conf_t     *racf;
     ngx_rtmp_session_t             *s;
-    ngx_uint_t                      sn, rn, n;
-    ngx_str_t                       srv, app, rec, name;
-    size_t                          len;
-    ngx_str_t                       msg;
     ngx_chain_t                     cl;
+    ngx_uint_t                      sn, rn, n;
+    ngx_str_t                       srv, app, rec, name, path;
+    ngx_str_t                       msg;
     ngx_buf_t                      *b;
+    ngx_int_t                       rc;
+    size_t                          len;
 
     sn = 0;
     if (ngx_http_arg(r, (u_char *) "srv", sizeof("srv") - 1, &srv) == NGX_OK) {
@@ -159,8 +160,8 @@ ngx_rtmp_control_record(ngx_http_request_t *r)
     racf = cacf->app_conf[ngx_rtmp_record_module.ctx_index];
 
     /* find live stream by name */
-    for (ls = lacf->streams[ngx_hash_key(name.data, name.len)]; ls;
-         ls = ls->next) 
+    for (ls = lacf->streams[ngx_hash_key(name.data, name.len) % lacf->nbuckets];
+         ls; ls = ls->next) 
     {
         len = ngx_strlen(ls->name);
 
@@ -197,25 +198,53 @@ ngx_rtmp_control_record(ngx_http_request_t *r)
         goto error;
     }
 
-    if (r->uri.len == sizeof("/record/start") - 1 &&
-        ngx_strncmp(r->uri.data, "/record/start", r->uri.len) == 0)
-    {
-        ngx_rtmp_record_open(s, rn, NULL);
+    ngx_memzero(&path, sizeof(path));
 
-    } else if (r->uri.len == sizeof("/record/stop") - 1 &&
-               ngx_strncmp(r->uri.data, "/record/stop", r->uri.len) == 0)
+    if (method->len == sizeof("start") - 1 &&
+        ngx_strncmp(method->data, "start", method->len) == 0)
     {
-        ngx_rtmp_record_close(s, rn, NULL);
+        rc = ngx_rtmp_record_open(s, rn, &path);
+
+    } else if (method->len == sizeof("stop") - 1 &&
+               ngx_strncmp(method->data, "stop", method->len) == 0)
+    {
+        rc = ngx_rtmp_record_close(s, rn, &path);
 
     } else {
-        ngx_str_set(&msg, "Undefined subrequest");
+        ngx_str_set(&msg, "Undefined method");
         goto error;
     }
 
-    r->header_only = 1;
-    r->headers_out.status = NGX_HTTP_OK;
+    if (rc == NGX_ERROR) {
+        ngx_str_set(&msg, "Recorder error");
+        goto error;
+    }
 
-    return ngx_http_send_header(r);
+    if (rc == NGX_AGAIN) {
+        /* already opened/closed */
+        ngx_str_null(&path);
+        r->header_only = 1;
+    }
+
+    r->headers_out.status = NGX_HTTP_OK;
+    r->headers_out.content_length_n = path.len;
+
+    b = ngx_create_temp_buf(r->pool, path.len);
+    if (b == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memzero(&cl, sizeof(cl));
+    cl.buf = b;
+
+    b->last = ngx_cpymem(b->pos, path.data, path.len);
+
+    b->memory = 1;
+    b->last_buf = 1;
+    
+    ngx_http_send_header(r);
+
+    return ngx_http_output_filter(r, &cl);
 
 error:
     r->headers_out.status = NGX_HTTP_BAD_REQUEST;
@@ -244,17 +273,53 @@ static ngx_int_t
 ngx_rtmp_control_handler(ngx_http_request_t *r)
 {
     ngx_rtmp_control_loc_conf_t    *llcf;
+    ngx_str_t                       section, method;
+    u_char                         *p;
+    ngx_uint_t                      n;
 
     llcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_control_module);
     if (llcf->control == 0) {
         return NGX_DECLINED;
     }
 
-    if (llcf->control & NGX_RTMP_CONTROL_RECORD &&
-        ngx_strncmp(r->uri.data, "/record/", sizeof("/record/") - 1) == 0)
-    {
-        return ngx_rtmp_control_record(r);
+    /* uri format: .../section/method?args */
+    ngx_memzero(&section, sizeof(section));
+    ngx_memzero(&method, sizeof(method));
+
+    for (n = r->uri.len; n; --n) {
+        p = &r->uri.data[n - 1];
+
+        if (*p != '/') {
+            continue;
+        }
+
+        if (method.data) {
+            section.data = p + 1;
+            section.len  = method.data - section.data - 1;
+            break;
+        }
+
+        method.data = p + 1;
+        method.len  = r->uri.data + r->uri.len - method.data;
     }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, r->connection->log, 0,
+                   "rtmp_control: section='%V' method='%V'",
+                   &section, &method);
+
+
+#define NGX_RTMP_CONTROL_SECTION(flag, secname)                             \
+    if (llcf->control & NGX_RTMP_CONTROL_##flag &&                          \
+        section.len == sizeof(#secname) - 1 &&                              \
+        ngx_strncmp(section.data, #secname, sizeof(#secname) - 1) == 0)     \
+    {                                                                       \
+        return ngx_rtmp_control_##secname(r, &method);                      \
+    }
+
+    NGX_RTMP_CONTROL_SECTION(RECORD, record);
+
+#undef NGX_RTMP_CONTROL_SECTION
+
 
     return NGX_DECLINED;
 }
