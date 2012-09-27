@@ -20,10 +20,6 @@ static char * ngx_rtmp_control_merge_loc_conf(ngx_conf_t *cf,
 #define NGX_RTMP_CONTROL_ALL        0xff
 #define NGX_RTMP_CONTROL_RECORD     0x01
 
-/*
- * global: stat-{bufs-{total,free,used}, total bytes in/out, bw in/out} - cscf
-*/
-
 
 typedef struct {
     ngx_uint_t                      control;
@@ -40,11 +36,11 @@ static ngx_conf_bitmask_t           ngx_rtmp_control_masks[] = {
 static ngx_command_t  ngx_rtmp_control_commands[] = {
 
     { ngx_string("rtmp_control"),
-        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
-        ngx_conf_set_bitmask_slot,
-        NGX_HTTP_LOC_CONF_OFFSET,
-        offsetof(ngx_rtmp_control_loc_conf_t, control),
-        ngx_rtmp_control_masks },
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
+      ngx_conf_set_bitmask_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_rtmp_control_loc_conf_t, control),
+      ngx_rtmp_control_masks },
 
     ngx_null_command
 };
@@ -222,7 +218,7 @@ ngx_rtmp_control_record(ngx_http_request_t *r)
     return ngx_http_send_header(r);
 
 error:
-    r->headers_out.status = NGX_HTTP_INTERNAL_SERVER_ERROR;
+    r->headers_out.status = NGX_HTTP_BAD_REQUEST;
     r->headers_out.content_length_n = msg.len;
 
     b = ngx_calloc_buf(r->pool);
