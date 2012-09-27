@@ -307,6 +307,28 @@ ngx_rtmp_record_close(ngx_rtmp_session_t *s, ngx_uint_t n, ngx_str_t *path)
 }
 
 
+ngx_uint_t
+ngx_rtmp_record_find(ngx_rtmp_record_app_conf_t *racf, ngx_str_t *id)
+{
+    ngx_rtmp_record_app_conf_t    **pracf, *rracf;
+    ngx_uint_t                      n;
+
+    pracf = racf->rec.elts;
+
+    for (n = 0; n < racf->rec.nelts; ++n, ++pracf) {
+        rracf = *pracf;
+
+        if (rracf->id.len == id->len &&
+            ngx_strncmp(rracf->id.data, id->data, id->len) == 0)
+        {
+            return n;
+        }
+    }
+
+    return NGX_CONF_UNSET_UINT;
+}
+
+
 /* This funcion returns pointer to a static buffer */
 static void
 ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
