@@ -238,8 +238,6 @@ ngx_rtmp_control_record(ngx_http_request_t *r, ngx_str_t *method)
     cl.buf = b;
 
     b->last = ngx_cpymem(b->pos, path.data, path.len);
-
-    b->memory = 1;
     b->last_buf = 1;
     
     ngx_http_send_header(r);
