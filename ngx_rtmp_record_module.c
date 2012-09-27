@@ -791,7 +791,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
     if ((rracf->flags & NGX_RTMP_RECORD_MANUAL) &&
         !brkframe && rctx->nframes == 0)
     {
-            return NGX_OK;
+        return NGX_OK;
     }
 
     if (rctx->file.fd == NGX_INVALID_FILE) {
