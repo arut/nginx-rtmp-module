@@ -440,8 +440,8 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         goto next;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "play: fmt found: '%V'", &ctx->fmt->name);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "play: %V", &ctx->fmt->name);
 
     sfx = &ctx->fmt->sfx;
 

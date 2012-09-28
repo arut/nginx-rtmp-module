@@ -2,13 +2,13 @@
 ## nginx-rtmp-module
 
 
-### Project page:
+### Project blog:
 
-  http://arut.github.com/nginx-rtmp-module
+  http://rarut.wordpress.com
 
 ### Wiki manual:
 
-  https://github.com/arut/nginx-rtmp-module/wiki
+  https://github.com/arut/nginx-rtmp-module/wiki/Directives
 
 ### Features:
 
@@ -19,17 +19,19 @@
 * Stream relay support for distributed
   streaming: push & pull models
 
-* Recording published streams in FLV file
+* Recording streams in multiple FLVs
 
 * H264/AAC support
 
 * Online transcoding with FFmpeg
 
 * HLS (HTTP Live Streaming) support;
-  experimental; requires recent libavformat 
+  requires recent libavformat 
   (>= 53.31.100) from ffmpeg (ffmpeg.org)
 
-* HTTP callbacks on publish/play/record
+* HTTP callbacks (publish/play/record etc)
+
+* Running external programs on certain events (exec)
 
 * Advanced buffering techniques
   to keep memory allocations at a minimum
@@ -43,6 +45,8 @@
 
 * Statistics in XML/XSL in machine- & human-
   readable form
+
+* Linux/FreeBSD/MacOS
 
 
 ### Build:
@@ -197,7 +201,7 @@ rtmp_auto_push directive.
             }
 
 
-            # HLS (experimental)
+            # HLS
 
             # HLS requires libavformat & should be configured as a separate
             # NGINX module in addition to nginx-rtmp-module:

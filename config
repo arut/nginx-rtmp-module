@@ -5,16 +5,18 @@ CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_core_module                        \
                 ngx_rtmp_cmd_module                         \
                 ngx_rtmp_access_module                      \
+                ngx_rtmp_record_module                      \
                 ngx_rtmp_live_module                        \
                 ngx_rtmp_play_module                        \
                 ngx_rtmp_flv_module                         \
                 ngx_rtmp_mp4_module                         \
-                ngx_rtmp_record_module                      \
                 ngx_rtmp_netcall_module                     \
-                ngx_rtmp_notify_module                      \
                 ngx_rtmp_relay_module                       \
                 ngx_rtmp_exec_module                        \
                 ngx_rtmp_codec_module                       \
+                ngx_rtmp_auto_push_module                   \
+                ngx_rtmp_enotify_module                     \
+                ngx_rtmp_notify_module                      \
                 "
 
 
@@ -31,23 +33,25 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_amf.c               \
                 $ngx_addon_dir/ngx_rtmp_send.c              \
                 $ngx_addon_dir/ngx_rtmp_shared.c            \
+                $ngx_addon_dir/ngx_rtmp_eval.c              \
                 $ngx_addon_dir/ngx_rtmp_receive.c           \
                 $ngx_addon_dir/ngx_rtmp_core_module.c       \
                 $ngx_addon_dir/ngx_rtmp_cmd_module.c        \
                 $ngx_addon_dir/ngx_rtmp_access_module.c     \
+                $ngx_addon_dir/ngx_rtmp_record_module.c     \
                 $ngx_addon_dir/ngx_rtmp_live_module.c       \
                 $ngx_addon_dir/ngx_rtmp_play_module.c       \
                 $ngx_addon_dir/ngx_rtmp_flv_module.c        \
                 $ngx_addon_dir/ngx_rtmp_mp4_module.c        \
-                $ngx_addon_dir/ngx_rtmp_record_module.c     \
                 $ngx_addon_dir/ngx_rtmp_netcall_module.c    \
-                $ngx_addon_dir/ngx_rtmp_notify_module.c     \
                 $ngx_addon_dir/ngx_rtmp_stat_module.c       \
                 $ngx_addon_dir/ngx_rtmp_relay_module.c      \
                 $ngx_addon_dir/ngx_rtmp_bandwidth.c         \
                 $ngx_addon_dir/ngx_rtmp_exec_module.c       \
                 $ngx_addon_dir/ngx_rtmp_codec_module.c      \
                 $ngx_addon_dir/ngx_rtmp_auto_push_module.c  \
+                $ngx_addon_dir/ngx_rtmp_enotify_module.c    \
+                $ngx_addon_dir/ngx_rtmp_notify_module.c     \
                 "
 CFLAGS="$CFLAGS -I$ngx_addon_dir"
 

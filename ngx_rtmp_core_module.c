@@ -282,6 +282,13 @@ ngx_rtmp_core_create_app_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    if (ngx_array_init(&conf->applications, cf->pool, 1,
+                       sizeof(ngx_rtmp_core_app_conf_t *))
+        != NGX_OK)
+    {
+        return NULL;
+    }
+
     return conf;
 }
 

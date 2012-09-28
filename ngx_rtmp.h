@@ -209,6 +209,7 @@ typedef struct {
 
     /* auto-pushed? */
     unsigned                auto_pushed:1;
+    unsigned                relay:1;
 
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */
@@ -294,6 +295,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
 
 
 typedef struct {
+    ngx_array_t             applications; /* ngx_rtmp_core_app_conf_t */
     ngx_str_t               name;
     void                  **app_conf;
 } ngx_rtmp_core_app_conf_t;
@@ -326,6 +328,7 @@ typedef struct {
 #define NGX_RTMP_MAIN_CONF              0x02000000
 #define NGX_RTMP_SRV_CONF               0x04000000
 #define NGX_RTMP_APP_CONF               0x08000000
+#define NGX_RTMP_REC_CONF               0x10000000
 
 
 #define NGX_RTMP_MAIN_CONF_OFFSET  offsetof(ngx_rtmp_conf_ctx_t, main_conf)

@@ -317,6 +317,7 @@ ngx_rtmp_merge_applications(ngx_conf_t *cf, ngx_array_t *applications,
     ngx_rtmp_conf_ctx_t            *ctx, saved;
     ngx_rtmp_core_app_conf_t      **cacfp;
     ngx_uint_t                      n;
+    ngx_rtmp_core_app_conf_t       *cacf;
 
     if (applications == NULL) {
         return NGX_CONF_OK;
@@ -332,6 +333,14 @@ ngx_rtmp_merge_applications(ngx_conf_t *cf, ngx_array_t *applications,
 
         rv = module->merge_app_conf(cf, app_conf[ctx_index],
                 (*cacfp)->app_conf[ctx_index]);
+        if (rv != NGX_CONF_OK) {
+            return rv;
+        }
+
+        cacf = (*cacfp)->app_conf[ngx_rtmp_core_module.ctx_index];
+        rv = ngx_rtmp_merge_applications(cf, &cacf->applications, 
+                                         (*cacfp)->app_conf,
+                                         module, ctx_index);
         if (rv != NGX_CONF_OK) {
             return rv;
         }

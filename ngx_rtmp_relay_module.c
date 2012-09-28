@@ -396,6 +396,7 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
         return NULL;
     }
     rs->app_conf = s->app_conf;
+    rs->relay = 1;
     rctx->session = rs;
     ngx_rtmp_set_ctx(rs, rctx, ngx_rtmp_relay_module);
     ngx_str_set(&rs->flashver, "ngx-local-relay");
@@ -503,7 +504,7 @@ ngx_int_t
 ngx_rtmp_relay_pull(ngx_rtmp_session_t *s, ngx_str_t *name,
         ngx_rtmp_relay_target_t *target)
 {
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
             "relay: create pull name='%V' app='%V' playpath='%V' url='%V'",
             name, &target->app, &target->play_path, &target->url.url);
 
@@ -517,7 +518,7 @@ ngx_int_t
 ngx_rtmp_relay_push(ngx_rtmp_session_t *s, ngx_str_t *name,
         ngx_rtmp_relay_target_t *target)
 {
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
             "relay: create push name='%V' app='%V' playpath='%V' url='%V'",
             name, &target->app, &target->play_path, &target->url.url);
 
@@ -535,6 +536,10 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_str_t                       name;
     size_t                          n;
     ngx_rtmp_relay_ctx_t           *ctx;
+
+    if (s->auto_pushed) {
+        goto next;
+    }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx && ctx->relay) {

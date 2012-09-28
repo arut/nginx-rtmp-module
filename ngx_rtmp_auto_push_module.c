@@ -400,7 +400,7 @@ ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_rtmp_auto_push_conf_t      *apcf;
     ngx_rtmp_auto_push_ctx_t       *ctx;
 
-    if (s->auto_pushed) {
+    if (s->auto_pushed || s->relay) {
         goto next;
     }
 
