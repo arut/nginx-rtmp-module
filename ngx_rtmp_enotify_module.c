@@ -243,7 +243,7 @@ static ngx_int_t
 ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 {
 #ifndef NGX_WIN32
-    int                         pid;
+    int                         pid, fd;
     ngx_str_t                   a, *arg;
     char                      **args;
     ngx_uint_t                  n;
@@ -258,6 +258,18 @@ ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 
         case 0:
             /* child */
+            fd = open("/dev/null", O_RDWR);            
+
+            if (fd != -1) {
+                close(0);
+                close(1);
+                close(2);
+
+                dup(fd);
+                dup(fd);
+                dup(fd);
+            }
+
             args = ngx_palloc(s->connection->pool, 
                               (ec->args.nelts + 2) * sizeof(char *));
             if (args == NULL) {

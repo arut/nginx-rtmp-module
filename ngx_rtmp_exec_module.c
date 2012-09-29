@@ -254,15 +254,22 @@ ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 static ngx_int_t
 ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
 {
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "exec: terminating child %ui", 
-            (ngx_int_t)e->pid);
-
     if (e->respawn_evt.timer_set) {
         ngx_del_timer(&e->respawn_evt);
     }
 
-    ngx_del_event(&e->read_evt, NGX_READ_EVENT, 0);
+    if (e->read_evt.active) {
+        ngx_del_event(&e->read_evt, NGX_READ_EVENT, 0);
+    }
+
+    if (e->active == 0) {
+        return NGX_OK;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "exec: terminating child %ui", 
+            (ngx_int_t)e->pid);
+
     e->active = 0;
     close(e->pipefd);
 
@@ -288,7 +295,7 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 #ifndef NGX_WIN32
     ngx_rtmp_exec_app_conf_t       *eacf;
     ngx_rtmp_exec_ctx_t            *ctx;
-    int                             pid;
+    int                             pid, fd;
     int                             pipefd[2];
     int                             ret;
     ngx_rtmp_exec_conf_t           *ec;
@@ -337,6 +344,18 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 
         case 0:
             /* child */
+            fd = open("/dev/null", O_RDWR);            
+
+            if (fd != -1) {
+                close(0);
+                close(1);
+                close(2);
+
+                dup(fd);
+                dup(fd);
+                dup(fd);
+            }
+
             args = ngx_palloc(s->connection->pool, 
                               (ec->args.nelts + 2) * sizeof(char *));
             if (args == NULL) {
@@ -411,9 +430,7 @@ ngx_rtmp_exec_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 
     e = ctx->execs;
     for (n = 0; n < eacf->execs.nelts; ++n, ++e) {
-        if (e->active) {
-            ngx_rtmp_exec_kill(s, e, 1);
-        }
+        ngx_rtmp_exec_kill(s, e, 1);
     }
 
 next:
