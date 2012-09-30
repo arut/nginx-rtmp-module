@@ -321,7 +321,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     size_t                          header_offset, last_offset;
     ngx_uint_t                      header_version, meta_version;
     ngx_int_t                       diff_timestamp;
-    uint32_t                       *last;
+    uint32_t                       *last, timestamp;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
@@ -352,11 +352,16 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             h->timestamp, h->timeshift);
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+    
+    timestamp = h->timestamp;
+    if (lacf->atc == 0) {
+        timestamp += h->timeshift;
+    }
 
     /* prepare output header */
     ngx_memzero(&ch, sizeof(ch));
     ngx_memzero(&lh, sizeof(lh));
-    ch.timestamp = h->timestamp;
+    ch.timestamp = timestamp;
     ch.msid = NGX_RTMP_LIVE_MSID;
     ch.type = h->type;
     lh.msid = ch.msid;
@@ -420,20 +425,20 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ss = pctx->session;
         last = (uint32_t *)((u_char *)pctx + last_offset);
 
-        ch.timestamp = lacf->atc ? h->timestamp :
-                       h->timeshift + h->timestamp - (uint32_t)ss->epoch;
+        ch.timestamp = timestamp;
+        if (lacf->atc == 0) {
+            ch.timestamp -= (uint32_t)ss->epoch;
+        }
 
         /* send absolute frame */
         if ((pctx->msg_mask & (1 << h->type)) == 0) {
 
             /* packet from the past for the peer */
-            if (lacf->atc == 0 &&
-                h->timeshift + h->timestamp < (uint32_t)ss->epoch)
-            {
+            if (lacf->atc == 0 && timestamp < (uint32_t)ss->epoch) {
                 ngx_log_debug3(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                     "live: av: %s packet from the past %uD < %uD",
                     h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio",
-                    h->timeshift + h->timestamp, (uint32_t)ss->epoch);
+                    timestamp, (uint32_t)ss->epoch);
                 continue;
             }
             
