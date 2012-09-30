@@ -60,6 +60,13 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, sync),
       NULL },
 
+    { ngx_string("atc"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, atc),
+      NULL },
+
       ngx_null_command
 };
 
@@ -107,6 +114,7 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->nbuckets = NGX_CONF_UNSET;
     lacf->buflen = NGX_CONF_UNSET;
     lacf->sync = NGX_CONF_UNSET;
+    lacf->atc = NGX_CONF_UNSET;
 
     return lacf;
 }
@@ -123,6 +131,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 0);
+    ngx_conf_merge_value(conf->atc, prev->atc, 0);
 
     conf->pool = ngx_create_pool(4096, &cf->cycle->new_log);
     if (conf->pool == NULL) {
@@ -337,10 +346,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "live: av: %s timestamp=%uD",
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "live: av: %s timestamp=%uD timeshift=%uD",
             h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio",
-            h->timestamp);
+            h->timestamp, h->timeshift);
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
@@ -410,17 +419,21 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ++peers;
         ss = pctx->session;
         last = (uint32_t *)((u_char *)pctx + last_offset);
-        ch.timestamp = s->epoch + h->timestamp - ss->epoch;
+
+        ch.timestamp = lacf->atc ? h->timestamp :
+                       h->timeshift + h->timestamp - (uint32_t)ss->epoch;
 
         /* send absolute frame */
         if ((pctx->msg_mask & (1 << h->type)) == 0) {
 
             /* packet from the past for the peer */
-            if (s->epoch + h->timestamp < ss->epoch) {
+            if (lacf->atc == 0 &&
+                h->timeshift + h->timestamp < (uint32_t)ss->epoch)
+            {
                 ngx_log_debug3(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                     "live: av: %s packet from the past %uD < %uD",
                     h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio",
-                    (uint32_t)(s->epoch + h->timestamp), (uint32_t)ss->epoch);
+                    h->timeshift + h->timestamp, (uint32_t)ss->epoch);
                 continue;
             }
             
