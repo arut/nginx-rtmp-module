@@ -18,6 +18,7 @@
 			private var microphone:Microphone;
 			private var connection:NetConnection;
 			private var stream:NetStream;
+			private var h264Settings:H264VideoStreamSettings;
 
 			private function toggleFeedListener(event:MouseEvent):void {
 				if(toggleFeed.label == 'Start Feed') {
@@ -69,6 +70,9 @@
 						stream = new NetStream(connection);
 						stream.attachCamera(camera);
 						stream.attachAudio(microphone);
+						h264Settings = new H264VideoStreamSettings();
+						h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_1_2);
+						stream.videoStreamSettings = h264Settings;
 						break;
 				}
 			}
@@ -88,6 +92,11 @@
 
 				camera = Camera.getCamera();
 				microphone = Microphone.getMicrophone();
+				microphone.setSilenceLevel(0);
+				microphone.codec = "Speex";
+				microphone.encodeQuality = 6;
+				camera.setMode(704, 576, 25);
+				camera.setQuality(131072, 70);
 				connection = new NetConnection();
 				connection.connect(streamer);
 				connection.addEventListener(NetStatusEvent.NET_STATUS, netStatusHander);
