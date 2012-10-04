@@ -16,7 +16,7 @@ ngx_rtmp_record_done_pt             ngx_rtmp_record_done;
 
 
 static ngx_rtmp_publish_pt          next_publish;
-static ngx_rtmp_delete_stream_pt    next_delete_stream;
+static ngx_rtmp_close_stream_pt     next_close_stream;
 
 
 static char *ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -558,8 +558,8 @@ ngx_rtmp_record_node_close(ngx_rtmp_session_t *s,
 
 
 static ngx_int_t
-ngx_rtmp_record_delete_stream(ngx_rtmp_session_t *s, 
-                              ngx_rtmp_delete_stream_t *v)
+ngx_rtmp_record_close_stream(ngx_rtmp_session_t *s, 
+                             ngx_rtmp_close_stream_t *v)
 {
     ngx_rtmp_record_ctx_t      *ctx;
     ngx_rtmp_record_rec_ctx_t *rctx;
@@ -572,7 +572,7 @@ ngx_rtmp_record_delete_stream(ngx_rtmp_session_t *s,
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                   "record: delete_stream %ui nodes",
+                   "record: close_stream %ui nodes",
                    ctx->rec.nelts);
 
     rctx = ctx->rec.elts;
@@ -582,7 +582,7 @@ ngx_rtmp_record_delete_stream(ngx_rtmp_session_t *s,
     }
 
 next:
-    return next_delete_stream(s, v);
+    return next_close_stream(s, v);
 }
 
 
@@ -953,8 +953,8 @@ ngx_rtmp_record_postconfiguration(ngx_conf_t *cf)
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_record_publish;
 
-    next_delete_stream = ngx_rtmp_delete_stream;
-    ngx_rtmp_delete_stream = ngx_rtmp_record_delete_stream;
+    next_close_stream = ngx_rtmp_close_stream;
+    ngx_rtmp_close_stream = ngx_rtmp_record_close_stream;
 
     return NGX_OK;
 }
