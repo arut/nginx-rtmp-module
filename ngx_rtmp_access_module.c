@@ -395,7 +395,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     case AF_INET6:
     case 0: /* all */
 
-        rule6 = ngx_array_push(ascf->rules6);
+        rule6 = ngx_array_push(&ascf->rules6);
         if (rule6 == NULL) {
             return NGX_CONF_ERROR;
         }
