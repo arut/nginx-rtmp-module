@@ -1931,7 +1931,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
     ngx_rtmp_mp4_track_t           *t;
     ngx_rtmp_mp4_cursor_t          *cr;
     uint32_t                        buflen, end_timestamp, sched,
-                                    timestamp, last_timestamp;
+                                    timestamp, last_timestamp, rdelay;
     ssize_t                         ret;
     u_char                          fhdr[5];
     size_t                          fhdr_size;
@@ -2059,10 +2059,13 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
 
             if (t->header) {
                 fhdr_size = 5;
+                
+                rdelay = ngx_rtmp_mp4_to_rtmp_timestamp(t, cr->delay);
+
                 ngx_rtmp_mp4_buffer[1] = 1;
-                ngx_rtmp_mp4_buffer[2] = cr->delay & 0xf00;
-                ngx_rtmp_mp4_buffer[3] = cr->delay & 0x0f0;
-                ngx_rtmp_mp4_buffer[4] = cr->delay & 0x00f;
+                ngx_rtmp_mp4_buffer[2] = (rdelay >> 16) & 0xff;
+                ngx_rtmp_mp4_buffer[3] = (rdelay >> 8)  & 0xff;
+                ngx_rtmp_mp4_buffer[4] = rdelay & 0xff;
             }
 
         } else { /* NGX_RTMP_MSG_AUDIO */
