@@ -161,6 +161,7 @@ ngx_rtmp_play_send(ngx_event_t *e)
 
     ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_MSID);
 
+    ngx_rtmp_send_play_status(s, "NetStream.Play.Complete", "status", 0, 0);
     ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status", "Stopped");
 }
 
