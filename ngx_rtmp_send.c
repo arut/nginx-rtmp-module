@@ -399,6 +399,7 @@ ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code, char* level,
     h.type = NGX_RTMP_MSG_AMF_META;
     h.csid = NGX_RTMP_CSID_AMF;
     h.msid = NGX_RTMP_MSID;
+    h.timestamp = duration;
 
     return ngx_rtmp_send_amf(s, &h, out_elts, 
                              sizeof(out_elts) / sizeof(out_elts[0]));

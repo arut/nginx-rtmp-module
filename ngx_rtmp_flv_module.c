@@ -13,10 +13,12 @@ static void ngx_rtmp_flv_read_meta(ngx_rtmp_session_t *s, ngx_file_t *f);
 static ngx_int_t ngx_rtmp_flv_timestamp_to_offset(ngx_rtmp_session_t *s, 
        ngx_file_t *f, ngx_int_t timestamp);
 static ngx_int_t ngx_rtmp_flv_init(ngx_rtmp_session_t *s, ngx_file_t *f);
-static ngx_int_t ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f,
+static ngx_int_t ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_flv_seek(ngx_rtmp_session_t *s, ngx_file_t *f,
        ngx_uint_t offset);
 static ngx_int_t ngx_rtmp_flv_stop(ngx_rtmp_session_t *s, ngx_file_t *f);
-static ngx_int_t ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f,
+                                   ngx_uint_t *ts);
 
 
 typedef struct {
@@ -389,7 +391,7 @@ ngx_rtmp_flv_read_meta(ngx_rtmp_session_t *s, ngx_file_t *f)
 
 
 static ngx_int_t
-ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f)
+ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
 {
     ngx_rtmp_flv_ctx_t             *ctx;
     uint32_t                        last_timestamp;
@@ -567,7 +569,28 @@ ngx_rtmp_flv_init(ngx_rtmp_session_t *s, ngx_file_t *f)
 
 
 static ngx_int_t
-ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
+ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f)
+{
+    ngx_rtmp_flv_ctx_t             *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_flv_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                  "flv: start");
+
+    ctx->offset = -1;
+    ctx->msg_mask = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_flv_seek(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
 {
     ngx_rtmp_flv_ctx_t             *ctx;
 
@@ -578,11 +601,9 @@ ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                  "flv: start timestamp=%ui", timestamp);
+                  "flv: seek timestamp=%ui", timestamp);
 
     ctx->start_timestamp = timestamp;
-    ctx->offset = -1;
-    ctx->msg_mask = 0;
 
     return NGX_OK;
 }
@@ -635,6 +656,7 @@ ngx_rtmp_flv_postconfiguration(ngx_conf_t *cf)
 
     fmt->init  = ngx_rtmp_flv_init;
     fmt->start = ngx_rtmp_flv_start;
+    fmt->seek  = ngx_rtmp_flv_seek;
     fmt->stop  = ngx_rtmp_flv_stop;
     fmt->send  = ngx_rtmp_flv_send;
 

@@ -9,12 +9,15 @@
 
 
 static ngx_int_t ngx_rtmp_mp4_postconfiguration(ngx_conf_t *cf);
-static ngx_int_t ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f);
-static ngx_int_t ngx_rtmp_mp4_done(ngx_rtmp_session_t *s, ngx_file_t *f);
-static ngx_int_t ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f,
-       ngx_uint_t offset);
-static ngx_int_t ngx_rtmp_mp4_stop(ngx_rtmp_session_t *s, ngx_file_t *f);
-static ngx_int_t ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_init(ngx_rtmp_session_t *s,  ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_done(ngx_rtmp_session_t *s,  ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_seek(ngx_rtmp_session_t *s,  ngx_file_t *f,
+                                   ngx_uint_t offset);
+static ngx_int_t ngx_rtmp_mp4_stop(ngx_rtmp_session_t *s,  ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_send(ngx_rtmp_session_t *s,  ngx_file_t *f,
+                                   ngx_uint_t *ts);
+static ngx_int_t ngx_rtmp_mp4_reset(ngx_rtmp_session_t *s);
 
 
 #pragma pack(push,4)
@@ -1921,7 +1924,7 @@ ngx_rtmp_mp4_seek_track(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t,
 
 
 static ngx_int_t
-ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
+ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
 {
     ngx_rtmp_mp4_ctx_t             *ctx;
     ngx_buf_t                       in_buf;
@@ -1962,6 +1965,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f)
 
     sched  = 0;
     active = 0;
+    last_timestamp = 0;
 
     end_timestamp = ctx->start_timestamp + 
                     (ngx_current_msec - ctx->epoch) + buflen;
@@ -2123,7 +2127,17 @@ next:
         return sched;
     }
 
-    return active ? NGX_OK : NGX_DONE;
+    if (active) {
+        return NGX_OK;
+    }
+
+    if (ts) {
+        *ts = last_timestamp;
+    }
+
+    /*ngx_rtmp_mp4_reset(s);*/
+
+    return NGX_DONE;
 }
 
 
@@ -2227,7 +2241,7 @@ ngx_rtmp_mp4_done(ngx_rtmp_session_t *s, ngx_file_t *f)
 
 
 static ngx_int_t
-ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
+ngx_rtmp_mp4_seek(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
 {
     ngx_rtmp_mp4_ctx_t     *ctx;
     ngx_uint_t              n;
@@ -2239,7 +2253,7 @@ ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: start timestamp=%ui", timestamp);
+                   "mp4: seek timestamp=%ui", timestamp);
 
     for (n = 0; n < ctx->ntracks; ++n) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -2248,8 +2262,51 @@ ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
         ngx_rtmp_mp4_seek_track(s, &ctx->tracks[n], timestamp);
     }
 
-    ctx->epoch = ngx_current_msec;
     ctx->start_timestamp = timestamp;
+
+    return ngx_rtmp_mp4_reset(s);
+}
+
+
+static ngx_int_t
+ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f)
+{
+    ngx_rtmp_mp4_ctx_t     *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "mp4: start timestamp=%uD", ctx->start_timestamp);
+
+    ctx->epoch = ngx_current_msec;
+
+    return NGX_OK;/*ngx_rtmp_mp4_reset(s);*/
+}
+
+
+static ngx_int_t
+ngx_rtmp_mp4_reset(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_mp4_ctx_t     *ctx;
+    ngx_rtmp_mp4_cursor_t  *cr;
+    ngx_rtmp_mp4_track_t   *t;
+    ngx_uint_t              n;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    t = &ctx->tracks[0];
+    for (n = 0; n < ctx->ntracks; ++n, ++t) {
+        cr = &t->cursor;
+        cr->not_first = 0;
+    }
 
     return NGX_OK;
 }
@@ -2258,10 +2315,20 @@ ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
 static ngx_int_t
 ngx_rtmp_mp4_stop(ngx_rtmp_session_t *s, ngx_file_t *f)
 {
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: stop");
+    ngx_rtmp_mp4_ctx_t     *ctx;
 
-    return NGX_OK;
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    ctx->start_timestamp += (ngx_current_msec - ctx->epoch);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "mp4: stop timestamp=%uD", ctx->start_timestamp);
+
+    return NGX_OK;/*ngx_rtmp_mp4_reset(s);*/
 }
 
 
@@ -2294,6 +2361,7 @@ ngx_rtmp_mp4_postconfiguration(ngx_conf_t *cf)
 
     fmt->init  = ngx_rtmp_mp4_init;
     fmt->done  = ngx_rtmp_mp4_done;
+    fmt->seek  = ngx_rtmp_mp4_seek;
     fmt->start = ngx_rtmp_mp4_start;
     fmt->stop  = ngx_rtmp_mp4_stop;
     fmt->send  = ngx_rtmp_mp4_send;

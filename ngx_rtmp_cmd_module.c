@@ -1003,71 +1003,17 @@ ngx_rtmp_cmd_pause_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 static ngx_int_t
 ngx_rtmp_cmd_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
 {
-    ngx_rtmp_header_t               h;
-
-    static double                   trans;
-
-    static ngx_rtmp_amf_elt_t       out_inf[] = {
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("code"),
-          "NetStream.Pause.Notify", 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("level"),
-          "status", 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("description"),
-          "Paused.", 0 },
-    };
-
-    static ngx_rtmp_amf_elt_t       out_elts[] = {
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          "onStatus", 0 },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_null_string,
-          &trans, 0 },
-
-        { NGX_RTMP_AMF_NULL, 
-          ngx_null_string,
-          NULL, 0 },
-
-        { NGX_RTMP_AMF_OBJECT, 
-          ngx_null_string,
-          out_inf, sizeof(out_inf) },
-    };
-
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "pause: state='%i' position=%i",
-            v->pause, (ngx_int_t) v->position);
-
-    /* send onStatus reply */
-    ngx_memzero(&h, sizeof(h));
-    h.type = NGX_RTMP_MSG_AMF_CMD;
-    h.csid = NGX_RTMP_CMD_CSID_AMF;
-    h.msid = NGX_RTMP_CMD_MSID;
+                  "pause: state='%i' position=%i",
+                  v->pause, (ngx_int_t) v->position);
 
     if (v->pause) {
-        out_inf[0].data = "NetStream.Pause.Notify";
-        out_inf[2].data = "Paused.";
-        return ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID) != NGX_OK
-            || ngx_rtmp_send_amf(s, &h, out_elts,
-                    sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK
-            ? NGX_ERROR
-            : NGX_OK;
+        return ngx_rtmp_send_status(s, "NetStream.Pause.Notify", "status",
+                                    "Paused");
+    } else {
+        return ngx_rtmp_send_status(s, "NetStream.Unpause.Notify", "status",
+                                    "Unpaused");
     }
-
-    out_inf[0].data = "NetStream.Unpause.Notify";
-    out_inf[2].data = "Unpaused.";
-    return ngx_rtmp_send_user_stream_begin(s, NGX_RTMP_CMD_MSID) != NGX_OK
-        || ngx_rtmp_send_amf(s, &h, out_elts,
-                sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK
-        ? NGX_ERROR
-        : NGX_OK;
 }
 
 
@@ -1124,57 +1070,13 @@ ngx_rtmp_cmd_seek_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 static ngx_int_t
 ngx_rtmp_cmd_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
 {
-    ngx_rtmp_header_t               h;
-
-    static double                   trans;
-
-    static ngx_rtmp_amf_elt_t       out_inf[] = {
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("code"),
-          "NetStream.Play.Reset", 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("level"),
-          "status", 0 },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_string("description"),
-          "Paused.", 0 },
-    };
-
-    static ngx_rtmp_amf_elt_t       out_elts[] = {
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          "onStatus", 0 },
-
-        { NGX_RTMP_AMF_NUMBER, 
-          ngx_null_string,
-          &trans, 0 },
-
-        { NGX_RTMP_AMF_NULL, 
-          ngx_null_string,
-          NULL, 0 },
-
-        { NGX_RTMP_AMF_OBJECT, 
-          ngx_null_string,
-          out_inf, sizeof(out_inf) },
-    };
-
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "seek: offset=%i", (ngx_int_t) v->offset);
-
-    /* send onStatus reply */
-    ngx_memzero(&h, sizeof(h));
-    h.type = NGX_RTMP_MSG_AMF_CMD;
-    h.csid = NGX_RTMP_CMD_CSID_AMF;
-    h.msid = NGX_RTMP_CMD_MSID;
+                  "seek: offset=%i", (ngx_int_t) v->offset);
 
     return (ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID) != NGX_OK
         || ngx_rtmp_send_user_stream_begin(s, NGX_RTMP_CMD_MSID) != NGX_OK
-        || ngx_rtmp_send_amf(s, &h, out_elts,
-            sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK)
+        || ngx_rtmp_send_status(s, "NetStream.Seek.Notify", "status",
+                                "Seeking")
         ? NGX_ERROR
         : NGX_OK;
 }

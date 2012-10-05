@@ -19,10 +19,18 @@ static ngx_int_t ngx_rtmp_play_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_play_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, 
        void *parent, void *child);
-static ngx_int_t ngx_rtmp_play_init(ngx_rtmp_session_t *s);
-static ngx_int_t ngx_rtmp_play_done(ngx_rtmp_session_t *s);
-static ngx_int_t ngx_rtmp_play_start(ngx_rtmp_session_t *s, double timestamp);
-static ngx_int_t ngx_rtmp_play_stop(ngx_rtmp_session_t *s);
+
+static ngx_int_t ngx_rtmp_play_do_init(ngx_rtmp_session_t *s);
+static ngx_int_t ngx_rtmp_play_do_done(ngx_rtmp_session_t *s);
+static ngx_int_t ngx_rtmp_play_do_start(ngx_rtmp_session_t *s);
+static ngx_int_t ngx_rtmp_play_do_stop(ngx_rtmp_session_t *s);
+static ngx_int_t ngx_rtmp_play_do_seek(ngx_rtmp_session_t *s,
+                                       ngx_uint_t timestamp);
+
+static ngx_int_t ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v);
+static ngx_int_t ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v);
+static ngx_int_t ngx_rtmp_play_pause(ngx_rtmp_session_t *s,
+                                     ngx_rtmp_pause_t *v);
 static void ngx_rtmp_play_send(ngx_event_t *e);
 
 
@@ -122,6 +130,7 @@ ngx_rtmp_play_send(ngx_event_t *e)
     ngx_rtmp_session_t     *s = e->data;
     ngx_rtmp_play_ctx_t    *ctx;
     ngx_int_t               rc;
+    ngx_uint_t              ts;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
@@ -129,7 +138,9 @@ ngx_rtmp_play_send(ngx_event_t *e)
         return;
     }
 
-    rc = ctx->fmt->send(s, &ctx->file);
+    ts = 0;
+
+    rc = ctx->fmt->send(s, &ctx->file, &ts);
 
     if (rc > 0) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -161,13 +172,14 @@ ngx_rtmp_play_send(ngx_event_t *e)
 
     ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_MSID);
 
-    ngx_rtmp_send_play_status(s, "NetStream.Play.Complete", "status", 0, 0);
+    ngx_rtmp_send_play_status(s, "NetStream.Play.Complete", "status", ts, 0);
+
     ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status", "Stopped");
 }
 
 
 static ngx_int_t
-ngx_rtmp_play_init(ngx_rtmp_session_t *s)
+ngx_rtmp_play_do_init(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_play_ctx_t            *ctx;
 
@@ -188,7 +200,7 @@ ngx_rtmp_play_init(ngx_rtmp_session_t *s)
 
 
 static ngx_int_t
-ngx_rtmp_play_done(ngx_rtmp_session_t *s)
+ngx_rtmp_play_do_done(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_play_ctx_t            *ctx;
 
@@ -209,10 +221,9 @@ ngx_rtmp_play_done(ngx_rtmp_session_t *s)
 
 
 static ngx_int_t
-ngx_rtmp_play_start(ngx_rtmp_session_t *s, double timestamp)
+ngx_rtmp_play_do_start(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_play_ctx_t            *ctx;
-    ngx_uint_t                      ts;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
@@ -220,27 +231,53 @@ ngx_rtmp_play_start(ngx_rtmp_session_t *s, double timestamp)
         return NGX_ERROR;
     }
 
-    ngx_rtmp_play_stop(s);
-
-    ts = (timestamp > 0 ? (ngx_uint_t) timestamp : 0);
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "play: start timestamp=%ui", ts);
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: start");
 
     if (ctx->fmt && ctx->fmt->start &&
-        ctx->fmt->start(s, &ctx->file, ts) != NGX_OK)
+        ctx->fmt->start(s, &ctx->file) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
     ngx_post_event((&ctx->send_evt), &ngx_posted_events);
 
+    ctx->playing = 1;
+
     return NGX_OK;
 }
 
 
 static ngx_int_t
-ngx_rtmp_play_stop(ngx_rtmp_session_t *s)
+ngx_rtmp_play_do_seek(ngx_rtmp_session_t *s, ngx_uint_t timestamp)
+{
+    ngx_rtmp_play_ctx_t            *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+
+    if (ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: seek timestamp=%ui", timestamp);
+
+    if (ctx->fmt && ctx->fmt->seek &&
+        ctx->fmt->seek(s, &ctx->file, timestamp) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ctx->playing) {
+        ngx_post_event((&ctx->send_evt), &ngx_posted_events);
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_do_stop(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_play_ctx_t            *ctx;
 
@@ -267,6 +304,8 @@ ngx_rtmp_play_stop(ngx_rtmp_session_t *s)
         return NGX_ERROR;
     }
 
+    ctx->playing = 0;
+
     return NGX_OK;
 }
 
@@ -285,9 +324,9 @@ ngx_rtmp_play_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "play: close_stream");
 
-    ngx_rtmp_play_stop(s);
+    ngx_rtmp_play_do_stop(s);
 
-    ngx_rtmp_play_done(s);
+    ngx_rtmp_play_do_done(s);
 
     if (ctx->file.fd != NGX_INVALID_FILE) {
         ngx_close_file(ctx->file.fd);
@@ -309,10 +348,7 @@ ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
         goto next;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "play: seek offset=%f", v->offset);
-
-    ngx_rtmp_play_start(s, v->offset);
+    ngx_rtmp_play_do_seek(s, v->offset);
 
 next:
     return next_seek(s, v);
@@ -335,9 +371,9 @@ ngx_rtmp_play_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
                    (ngx_int_t) v->pause, v->position);
 
     if (v->pause) {
-        ngx_rtmp_play_stop(s);
+        ngx_rtmp_play_do_stop(s);
     } else {
-        ngx_rtmp_play_start(s, v->position);
+        ngx_rtmp_play_do_start(s); /*TODO: v->position? */
     }
 
 next:
@@ -476,11 +512,15 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ngx_rtmp_send_user_recorded(s, 1);
 
-    if (ngx_rtmp_play_init(s) != NGX_OK) {
+    if (ngx_rtmp_play_do_init(s) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    if (ngx_rtmp_play_start(s, v->start) != NGX_OK) {
+    if (ngx_rtmp_play_do_seek(s, v->start < 0 ? 0 : v->start) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_play_do_start(s) != NGX_OK) {
         return NGX_ERROR;
     }
 
