@@ -111,6 +111,14 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       offsetof(ngx_rtmp_record_app_conf_t, interval),
       NULL },
 
+    { ngx_string("record_notify"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, notify),
+      NULL },
+
     { ngx_string("recorder"),
       NGX_RTMP_APP_CONF|NGX_CONF_BLOCK|NGX_CONF_TAKE1,
       ngx_rtmp_record_recorder,
@@ -166,6 +174,7 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     racf->max_frames = NGX_CONF_UNSET;
     racf->interval   = NGX_CONF_UNSET;
     racf->unique     = NGX_CONF_UNSET;
+    racf->notify     = NGX_CONF_UNSET;
     racf->url        = NGX_CONF_UNSET_PTR;
 
     ngx_str_set(&racf->id, "default");
@@ -190,6 +199,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
     ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
     ngx_conf_merge_value(conf->unique, prev->unique, 0);
+    ngx_conf_merge_value(conf->notify, prev->notify, 0);
     ngx_conf_merge_msec_value(conf->interval, prev->interval, 
                               (ngx_msec_t) NGX_CONF_UNSET);
     ngx_conf_merge_bitmask_value(conf->flags, prev->flags, 0);
@@ -397,6 +407,11 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                    "record: %V opened '%V'", &rracf->id, &path);
 
+    if (rracf->notify) {
+        ngx_rtmp_send_status(s, "NetStream.Record.Start", "status",
+                             rracf->id.data ? (char *) rracf->id.data : "");
+    }
+
     return NGX_OK;
 }
 
@@ -539,6 +554,11 @@ ngx_rtmp_record_node_close(ngx_rtmp_session_t *s,
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                    "record: %V closed", &rracf->id);
+
+    if (rracf->notify) {
+        ngx_rtmp_send_status(s, "NetStream.Record.Stop", "status",
+                             rracf->id.data ? (char *) rracf->id.data : "");
+    }
 
     app_conf = s->app_conf;
 

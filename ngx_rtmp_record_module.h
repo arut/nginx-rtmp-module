@@ -26,6 +26,7 @@ typedef struct {
     ngx_msec_t                          interval;
     ngx_str_t                           suffix;
     ngx_flag_t                          unique;
+    ngx_flag_t                          notify;
     ngx_url_t                          *url;
 
     void                              **rec_conf;
