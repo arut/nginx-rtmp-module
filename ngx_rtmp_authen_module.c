@@ -104,6 +104,7 @@ ngx_rtmp_authen_connect_create(ngx_rtmp_session_t *s, void *arg,
     ngx_rtmp_authen_app_conf_t    *aacf;
     ngx_chain_t                   *hl, *cl, *pl;
     ngx_buf_t                     *b;
+    ngx_str_t                     *addr_text;
 
     aacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_authen_module);
 
@@ -121,7 +122,11 @@ ngx_rtmp_authen_connect_create(ngx_rtmp_session_t *s, void *arg,
         return NULL;
     }
 
-    b = ngx_create_temp_buf(pool, sizeof("&call=connect"));
+    addr_text = &s->connection->addr_text;
+
+    b = ngx_create_temp_buf(pool,
+            sizeof("&call=connect") +
+            sizeof("&addr=") + addr_text->len);
     if (b == NULL) {
         return NULL;
     }
@@ -130,6 +135,10 @@ ngx_rtmp_authen_connect_create(ngx_rtmp_session_t *s, void *arg,
 
     b->last = ngx_cpymem(b->last, (u_char *)"&call=connect",
             sizeof("&call=connect") - 1);
+
+    b->last = ngx_cpymem(b->last, (u_char *)"&addr=", sizeof("&addr=") - 1);
+    b->last = (u_char *)ngx_escape_uri(b->last, addr_text->data,
+            addr_text->len, 0);
 
     /* HTTP header */
     hl = ngx_rtmp_netcall_http_format_header(aacf->connect_url, pool,
