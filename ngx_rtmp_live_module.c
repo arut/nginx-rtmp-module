@@ -67,6 +67,13 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, atc),
       NULL },
 
+    { ngx_string("interleave"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, interleave),
+      NULL },
+
       ngx_null_command
 };
 
@@ -115,6 +122,7 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->buflen = NGX_CONF_UNSET;
     lacf->sync = NGX_CONF_UNSET;
     lacf->atc = NGX_CONF_UNSET;
+    lacf->interleave = NGX_CONF_UNSET;
 
     return lacf;
 }
@@ -132,6 +140,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 0);
     ngx_conf_merge_value(conf->atc, prev->atc, 0);
+    ngx_conf_merge_value(conf->interleave, prev->interleave, 0);
 
     conf->pool = ngx_create_pool(4096, &cf->cycle->new_log);
     if (conf->pool == NULL) {
@@ -365,19 +374,25 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ch.msid = NGX_RTMP_LIVE_MSID;
     ch.type = h->type;
     lh.msid = ch.msid;
+
+    if (lacf->interleave || h->type == NGX_RTMP_MSG_VIDEO) {
+        last_offset = offsetof(ngx_rtmp_live_ctx_t, last_video);
+    } else {
+        last_offset = offsetof(ngx_rtmp_live_ctx_t, last_audio);
+    }
+
+    last = (uint32_t *)((u_char *)ctx + last_offset);
+    lh.timestamp = *last;
+    *last = ch.timestamp;
+
     if (h->type == NGX_RTMP_MSG_VIDEO) {
         prio = ngx_rtmp_get_video_frame_type(in);
         ch.csid = NGX_RTMP_LIVE_CSID_VIDEO;
-        lh.timestamp = ctx->last_video;
-        ctx->last_video = ch.timestamp;
-        last_offset = offsetof(ngx_rtmp_live_ctx_t, last_video);
     } else {
         prio = 0;
         ch.csid = NGX_RTMP_LIVE_CSID_AUDIO;
-        lh.timestamp = ctx->last_audio;
-        ctx->last_audio = ch.timestamp;
-        last_offset = offsetof(ngx_rtmp_live_ctx_t, last_audio);
     }
+
     lh.csid = ch.csid;
     diff_timestamp = ch.timestamp - lh.timestamp;
 
@@ -431,7 +446,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
 
         /* send absolute frame */
-        if ((pctx->msg_mask & (1 << h->type)) == 0) {
+        if ((pctx->msg_mask & (1 << ch.csid)) == 0) {
 
             /* packet from the past for the peer */
             if (lacf->atc == 0 && timestamp < (uint32_t)ss->epoch) {
@@ -452,7 +467,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                     header_out ? header_out : in);
             ngx_rtmp_prepare_message(s, &ch, NULL, peer_out);
             if (ngx_rtmp_send_message(ss, peer_out, prio) == NGX_OK) {
-                pctx->msg_mask |= (1 << h->type);
+                pctx->msg_mask |= (1 << ch.csid);
                 if (header_out) {
                     *(ngx_uint_t *)((u_char *)pctx + header_offset) 
                         = header_version;
