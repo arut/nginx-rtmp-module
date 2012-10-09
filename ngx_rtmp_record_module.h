@@ -51,6 +51,10 @@ typedef struct {
 } ngx_rtmp_record_ctx_t;
 
 
+ngx_uint_t ngx_rtmp_record_find(ngx_rtmp_record_app_conf_t *racf,
+           ngx_str_t *id);
+
+
 /* Manual recording control,
  * 'n' is record node index in config array.
  * Note: these functions allocate path in static buffer */
