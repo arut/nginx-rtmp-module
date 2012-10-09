@@ -164,6 +164,13 @@ ngx_rtmp_ping(ngx_event_t *pev)
         return;
     }
 
+    if (cscf->busy) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0, 
+                "ping: not busy between pings");
+        ngx_rtmp_finalize_session(s);
+        return;
+    }
+
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "ping: schedule %Mms", cscf->ping_timeout);
 

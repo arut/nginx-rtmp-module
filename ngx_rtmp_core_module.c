@@ -127,6 +127,13 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, out_cork),
       NULL },
 
+    { ngx_string("busy"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, busy),
+      NULL },
+
     /* time fixes are needed for flash clients */
     { ngx_string("play_time_fix"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
@@ -232,6 +239,7 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->out_cork = NGX_CONF_UNSET;
     conf->play_time_fix = NGX_CONF_UNSET;
     conf->publish_time_fix = NGX_CONF_UNSET;
+    conf->busy = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -258,6 +266,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
             conf->out_queue / 8);
     ngx_conf_merge_value(conf->play_time_fix, prev->play_time_fix, 1);
     ngx_conf_merge_value(conf->publish_time_fix, prev->publish_time_fix, 1);
+    ngx_conf_merge_value(conf->busy, prev->busy, 0);
 
     if (prev->pool == NULL) {
         prev->pool = ngx_create_pool(4096, &cf->cycle->new_log);
