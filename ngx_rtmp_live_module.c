@@ -393,6 +393,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ch.csid = NGX_RTMP_LIVE_CSID_AUDIO;
     }
 
+    if (lacf->interleave) {
+        ch.csid = NGX_RTMP_LIVE_CSID_VIDEO;
+    }
+
     lh.csid = ch.csid;
     diff_timestamp = ch.timestamp - lh.timestamp;
 
