@@ -221,7 +221,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
              * 3 bytes until 18-22 bits of AAC header */
             if (in->buf->last - in->buf->pos >= 5) {
                 ctx->aac_sample_rate = aac_sample_rates[
-                                       (in->buf->pos[4] >> 2) & 0xff];
+                                       (in->buf->pos[4] >> 2) & 0xf];
                 ctx->sample_rate = ctx->aac_sample_rate;
             }
 
