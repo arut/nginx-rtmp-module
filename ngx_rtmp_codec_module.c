@@ -162,6 +162,11 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static ngx_uint_t                   sample_rates[] = 
                                         { 5512, 11025, 22050, 44100 };
 
+    static ngx_uint_t                   aac_sample_rates[] = 
+                                        { 96000, 88200, 64000, 48000,
+                                          44100, 32000, 24000, 22050,
+                                          16000, 12000, 11025,  8000,
+                                           7350,     0,     0,    0 };
 
     if (h->type != NGX_RTMP_MSG_AUDIO && h->type != NGX_RTMP_MSG_VIDEO) {
         return NGX_OK;
@@ -183,7 +188,10 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->audio_codec_id = (fmt & 0xf0) >> 4;
         ctx->audio_channels = (fmt & 0x01) + 1;
         ctx->sample_size = (fmt & 0x02) ? 2 : 1;
-        ctx->sample_rate = sample_rates[(fmt & 0x0c) >> 2];
+
+        if (ctx->aac_sample_rate == 0) {
+            ctx->sample_rate = sample_rates[(fmt & 0x0c) >> 2];
+        }
     } else {
         ctx->video_codec_id = (fmt & 0x0f);
     }
@@ -207,8 +215,19 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             header = &ctx->aac_header;
             pheader = &ctx->aac_pheader;
             version = &ctx->aac_version;
-            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                    "codec: AAC header arrived");
+            
+            /* 1 byte RTMP audio header
+             * 1 byte AAC conf/data
+             * 3 bytes until 18-22 bits of AAC header */
+            if (in->buf->last - in->buf->pos >= 5) {
+                ctx->aac_sample_rate = aac_sample_rates[
+                                       (in->buf->pos[4] >> 2) & 0xff];
+                ctx->sample_rate = ctx->aac_sample_rate;
+            }
+
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "codec: AAC header arrived, sample_rate=%u", 
+                           ctx->aac_sample_rate);
         }
     } else {
         if (ctx->video_codec_id == NGX_RTMP_VIDEO_H264) {
