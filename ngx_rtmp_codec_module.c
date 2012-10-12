@@ -226,7 +226,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
 
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "codec: AAC header arrived, sample_rate=%u", 
+                           "codec: AAC header arrived, sample_rate=%ui", 
                            ctx->aac_sample_rate);
         }
     } else {
