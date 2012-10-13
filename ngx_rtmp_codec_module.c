@@ -158,7 +158,8 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t                       **header, **pheader;
     uint8_t                             fmt;
     ngx_rtmp_header_t                   ch, lh;
-    ngx_uint_t                         *version;
+    ngx_uint_t                         *version, idx;
+    u_char                             *p;
     static ngx_uint_t                   sample_rates[] = 
                                         { 5512, 11025, 22050, 44100 };
 
@@ -216,12 +217,48 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             pheader = &ctx->aac_pheader;
             version = &ctx->aac_version;
             
-            /* 1 byte RTMP audio header
-             * 1 byte AAC conf/data
-             * 3 bytes until 18-22 bits of AAC header */
-            if (in->buf->last - in->buf->pos >= 5) {
-                ctx->aac_sample_rate = aac_sample_rates[
-                                       (in->buf->pos[4] >> 2) & 0xf];
+            if (in->buf->last - in->buf->pos > 3) {
+                p = in->buf->pos + 2;
+
+                /* MPEG-4 Audio Specific Config
+
+                   5 bits: object type
+                   if (object type == 31)
+                   6 bits + 32: object type
+               --->4 bits: frequency index
+                   if (frequency index == 15)
+                   24 bits: frequency
+                   4 bits: channel configuration
+                   var bits: AOT Specific Config
+                 */
+
+                if ((p[0] >> 3) == 0x1f) {
+                    idx = (p[1] >> 1) & 0x0f;
+                } else {
+                    idx = ((p[0] << 1) & 0x0f) | (p[1] >> 7);
+                }
+
+#ifdef NGX_DEBUG
+                {
+                    u_char buf[256], *p, *pp;
+                    u_char hex[] = "01234567890abcdef";
+
+                    for (pp = buf, p = in->buf->pos;
+                         p < in->buf->last && pp < buf + sizeof(buf) - 1;
+                         ++p)
+                    {
+                        *pp++ = hex[*p >> 4];
+                        *pp++ = hex[*p & 0x0f];
+                    }
+
+                    *pp = 0;
+
+                    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                            "codec: AAC header: %s", buf);
+                }
+#endif
+
+                ctx->aac_sample_rate = aac_sample_rates[idx];
                 ctx->sample_rate = ctx->aac_sample_rate;
             }
 
