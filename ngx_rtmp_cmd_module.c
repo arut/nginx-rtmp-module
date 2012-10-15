@@ -1076,7 +1076,7 @@ ngx_rtmp_cmd_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
     return (ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_CMD_MSID) != NGX_OK
         || ngx_rtmp_send_user_stream_begin(s, NGX_RTMP_CMD_MSID) != NGX_OK
         || ngx_rtmp_send_status(s, "NetStream.Seek.Notify", "status",
-                                "Seeking")
+                                "Seeking"))
         ? NGX_ERROR
         : NGX_OK;
 }
