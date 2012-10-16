@@ -947,7 +947,6 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /* write to file */
     av_init_packet(&packet);
     packet.dts = h->timestamp * 90L;
-    packet.pts = packet.dts;
     packet.stream_index = ctx->out_astream;
     packet.data = buffer;
     packet.size = ngx_rtmp_hls_chain2buffer(buffer, sizeof(buffer), in, 1);
@@ -960,6 +959,10 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         dts = ctx->aframe_base + ctx->aframe_num * 90000 * 1024 /
                                  codec_ctx->sample_rate;
         ddts = dts - packet.dts;
+
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: sync stat ddts=%L (%.5fs)",
+                       ddts, ddts / 90000.);
 
         if (ddts > (int64_t) hacf->sync * 90 ||
             ddts < (int64_t) hacf->sync * -90)
@@ -976,6 +979,8 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         ctx->aframe_num++;
     }
+
+    packet.pts = packet.dts;
 
     if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
         if (packet.size == 0) {
@@ -1160,7 +1165,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->playlen = NGX_CONF_UNSET;
     conf->nbuckets = 1024;
 
-	return conf;
+    return conf;
 }
 
 
