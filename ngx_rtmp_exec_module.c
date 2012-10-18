@@ -308,10 +308,10 @@ ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
 static ngx_int_t
 ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 {
-#ifndef NGX_WIN32
+#if !(NGX_WIN32)
     ngx_rtmp_exec_app_conf_t       *eacf;
     ngx_rtmp_exec_ctx_t            *ctx;
-    int                             pid, fd;
+    int                             pid, fd, maxfd;
     int                             pipefd[2];
     int                             ret;
     ngx_rtmp_exec_conf_t           *ec;
@@ -324,6 +324,8 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_exec_module);
     e = ctx->execs + n;
+
+    ngx_memzero(e, sizeof(*e));
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "exec: starting child '%V'", 
@@ -360,6 +362,17 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 
         case 0:
             /* child */
+
+            /* close all descriptors but pipe write end */
+            maxfd = sysconf(_SC_OPEN_MAX);
+            for (fd = 0; fd < maxfd; ++fd) {
+                if (fd == pipefd[1]) {
+                    continue;
+                }
+
+                close(fd);
+            }
+
             fd = open("/dev/null", O_RDWR);            
 
             dup2(fd, STDIN_FILENO);

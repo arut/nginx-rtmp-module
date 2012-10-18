@@ -242,7 +242,7 @@ ngx_rtmp_enotify_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 static ngx_int_t
 ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 {
-#ifndef NGX_WIN32
+#if !(NGX_WIN32)
     int                         pid, fd;
     ngx_str_t                   a, *arg;
     char                      **args;
