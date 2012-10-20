@@ -290,11 +290,11 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* equal headers; timeout diff is zero */
     ngx_memzero(&ch, sizeof(ch));
-    ch.msid = NGX_RTMP_LIVE_MSID;
+    ch.msid = NGX_RTMP_MSID;
     ch.type = h->type;
     ch.csid = (h->type == NGX_RTMP_MSG_VIDEO
-        ? NGX_RTMP_LIVE_CSID_VIDEO
-        : NGX_RTMP_LIVE_CSID_AUDIO);
+        ? NGX_RTMP_CSID_VIDEO
+        : NGX_RTMP_CSID_AUDIO);
     lh = ch;
     *header = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
     *pheader = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
@@ -428,8 +428,8 @@ ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
     }
 
     ngx_memzero(&h, sizeof(h));
-    h.csid = NGX_RTMP_LIVE_CSID_META;
-    h.msid = NGX_RTMP_LIVE_MSID;
+    h.csid = NGX_RTMP_CSID_AMF;
+    h.msid = NGX_RTMP_MSID;
     h.type = NGX_RTMP_MSG_AMF_META;
     ngx_rtmp_prepare_message(s, &h, NULL, ctx->meta);
 

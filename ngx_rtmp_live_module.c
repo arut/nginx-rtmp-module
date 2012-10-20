@@ -337,18 +337,18 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_memzero(&ch, sizeof(ch));
     ngx_memzero(&lh, sizeof(lh));
     ch.timestamp = h->timestamp;
-    ch.msid = NGX_RTMP_LIVE_MSID;
+    ch.msid = NGX_RTMP_MSID;
     ch.type = h->type;
     lh.msid = ch.msid;
     if (h->type == NGX_RTMP_MSG_VIDEO) {
         prio = ngx_rtmp_get_video_frame_type(in);
-        ch.csid = NGX_RTMP_LIVE_CSID_VIDEO;
+        ch.csid = NGX_RTMP_CSID_VIDEO;
         lh.timestamp = ctx->last_video;
         ctx->last_video = ch.timestamp;
     } else {
         /* audio priority is the same as video key frame's */
         prio = NGX_RTMP_VIDEO_KEY_FRAME;
-        ch.csid = NGX_RTMP_LIVE_CSID_AUDIO;
+        ch.csid = NGX_RTMP_CSID_AUDIO;
         lh.timestamp = ctx->last_audio;
         ctx->last_audio = ch.timestamp;
     }
