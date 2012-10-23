@@ -28,6 +28,10 @@ static ngx_int_t ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname,
        ngx_url_t *url);
 
 
+ngx_str_t   ngx_rtmp_notify_urlencoded = 
+            ngx_string("application/x-www-form-urlencoded");
+
+
 #define NGX_RTMP_NOTIFY_PUBLISHING              0x01
 #define NGX_RTMP_NOTIFY_PLAYING                 0x02
 
@@ -190,6 +194,7 @@ ngx_rtmp_notify_publish_create(ngx_rtmp_session_t *s, void *arg,
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
     ngx_str_t                      *addr_text;
+    ngx_url_t                      *url;
     size_t                          name_len, type_len, args_len;
 
     nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
@@ -244,9 +249,10 @@ ngx_rtmp_notify_publish_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(nacf->url[NGX_RTMP_NOTIFY_PUBLISH],
+    url = nacf->url[NGX_RTMP_NOTIFY_PUBLISH];
+    hl = ngx_rtmp_netcall_http_format_header(&url->uri, &url->host,
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
-            &ngx_rtmp_netcall_content_type_urlencoded);
+            &ngx_rtmp_notify_urlencoded);
 
     if (hl == NULL) {
         return NULL;
@@ -270,6 +276,7 @@ ngx_rtmp_notify_play_create(ngx_rtmp_session_t *s, void *arg,
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
     ngx_str_t                      *addr_text;
+    ngx_url_t                      *url;
     size_t                          name_len, args_len;
 
     nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
@@ -324,9 +331,10 @@ ngx_rtmp_notify_play_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(nacf->url[NGX_RTMP_NOTIFY_PLAY],
+    url = nacf->url[NGX_RTMP_NOTIFY_PLAY];
+    hl = ngx_rtmp_netcall_http_format_header(&url->uri, &url->host,
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
-            &ngx_rtmp_netcall_content_type_urlencoded);
+            &ngx_rtmp_notify_urlencoded);
 
     if (hl == NULL) {
         return NULL;
@@ -401,9 +409,9 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(ds->url, pool,
-            cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
-            &ngx_rtmp_netcall_content_type_urlencoded);
+    hl = ngx_rtmp_netcall_http_format_header(&ds->url->uri, &ds->url->host,
+            pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
+            &ngx_rtmp_notify_urlencoded);
 
     if (hl == NULL) {
         return NULL;
@@ -428,6 +436,7 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
     ngx_chain_t                    *hl, *cl, *pl;
     ngx_buf_t                      *b;
     ngx_str_t                      *addr_text;
+    ngx_url_t                      *url;
     size_t                          name_len, args_len;
 
     nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
@@ -489,10 +498,10 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(
-            nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE],
+    url = nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE];
+    hl = ngx_rtmp_netcall_http_format_header(&url->uri, &url->host,
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
-            &ngx_rtmp_netcall_content_type_urlencoded);
+            &ngx_rtmp_notify_urlencoded);
 
     if (hl == NULL) {
         return NULL;

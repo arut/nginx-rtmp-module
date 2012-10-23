@@ -5,6 +5,7 @@
 
 #include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_streams.h"
 
 
@@ -14,6 +15,8 @@ static ngx_rtmp_seek_pt                 next_seek;
 static ngx_rtmp_pause_pt                next_pause;
 
 
+static char *ngx_rtmp_play_url(ngx_conf_t *cf, ngx_command_t *cmd,
+       void *conf);
 static void *ngx_rtmp_play_create_main_conf(ngx_conf_t *cf);
 static ngx_int_t ngx_rtmp_play_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_play_create_app_conf(ngx_conf_t *cf);
@@ -24,15 +27,29 @@ static ngx_int_t ngx_rtmp_play_done(ngx_rtmp_session_t *s);
 static ngx_int_t ngx_rtmp_play_start(ngx_rtmp_session_t *s, double timestamp);
 static ngx_int_t ngx_rtmp_play_stop(ngx_rtmp_session_t *s);
 static void ngx_rtmp_play_send(ngx_event_t *e);
+static ngx_int_t ngx_rtmp_play_open(ngx_rtmp_session_t *s, double start);
+static ngx_int_t ngx_rtmp_play_remote_handle(ngx_rtmp_session_t *s,
+       void *arg, ngx_chain_t *in);
+static ngx_chain_t * ngx_rtmp_play_remote_create(ngx_rtmp_session_t *s,
+       void *arg, ngx_pool_t *pool);
+static ngx_int_t ngx_rtmp_play_open_remote(ngx_rtmp_session_t *s,
+       ngx_rtmp_play_t *v);
 
 
 static ngx_command_t  ngx_rtmp_play_commands[] = {
 
     { ngx_string("play"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_rtmp_play_url,
+      NGX_RTMP_APP_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("play_temp_path"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_play_app_conf_t, root),
+      offsetof(ngx_rtmp_play_app_conf_t, temp_path),
       NULL },
 
       ngx_null_command
@@ -111,6 +128,7 @@ ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_play_app_conf_t *conf = child;
 
     ngx_conf_merge_str_value(conf->root, prev->root, "");
+    ngx_conf_merge_str_value(conf->temp_path, prev->temp_path, "/tmp");
 
     return NGX_CONF_OK;
 }
@@ -352,7 +370,6 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ngx_rtmp_play_app_conf_t       *pacf;
     ngx_rtmp_play_ctx_t            *ctx;
     u_char                         *p;
-    ngx_event_t                    *e;
     ngx_rtmp_play_fmt_t            *fmt, **pfmt;
     ngx_str_t                      *pfx, *sfx;
     ngx_str_t                       name;
@@ -457,17 +474,46 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     p = ngx_snprintf(path, sizeof(path), "%V/%V%V", &pacf->root, &name, sfx);
     *p = 0;
 
+    ctx->file.fd = NGX_INVALID_FILE;
+
+    if (pacf->url) {
+        return ngx_rtmp_play_open_remote(s, v);
+    }
+
+    /* open local */
+
     ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN, 
                                  NGX_FILE_DEFAULT_ACCESS);
 
     if (ctx->file.fd == NGX_INVALID_FILE) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "play: error opening file '%s'", path);
         return NGX_ERROR;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "play: opened file '%s'", path);
+                   "play: opened local file '%s'", path);
+
+    if (ngx_rtmp_play_open(s, v->start) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+next:
+    return next_play(s, v);
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_open(ngx_rtmp_session_t *s, double start)
+{
+    ngx_rtmp_play_ctx_t    *ctx;
+    ngx_event_t            *e;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+
+    if (ctx->file.fd == NGX_INVALID_FILE) {
+        return NGX_ERROR;
+    }
 
     e = &ctx->send_evt;
     e->data = s;
@@ -480,12 +526,247 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         return NGX_ERROR;
     }
 
-    if (ngx_rtmp_play_start(s, v->start) != NGX_OK) {
+    if (ngx_rtmp_play_start(s, start) != NGX_OK) {
         return NGX_ERROR;
     }
 
-next:
-    return next_play(s, v);
+    return NGX_OK;
+}
+
+
+static ngx_chain_t *
+ngx_rtmp_play_remote_create(ngx_rtmp_session_t *s, void *arg, ngx_pool_t *pool)
+{
+    ngx_rtmp_play_t                *v = arg;
+
+    ngx_rtmp_play_app_conf_t       *pacf;
+    ngx_chain_t                    *hl, *cl, *pl;
+    ngx_buf_t                      *b;
+    ngx_str_t                      *addr_text, uri;
+    u_char                         *p;
+    size_t                          name_len, args_len;
+    static ngx_str_t                text_plain = ngx_string("text/plain");
+
+    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+
+    /* common variables */
+    cl = ngx_rtmp_netcall_http_format_session(s, pool);
+
+    if (cl == NULL) {
+        return NULL;
+    }
+
+    /* publish variables */
+    pl = ngx_alloc_chain_link(pool);
+
+    if (pl == NULL) {
+        return NULL;
+    }
+
+    name_len = ngx_strlen(v->name);
+    args_len = ngx_strlen(v->args);
+    addr_text = &s->connection->addr_text;
+
+    b = ngx_create_temp_buf(pool,
+            sizeof("&addr=") + addr_text->len +
+            1 + args_len);
+    if (b == NULL) {
+        return NULL;
+    }
+
+    pl->buf = b;
+
+    b->last = ngx_cpymem(b->last, (u_char*)"&addr=", sizeof("&addr=") -1);
+    b->last = (u_char*)ngx_escape_uri(b->last, addr_text->data,
+                                      addr_text->len, 0);
+
+    if (args_len) {
+        *b->last++ = '&';
+        b->last = (u_char *)ngx_cpymem(b->last, v->args, args_len);
+    }
+
+    /* create uri */
+    uri.len = pacf->url->uri.len + name_len;
+    uri.data = ngx_palloc(pool, uri.len);
+
+    p = ngx_cpymem(uri.data, pacf->url->uri.data, pacf->url->uri.len);
+    ngx_memcpy(p, v->name, name_len);
+
+    /* HTTP header */
+    hl = ngx_rtmp_netcall_http_format_header(&uri, &pacf->url->host,
+            pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
+            &text_plain);
+
+    if (hl == NULL) {
+        return NULL;
+    }
+
+    hl->next = cl;
+    cl->next = pl;
+    pl->next = NULL;
+
+    return hl;
+}
+
+
+static ngx_int_t 
+ngx_rtmp_play_remote_handle(ngx_rtmp_session_t *s, void *arg, ngx_chain_t *in)
+{
+    ngx_rtmp_play_t                *v = arg;
+
+    if (ngx_rtmp_play_open(s, v->start) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return next_play(s, (ngx_rtmp_play_t *)arg);
+}
+
+
+static ngx_int_t 
+ngx_rtmp_play_remote_sink(ngx_rtmp_session_t *s, ngx_chain_t *in)
+{
+    ngx_rtmp_play_ctx_t    *ctx;
+    ngx_buf_t              *b;
+    ngx_int_t               rc;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+
+    /* skip HTTP header */
+    for (; in && ctx->ncrs != 2; in = in->next) {
+        b = in->buf;
+
+        for (; b->pos != b->last && ctx->ncrs != 2; ++b->pos) {
+            switch (*b->pos) {
+                case '\n':
+                    ++ctx->ncrs;
+                    break;
+                case '\r':
+                    break;
+                default:
+                    ctx->ncrs = 0;
+            }
+        }
+    }
+
+    /* write to temp file */
+    for (; in; in = in->next) {
+        b = in->buf;
+
+        if (b->pos == b->last) {
+            continue;
+        }
+
+        rc = ngx_write_fd(ctx->file.fd, b->pos, b->last - b->pos);
+
+        if (rc == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, ngx_errno, 
+                          "play: error writing to temp file");
+            return NGX_ERROR;
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_open_remote(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
+{
+    ngx_rtmp_play_app_conf_t       *pacf;
+    ngx_rtmp_play_ctx_t            *ctx;
+    ngx_rtmp_netcall_init_t         ci;
+    u_char                         *p;
+    ngx_err_t                       err;
+    static u_char                   path[NGX_MAX_PATH];
+    static ngx_uint_t               counter;
+
+    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+
+    for ( ;; ) {
+        p = ngx_snprintf(path, sizeof(path), "%V/nginx-rtmp-play%ui",
+                         &pacf->temp_path, counter++);
+        *p = 0;
+
+        ctx->file.fd = ngx_open_tempfile(path, 0, 0);
+
+        if (ctx->file.fd != NGX_INVALID_FILE) {
+            break;
+        }
+
+        err = ngx_errno;
+
+        if (err != NGX_EEXIST) {
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, err,
+                          "play: failed to create temp file");
+
+            return NGX_ERROR;
+        }
+    }
+
+    ngx_memzero(&ci, sizeof(ci));
+
+    ci.url = pacf->url;;
+    ci.create = ngx_rtmp_play_remote_create;
+    ci.sink   = ngx_rtmp_play_remote_sink;
+    ci.handle = ngx_rtmp_play_remote_handle;
+    ci.arg = v;
+    ci.argsize = sizeof(*v);
+
+    return ngx_rtmp_netcall_create(s, &ci);
+}
+
+
+static char *
+ngx_rtmp_play_url(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_rtmp_play_app_conf_t       *pacf;
+    ngx_str_t                       url;
+    ngx_url_t                      *u;
+    size_t                          add;
+    ngx_str_t                      *value;
+
+    value = cf->args->elts;
+
+    if (ngx_strncasecmp(value[1].data, (u_char *) "http://", 7)) {
+
+        /* local file */
+
+        pacf->root = value[1];
+        return NGX_CONF_OK;
+    }
+    
+    /* http case */
+
+    url = value[1];
+
+    add = sizeof("http://") - 1;
+
+    url.data += add;
+    url.len  -= add;
+
+    u = ngx_pcalloc(cf->pool, sizeof(ngx_url_t));
+    if (u == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    u->url.len = url.len;
+    u->url.data = url.data;
+    u->default_port = 80;
+    u->uri_part = 1;
+    
+    if (ngx_parse_url(cf->pool, u) != NGX_OK) {
+        if (u->err) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "%s in url \"%V\"", u->err, &u->url);
+        }
+        return NGX_CONF_ERROR;
+    }
+
+    pacf->url = u;
+
+    return NGX_CONF_OK;
 }
 
 

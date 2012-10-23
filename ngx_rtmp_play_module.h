@@ -39,11 +39,14 @@ typedef struct {
     ngx_file_t              file;
     ngx_rtmp_play_fmt_t    *fmt;
     ngx_event_t             send_evt;
+    ngx_uint_t              ncrs;
 } ngx_rtmp_play_ctx_t;
 
 
 typedef struct {
     ngx_str_t               root;
+    ngx_str_t               temp_path;
+    ngx_url_t              *url;
 } ngx_rtmp_play_app_conf_t;
 
 
