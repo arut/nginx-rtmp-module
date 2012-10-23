@@ -491,15 +491,17 @@ ngx_rtmp_netcall_send(ngx_event_t *wev)
 
 
 ngx_chain_t *
-ngx_rtmp_netcall_http_format_header(ngx_str_t *uri, ngx_str_t *host,
-                                   ngx_pool_t *pool, size_t content_length,
-                                   ngx_str_t *content_type)
+ngx_rtmp_netcall_http_format_header(ngx_int_t method, ngx_str_t *uri,
+                                    ngx_str_t *host, ngx_pool_t *pool,
+                                    size_t content_length,
+                                    ngx_str_t *content_type)
 {
     ngx_chain_t                    *cl;
     ngx_buf_t                      *b;
+    const char                     *method_s;
 
     static char rq_tmpl[] = 
-        "POST %V HTTP/1.0\r\n"
+        "%s %V HTTP/1.0\r\n"
         "Host: %V\r\n"
         "Content-Type: %V\r\n"
         "Connection: Close\r\n"
@@ -513,6 +515,7 @@ ngx_rtmp_netcall_http_format_header(ngx_str_t *uri, ngx_str_t *host,
     }
         
     b = ngx_create_temp_buf(pool, sizeof(rq_tmpl) 
+            + sizeof("POST") - 1 /* longest method */
             + uri->len
             + host->len
             + content_type->len
@@ -523,9 +526,21 @@ ngx_rtmp_netcall_http_format_header(ngx_str_t *uri, ngx_str_t *host,
     }
 
     cl->buf = b;
+    cl->next = NULL;
+
+    switch (method) {
+        case NGX_RTMP_NETCALL_HTTP_GET:
+            method_s = "GET";
+            break;
+        case NGX_RTMP_NETCALL_HTTP_POST:
+            method_s = "POST";
+            break;
+        default:
+            return NULL;
+    }
 
     b->last = ngx_snprintf(b->last, b->end - b->last, rq_tmpl,
-            uri, host, content_type, content_length);
+                           method_s, uri, host, content_type, content_length);
 
     return cl;
 }

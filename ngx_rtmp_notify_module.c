@@ -220,7 +220,7 @@ ngx_rtmp_notify_publish_create(ngx_rtmp_session_t *s, void *arg,
 
     b = ngx_create_temp_buf(pool,
             sizeof("&call=publish") +
-            sizeof("&addr=") + addr_text->len +
+            sizeof("&addr=") + addr_text->len *3 +
             sizeof("&name=") + name_len * 3 +
             sizeof("&type=") + type_len * 3 +
             1 + args_len);
@@ -250,7 +250,8 @@ ngx_rtmp_notify_publish_create(ngx_rtmp_session_t *s, void *arg,
 
     /* HTTP header */
     url = nacf->url[NGX_RTMP_NOTIFY_PUBLISH];
-    hl = ngx_rtmp_netcall_http_format_header(&url->uri, &url->host,
+    hl = ngx_rtmp_netcall_http_format_header(NGX_RTMP_NETCALL_HTTP_POST,
+            &url->uri, &url->host,
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
             &ngx_rtmp_notify_urlencoded);
 
@@ -301,7 +302,7 @@ ngx_rtmp_notify_play_create(ngx_rtmp_session_t *s, void *arg,
 
     b = ngx_create_temp_buf(pool,
             sizeof("&call=play") + 
-            sizeof("&addr=") + addr_text->len + 
+            sizeof("&addr=") + addr_text->len * 3 + 
             sizeof("&name=") + name_len * 3 +
             sizeof("&start=&duration=&reset=") + NGX_OFF_T_LEN * 3
             + 1 + args_len);
@@ -332,7 +333,8 @@ ngx_rtmp_notify_play_create(ngx_rtmp_session_t *s, void *arg,
 
     /* HTTP header */
     url = nacf->url[NGX_RTMP_NOTIFY_PLAY];
-    hl = ngx_rtmp_netcall_http_format_header(&url->uri, &url->host,
+    hl = ngx_rtmp_netcall_http_format_header(NGX_RTMP_NETCALL_HTTP_POST,
+            &url->uri, &url->host,
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
             &ngx_rtmp_notify_urlencoded);
 
@@ -382,7 +384,7 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
 
     b = ngx_create_temp_buf(pool,
             sizeof("&call=") + cbname_len +
-            sizeof("&addr=") + addr_text->len + 
+            sizeof("&addr=") + addr_text->len * 3 + 
             sizeof("&name=") + name_len * 3
             + 1 + args_len);
     if (b == NULL) {
@@ -409,7 +411,8 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(&ds->url->uri, &ds->url->host,
+    hl = ngx_rtmp_netcall_http_format_header(NGX_RTMP_NETCALL_HTTP_POST,
+            &ds->url->uri, &ds->url->host,
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
             &ngx_rtmp_notify_urlencoded);
 
@@ -464,7 +467,7 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
     b = ngx_create_temp_buf(pool,
                             sizeof("&call=record_done") +
                             sizeof("&recorder=") + v->recorder.len + 
-                            sizeof("&addr=") + addr_text->len +
+                            sizeof("&addr=") + addr_text->len *3 +
                             sizeof("&name=") + name_len * 3 +
                             sizeof("&path=") + v->path.len * 3 +
                             + 1 + args_len);
@@ -499,7 +502,8 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
 
     /* HTTP header */
     url = nacf->url[NGX_RTMP_NOTIFY_RECORD_DONE];
-    hl = ngx_rtmp_netcall_http_format_header(&url->uri, &url->host,
+    hl = ngx_rtmp_netcall_http_format_header(NGX_RTMP_NETCALL_HTTP_POST,
+            &url->uri, &url->host,
             pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
             &ngx_rtmp_notify_urlencoded);
 

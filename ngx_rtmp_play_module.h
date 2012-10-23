@@ -40,6 +40,7 @@ typedef struct {
     ngx_rtmp_play_fmt_t    *fmt;
     ngx_event_t             send_evt;
     ngx_uint_t              ncrs;
+    ngx_str_t               name;
 } ngx_rtmp_play_ctx_t;
 
 
