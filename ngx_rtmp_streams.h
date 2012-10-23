@@ -13,6 +13,7 @@
 #define NGX_RTMP_CSID_AMF               5
 #define NGX_RTMP_CSID_AUDIO             6
 #define NGX_RTMP_CSID_VIDEO             7
+#define NGX_RTMP_CSID_AV                7
 
 
 /*legacy*/

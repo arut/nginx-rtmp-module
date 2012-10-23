@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 #include "ngx_rtmp.h"
+#include "ngx_rtmp_streams.h"
 
 
 static void *ngx_rtmp_core_create_main_conf(ngx_conf_t *cf);
@@ -172,6 +173,38 @@ ngx_module_t  ngx_rtmp_core_module = {
     NULL,                                  /* exit master */
     NGX_MODULE_V1_PADDING
 };
+
+
+ngx_int_t
+ngx_rtmp_get_csid_by_type(ngx_rtmp_session_t *s, ngx_int_t type)
+{
+    ngx_rtmp_core_main_conf_t  *cmcf;
+
+    cmcf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_core_module);
+
+    if (cmcf->interleave) {
+        switch (type) {
+            case NGX_RTMP_MSG_AUDIO:
+            case NGX_RTMP_MSG_VIDEO:
+            case NGX_RTMP_MSG_AMF_META:
+                return NGX_RTMP_CSID_AV;
+        }
+
+        return 0;
+
+    }
+        
+    switch (type) {
+        case NGX_RTMP_MSG_AUDIO:
+            return NGX_RTMP_CSID_AUDIO;
+        case NGX_RTMP_MSG_VIDEO:
+            return NGX_RTMP_CSID_VIDEO;
+        case NGX_RTMP_MSG_AMF_META:
+            return NGX_RTMP_CSID_AMF;
+    }
+
+    return 0;
+}
 
 
 static void *

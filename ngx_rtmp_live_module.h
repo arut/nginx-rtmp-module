@@ -21,6 +21,12 @@ typedef struct ngx_rtmp_live_ctx_s ngx_rtmp_live_ctx_t;
 typedef struct ngx_rtmp_live_stream_s ngx_rtmp_live_stream_t;
 
 
+typedef struct {
+    uint32_t                            csid;
+    uint32_t                            timestamp;
+} ngx_rtmp_live_chunk_stream_t;
+
+
 struct ngx_rtmp_live_ctx_s {
     ngx_rtmp_session_t                 *session;
     ngx_rtmp_live_stream_t             *stream;
@@ -30,11 +36,9 @@ struct ngx_rtmp_live_ctx_s {
     ngx_uint_t                          dropped;
     uint32_t                            csid;
     uint32_t                            next_push;
-    uint32_t                            last_audio;
-    uint32_t                            last_video;
-    ngx_uint_t                          aac_version;
-    ngx_uint_t                          avc_version;
     ngx_uint_t                          meta_version;
+    ngx_rtmp_live_chunk_stream_t        chunk_stream[3];
+    ngx_uint_t                          header_versions[2];
 };
 
 

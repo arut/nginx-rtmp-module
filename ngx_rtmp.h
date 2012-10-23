@@ -505,6 +505,9 @@ ngx_int_t ngx_rtmp_send_status(ngx_rtmp_session_t *s, char *code,
         char* level, char *desc);
 
 
+ngx_int_t ngx_rtmp_get_csid_by_type(ngx_rtmp_session_t *s, ngx_int_t type);
+
+
 /* Frame types */
 #define NGX_RTMP_VIDEO_KEY_FRAME            1
 #define NGX_RTMP_VIDEO_INTER_FRAME          2
