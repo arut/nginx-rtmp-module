@@ -604,6 +604,8 @@ ngx_rtmp_flv_seek(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
                   "flv: seek timestamp=%ui", timestamp);
 
     ctx->start_timestamp = timestamp;
+    ctx->offset = -1;
+    ctx->msg_mask = 0;
 
     return NGX_OK;
 }
