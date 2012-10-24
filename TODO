@@ -1,17 +1,12 @@
-- Auto-pushing pulled stream
+- option to start live streaming with a keyframe
 
-- Pull secondary address support
+- interleaved mode
 
-- Binary search in play module
+- vod seamless pause
 
-- More Wiki docs
+- DNS round-robin url
 
 
-Style:
-======
+- a/v merge from different sources
 
-- Move out & merge stream ids from live & cmd modules
-
-- Clean cmd module:
-  * make shortcuts for status messages
-  * move protocol message sending to live/play modules
+- multiple streams perconnection
