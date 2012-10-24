@@ -54,6 +54,8 @@ typedef struct {
     ngx_rtmp_live_stream_t            **streams;
     ngx_flag_t                          live;
     ngx_flag_t                          meta;
+    ngx_msec_t                          sync;
+    ngx_flag_t                          atc;
     ngx_msec_t                          buflen;
     ngx_pool_t                         *pool;
     ngx_rtmp_live_stream_t             *free_streams;

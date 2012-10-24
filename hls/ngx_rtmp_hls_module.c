@@ -992,8 +992,9 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         --packet.size;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "hls: audio buffer %uD", *(uint32_t*)packet.data);
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "hls: audio dts=%L timestamp=%uD", (int64_t)packet.dts,
+            h->timestamp);
 
     if (av_interleaved_write_frame(ctx->out_format, &packet) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,

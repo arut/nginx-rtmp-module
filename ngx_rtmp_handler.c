@@ -403,6 +403,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     st->dtime = timestamp;
                 } else {
                     h->timestamp = timestamp;
+                    h->timeshift = (uint32_t) ngx_current_msec - timestamp;
                     st->dtime = 0;
                 }
             }
@@ -701,9 +702,13 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 
     nmsg = (s->out_last - s->out_pos) % s->out_queue + 1;
 
+    if (priority > 3) {
+        priority = 3;
+    }
+
     /* drop packet? 
      * Note we always leave 1 slot free */
-    if (nmsg + priority * s->out_queue / 16 >= s->out_queue) {
+    if (nmsg + priority * s->out_queue / 4 >= s->out_queue) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "RTMP drop message bufs=%ui, priority=%ui",
                 nmsg, priority);

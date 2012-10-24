@@ -151,6 +151,7 @@ typedef struct {
 typedef struct {
     uint32_t                csid;       /* chunk stream id */
     uint32_t                timestamp;  /* timestamp (delta) */
+    uint32_t                timeshift;  /* clock - timestamp */
     uint32_t                mlen;       /* message length */
     uint8_t                 type;       /* message type id */
     uint32_t                msid;       /* message stream id */
@@ -201,6 +202,7 @@ typedef struct {
     /* connection timestamps */
     ngx_msec_t              epoch;
     ngx_msec_t              peer_epoch;
+    ngx_msec_t              base_time;
 
     /* ping */
     ngx_event_t             ping_evt;
