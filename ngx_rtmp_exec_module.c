@@ -38,6 +38,7 @@ typedef struct {
     ngx_array_t                         execs; /* ngx_rtmp_exec_conf_t */
     ngx_msec_t                          respawn_timeout;
     ngx_flag_t                          respawn;
+    ngx_int_t                           kill_signal;
 } ngx_rtmp_exec_app_conf_t;
 
 
@@ -59,6 +60,8 @@ typedef struct {
 } ngx_rtmp_exec_ctx_t;
 
 
+static char *ngx_rtmp_exec_kill_signal(ngx_conf_t *cf, ngx_command_t *cmd,
+       void *conf);
 static ngx_int_t ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e,
        ngx_int_t  term);
 static ngx_int_t ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n);
@@ -85,6 +88,13 @@ static ngx_command_t  ngx_rtmp_exec_commands[] = {
       ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_exec_app_conf_t, respawn_timeout),
+      NULL },
+
+    { ngx_string("exec_kill_signal"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_rtmp_exec_kill_signal,
+      NGX_RTMP_APP_CONF_OFFSET,
+      0,
       NULL },
 
       ngx_null_command
@@ -165,6 +175,7 @@ ngx_rtmp_exec_create_app_conf(ngx_conf_t *cf)
 
     eacf->respawn = NGX_CONF_UNSET;
     eacf->respawn_timeout = NGX_CONF_UNSET;
+    eacf->kill_signal = NGX_CONF_UNSET;
 
     if (ngx_array_init(&eacf->execs, cf->pool, 1, 
                 sizeof(ngx_rtmp_exec_conf_t)) != NGX_OK)
@@ -187,6 +198,7 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->respawn, prev->respawn, 1);
     ngx_conf_merge_msec_value(conf->respawn_timeout, prev->respawn_timeout, 
             5000);
+    ngx_conf_merge_value(conf->kill_signal, prev->kill_signal, SIGKILL);
 
     if (prev->execs.nelts) {
         ec = ngx_array_push_n(&conf->execs, prev->execs.nelts);
@@ -254,6 +266,10 @@ ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 static ngx_int_t
 ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
 {
+    ngx_rtmp_exec_app_conf_t   *eacf;
+
+    eacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_exec_module);
+
     if (e->respawn_evt.timer_set) {
         ngx_del_timer(&e->respawn_evt);
     }
@@ -277,7 +293,7 @@ ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
         return NGX_OK;
     }
 
-    if (kill(e->pid, SIGKILL) == -1) {
+    if (kill(e->pid, eacf->kill_signal) == -1) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, ngx_errno,
                 "exec: kill failed pid=%i", (ngx_int_t)e->pid);
     } else {
@@ -292,10 +308,10 @@ ngx_rtmp_exec_kill(ngx_rtmp_session_t *s, ngx_rtmp_exec_t *e, ngx_int_t term)
 static ngx_int_t
 ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 {
-#ifndef NGX_WIN32
+#if !(NGX_WIN32)
     ngx_rtmp_exec_app_conf_t       *eacf;
     ngx_rtmp_exec_ctx_t            *ctx;
-    int                             pid, fd;
+    int                             pid, fd, maxfd;
     int                             pipefd[2];
     int                             ret;
     ngx_rtmp_exec_conf_t           *ec;
@@ -308,6 +324,8 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_exec_module);
     e = ctx->execs + n;
+
+    ngx_memzero(e, sizeof(*e));
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "exec: starting child '%V'", 
@@ -344,6 +362,17 @@ ngx_rtmp_exec_run(ngx_rtmp_session_t *s, size_t n)
 
         case 0:
             /* child */
+
+            /* close all descriptors but pipe write end */
+            maxfd = sysconf(_SC_OPEN_MAX);
+            for (fd = 0; fd < maxfd; ++fd) {
+                if (fd == pipefd[1]) {
+                    continue;
+                }
+
+                close(fd);
+            }
+
             fd = open("/dev/null", O_RDWR);            
 
             dup2(fd, STDIN_FILENO);
@@ -510,6 +539,57 @@ ngx_rtmp_exec_exec(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_rtmp_exec_kill_signal(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_rtmp_exec_app_conf_t   *eacf;
+    ngx_str_t                  *value;
+
+    eacf = ngx_rtmp_conf_get_module_app_conf(cf, ngx_rtmp_exec_module);
+    value = cf->args->elts;
+    value++;
+
+    eacf->kill_signal = ngx_atoi(value->data, value->len);
+    if (eacf->kill_signal != NGX_ERROR) {
+        return NGX_CONF_OK;
+    }
+
+#define NGX_RMTP_EXEC_SIGNAL(name)                                          \
+    if (value->len == sizeof(#name) - 1 &&                                  \
+        ngx_strncasecmp(value->data, (u_char *) #name, value->len) == 0)    \
+    {                                                                       \
+        eacf->kill_signal = SIG##name;                                      \
+        return NGX_CONF_OK;                                                 \
+    }
+
+    /* POSIX.1-1990 signals */
+
+    NGX_RMTP_EXEC_SIGNAL(HUP);
+    NGX_RMTP_EXEC_SIGNAL(INT);
+    NGX_RMTP_EXEC_SIGNAL(QUIT);
+    NGX_RMTP_EXEC_SIGNAL(ILL);
+    NGX_RMTP_EXEC_SIGNAL(ABRT);
+    NGX_RMTP_EXEC_SIGNAL(FPE);
+    NGX_RMTP_EXEC_SIGNAL(KILL);
+    NGX_RMTP_EXEC_SIGNAL(SEGV);
+    NGX_RMTP_EXEC_SIGNAL(PIPE);
+    NGX_RMTP_EXEC_SIGNAL(ALRM);
+    NGX_RMTP_EXEC_SIGNAL(TERM);
+    NGX_RMTP_EXEC_SIGNAL(USR1);
+    NGX_RMTP_EXEC_SIGNAL(USR2);
+    NGX_RMTP_EXEC_SIGNAL(CHLD);
+    NGX_RMTP_EXEC_SIGNAL(CONT);
+    NGX_RMTP_EXEC_SIGNAL(STOP);
+    NGX_RMTP_EXEC_SIGNAL(TSTP);
+    NGX_RMTP_EXEC_SIGNAL(TTIN);
+    NGX_RMTP_EXEC_SIGNAL(TTOU);
+
+#undef NGX_RMTP_EXEC_SIGNAL
+
+    return "unknown signal";
 }
 
 

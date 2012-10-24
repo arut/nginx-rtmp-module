@@ -242,8 +242,8 @@ ngx_rtmp_enotify_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 static ngx_int_t
 ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 {
-#ifndef NGX_WIN32
-    int                         pid, fd;
+#if !(NGX_WIN32)
+    int                         pid, fd, maxfd;
     ngx_str_t                   a, *arg;
     char                      **args;
     ngx_uint_t                  n;
@@ -258,6 +258,13 @@ ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 
         case 0:
             /* child */
+
+            /* close all descriptors */
+            maxfd = sysconf(_SC_OPEN_MAX);
+            for (fd = 0; fd < maxfd; ++fd) {
+                close(fd);
+            }
+
             fd = open("/dev/null", O_RDWR);            
 
             dup2(fd, STDIN_FILENO);

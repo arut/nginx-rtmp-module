@@ -26,6 +26,7 @@ typedef struct {
     ngx_msec_t                          interval;
     ngx_str_t                           suffix;
     ngx_flag_t                          unique;
+    ngx_flag_t                          notify;
     ngx_url_t                          *url;
 
     void                              **rec_conf;
@@ -48,6 +49,10 @@ typedef struct {
     u_char                              name[NGX_RTMP_MAX_NAME];
     u_char                              args[NGX_RTMP_MAX_ARGS];
 } ngx_rtmp_record_ctx_t;
+
+
+ngx_uint_t ngx_rtmp_record_find(ngx_rtmp_record_app_conf_t *racf,
+           ngx_str_t *id);
 
 
 /* Manual recording control,

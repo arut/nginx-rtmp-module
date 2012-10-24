@@ -43,11 +43,15 @@ typedef struct {
     ngx_rtmp_play_fmt_t    *fmt;
     ngx_event_t             send_evt;
     unsigned                playing:1;
+    ngx_uint_t              ncrs;
+    ngx_str_t               name;
 } ngx_rtmp_play_ctx_t;
 
 
 typedef struct {
     ngx_str_t               root;
+    ngx_str_t               temp_path;
+    ngx_url_t              *url;
 } ngx_rtmp_play_app_conf_t;
 
 

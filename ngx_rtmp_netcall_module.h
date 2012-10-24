@@ -15,8 +15,13 @@
 typedef ngx_chain_t * (*ngx_rtmp_netcall_create_pt)(ngx_rtmp_session_t *s,
         void *arg, ngx_pool_t *pool);
 typedef ngx_int_t (*ngx_rtmp_netcall_filter_pt)(ngx_chain_t *in);
+typedef ngx_int_t (*ngx_rtmp_netcall_sink_pt)(ngx_rtmp_session_t *s,
+        ngx_chain_t *in);
 typedef ngx_int_t (*ngx_rtmp_netcall_handle_pt)(ngx_rtmp_session_t *s, 
         void *arg, ngx_chain_t *in);
+
+#define NGX_RTMP_NETCALL_HTTP_GET   1
+#define NGX_RTMP_NETCALL_HTTP_POST  2
 
 
 /* If handle is NULL then netcall is created detached
@@ -32,6 +37,7 @@ typedef struct {
     ngx_url_t                      *url;
     ngx_rtmp_netcall_create_pt      create;
     ngx_rtmp_netcall_filter_pt      filter;
+    ngx_rtmp_netcall_sink_pt        sink;
     ngx_rtmp_netcall_handle_pt      handle;
     void                           *arg;
     size_t                          argsize;
@@ -41,14 +47,13 @@ typedef struct {
 ngx_int_t ngx_rtmp_netcall_create(ngx_rtmp_session_t *s, 
         ngx_rtmp_netcall_init_t *ci);
 
-extern ngx_str_t    ngx_rtmp_netcall_content_type_urlencoded;
-
 
 /* HTTP handling */
 ngx_chain_t * ngx_rtmp_netcall_http_format_session(ngx_rtmp_session_t *s, 
         ngx_pool_t *pool);
-ngx_chain_t * ngx_rtmp_netcall_http_format_header(ngx_url_t *url, 
-        ngx_pool_t *pool, size_t content_length, ngx_str_t *content_type);
+ngx_chain_t * ngx_rtmp_netcall_http_format_header(ngx_int_t method,
+        ngx_str_t *uri, ngx_str_t *host, ngx_pool_t *pool,
+        size_t content_length, ngx_str_t *content_type);
 ngx_chain_t * ngx_rtmp_netcall_http_skip_header(ngx_chain_t *in);
 
 
