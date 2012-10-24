@@ -1240,7 +1240,8 @@ ngx_rtmp_mp4_seek_time(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t,
                 return NGX_ERROR;
             }
 
-            cr->time_count = (timestamp - cr->timestamp) / ngx_rtmp_r32(te->sample_delta);
+            cr->time_count = (timestamp - cr->timestamp) /
+                             ngx_rtmp_r32(te->sample_delta);
             cr->timestamp += ngx_rtmp_r32(te->sample_delta) * cr->time_count;
             cr->pos += cr->time_count;
 
@@ -1523,12 +1524,19 @@ static ngx_int_t
 ngx_rtmp_mp4_seek_size(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
 {
     ngx_rtmp_mp4_cursor_t      *cr;
+    ngx_uint_t                  pos;
 
     cr = &t->cursor;
+
+    if (cr->chunk_count > cr->pos) {
+        return NGX_ERROR;
+    }
 
     if (t->sizes) {
         if (t->sizes->sample_size) {
             cr->size = ngx_rtmp_r32(t->sizes->sample_size);
+
+            cr->offset += cr->size * cr->chunk_count;
 
             ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                            "mp4: track#%ui seek size fix=%uz",
@@ -1544,6 +1552,10 @@ ngx_rtmp_mp4_seek_size(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
                            ngx_rtmp_r32(t->sizes->sample_count));
 
             return NGX_ERROR;
+        }
+
+        for (pos = 1; pos <= cr->chunk_count; ++pos) {
+            cr->offset += ngx_rtmp_r32(t->sizes->entries[cr->pos - pos]);
         }
 
         cr->size_pos = cr->pos;
@@ -1624,6 +1636,7 @@ ngx_rtmp_mp4_seek_key(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
 {
     ngx_rtmp_mp4_cursor_t      *cr;
     uint32_t                   *ke;
+    ngx_int_t                   dpos;
 
     cr = &t->cursor;
 
@@ -1632,7 +1645,7 @@ ngx_rtmp_mp4_seek_key(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
     }
 
     while (cr->key_pos < ngx_rtmp_r32(t->keys->entry_count)) {
-        if (ngx_rtmp_r32(t->keys->entries[cr->key_pos]) >= cr->pos) {
+        if (ngx_rtmp_r32(t->keys->entries[cr->key_pos]) > cr->pos) {
             break;
         }
 
@@ -1648,7 +1661,18 @@ ngx_rtmp_mp4_seek_key(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
     }
 
     ke = &t->keys->entries[cr->key_pos];
-    cr->key = (cr->pos + 1 == ngx_rtmp_r32(*ke));
+    /*cr->key = (cr->pos + 1 == ngx_rtmp_r32(*ke));*/
+
+    /* distance to the next keyframe */
+    dpos = ngx_rtmp_r32(*ke) - cr->pos - 1;
+    cr->key = 1;
+
+    /* TODO: range version needed */
+    for (; dpos > 0; --dpos) {
+        ngx_rtmp_mp4_next_time(s, t);
+    }
+
+/*    cr->key = (cr->pos + 1 == ngx_rtmp_r32(*ke));*/
 
     ngx_log_debug6(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "mp4: track#%ui seek key[%ui/%uD][%ui/%uD]=%s",
@@ -2246,6 +2270,7 @@ static ngx_int_t
 ngx_rtmp_mp4_seek(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
 {
     ngx_rtmp_mp4_ctx_t     *ctx;
+    ngx_rtmp_mp4_track_t   *t;
     ngx_uint_t              n;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
@@ -2258,6 +2283,29 @@ ngx_rtmp_mp4_seek(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
                    "mp4: seek timestamp=%ui", timestamp);
 
     for (n = 0; n < ctx->ntracks; ++n) {
+        t = &ctx->tracks[n];
+
+        if (t->type != NGX_RTMP_MSG_VIDEO) {
+            continue;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "mp4: track#%ui seek video", n);
+
+        ngx_rtmp_mp4_seek_track(s, t, timestamp);
+
+        timestamp = ngx_rtmp_mp4_to_rtmp_timestamp(t, t->cursor.timestamp);
+
+        break;
+    }
+
+    for (n = 0; n < ctx->ntracks; ++n) {
+        t = &ctx->tracks[n];
+
+        if (t->type == NGX_RTMP_MSG_VIDEO) {
+            continue;
+        }
+
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "mp4: track#%ui seek", n);
 
