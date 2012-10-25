@@ -202,17 +202,19 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name,
     }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
-    if (ctx == NULL) {
-        ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_live_ctx_t));
-        ctx->session = s;
-        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_live_module);
-    }
-
-    if (ctx->stream) {
+    if (ctx && ctx->stream) {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 
                 0, "live: already joined");
         return;
     }
+
+    if (ctx == NULL) {
+        ctx = ngx_palloc(s->connection->pool, sizeof(ngx_rtmp_live_ctx_t));
+        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_live_module);
+    }
+
+    ngx_memzero(ctx, sizeof(*ctx));
+    ctx->session = s;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
             "live: join '%s'", name);
@@ -378,6 +380,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->last_audio = ch.timestamp;
         last_offset = offsetof(ngx_rtmp_live_ctx_t, last_audio);
     }
+
+    if ((ctx->msg_mask & (1 << h->type)) == 0) {
+        lh.timestamp = ch.timestamp;
+        ctx->msg_mask |= (1 << h->type);
+    }
+
     lh.csid = ch.csid;
     diff_timestamp = ch.timestamp - lh.timestamp;
 
