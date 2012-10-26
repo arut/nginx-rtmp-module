@@ -68,10 +68,6 @@ typedef struct {
     ngx_chain_t                *avc_header;
     ngx_chain_t                *aac_header;
 
-    /* prepared headers (for live streaming) */
-    ngx_chain_t                *avc_pheader;
-    ngx_chain_t                *aac_pheader;
-
     ngx_chain_t                *meta;
     ngx_uint_t                  meta_version;
 } ngx_rtmp_codec_ctx_t;

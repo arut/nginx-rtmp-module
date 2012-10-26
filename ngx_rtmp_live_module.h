@@ -29,12 +29,15 @@ struct ngx_rtmp_live_ctx_s {
     ngx_uint_t                          msg_mask;
     ngx_uint_t                          dropped;
     uint32_t                            csid;
-    uint32_t                            next_push;
     uint32_t                            last_audio;
     uint32_t                            last_video;
     ngx_uint_t                          aac_version;
     ngx_uint_t                          avc_version;
     ngx_uint_t                          meta_version;
+
+    /* last stream timestamps */
+    uint32_t                            last[2];
+    uint32_t                           *plast[2];
 };
 
 
