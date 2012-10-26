@@ -13,10 +13,12 @@ static void ngx_rtmp_flv_read_meta(ngx_rtmp_session_t *s, ngx_file_t *f);
 static ngx_int_t ngx_rtmp_flv_timestamp_to_offset(ngx_rtmp_session_t *s, 
        ngx_file_t *f, ngx_int_t timestamp);
 static ngx_int_t ngx_rtmp_flv_init(ngx_rtmp_session_t *s, ngx_file_t *f);
-static ngx_int_t ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f,
+static ngx_int_t ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_flv_seek(ngx_rtmp_session_t *s, ngx_file_t *f,
        ngx_uint_t offset);
 static ngx_int_t ngx_rtmp_flv_stop(ngx_rtmp_session_t *s, ngx_file_t *f);
-static ngx_int_t ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f);
+static ngx_int_t ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f,
+                                   ngx_uint_t *ts);
 
 
 typedef struct {
@@ -42,6 +44,7 @@ typedef struct {
 
 #define NGX_RTMP_FLV_BUFFER             (1024*1024)
 #define NGX_RTMP_FLV_DEFAULT_BUFLEN     1000
+#define NGX_RTMP_FLV_BUFLEN_ADDON       1000
 #define NGX_RTMP_FLV_TAG_HEADER         11
 #define NGX_RTMP_FLV_DATA_OFFSET        13
 
@@ -343,8 +346,8 @@ ngx_rtmp_flv_read_meta(ngx_rtmp_session_t *s, ngx_file_t *f)
     ngx_memzero(&h, sizeof(h));
 
     h.type = NGX_RTMP_MSG_AMF_META;
-    h.msid = NGX_RTMP_LIVE_MSID;
-    h.csid = NGX_RTMP_LIVE_CSID_META;
+    h.msid = NGX_RTMP_MSID;
+    h.csid = NGX_RTMP_CSID_AMF;
 
     size = 0;
     ngx_rtmp_rmemcpy(&size, ngx_rtmp_flv_header + 1, 3);
@@ -389,7 +392,7 @@ ngx_rtmp_flv_read_meta(ngx_rtmp_session_t *s, ngx_file_t *f)
 
 
 static ngx_int_t
-ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f)
+ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
 {
     ngx_rtmp_flv_ctx_t             *ctx;
     uint32_t                        last_timestamp;
@@ -431,7 +434,7 @@ ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f)
     /* parse header fields */
     ngx_memzero(&h, sizeof(h));
 
-    h.msid = NGX_RTMP_LIVE_MSID;
+    h.msid = NGX_RTMP_MSID;
     h.type = ngx_rtmp_flv_header[0];
 
     size = 0;
@@ -524,7 +527,8 @@ next:
         return NGX_OK;
     }
 
-    buflen = (s->buflen ? s->buflen : NGX_RTMP_FLV_DEFAULT_BUFLEN);
+    buflen = (s->buflen ? s->buflen + NGX_RTMP_FLV_BUFLEN_ADDON:
+                                      NGX_RTMP_FLV_DEFAULT_BUFLEN);
     end_timestamp = (ngx_current_msec - ctx->epoch) +
                      ctx->start_timestamp + buflen;
 
@@ -567,7 +571,28 @@ ngx_rtmp_flv_init(ngx_rtmp_session_t *s, ngx_file_t *f)
 
 
 static ngx_int_t
-ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
+ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f)
+{
+    ngx_rtmp_flv_ctx_t             *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_flv_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                  "flv: start");
+
+    ctx->offset = -1;
+    ctx->msg_mask = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_flv_seek(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
 {
     ngx_rtmp_flv_ctx_t             *ctx;
 
@@ -578,9 +603,10 @@ ngx_rtmp_flv_start(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t timestamp)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                  "flv: start timestamp=%ui", timestamp);
+                  "flv: seek timestamp=%ui", timestamp);
 
     ctx->start_timestamp = timestamp;
+    ctx->epoch = ngx_current_msec;
     ctx->offset = -1;
     ctx->msg_mask = 0;
 
@@ -635,6 +661,7 @@ ngx_rtmp_flv_postconfiguration(ngx_conf_t *cf)
 
     fmt->init  = ngx_rtmp_flv_init;
     fmt->start = ngx_rtmp_flv_start;
+    fmt->seek  = ngx_rtmp_flv_seek;
     fmt->stop  = ngx_rtmp_flv_stop;
     fmt->send  = ngx_rtmp_flv_send;
 

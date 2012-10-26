@@ -289,6 +289,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     size_t                  max_message;
     ngx_flag_t              play_time_fix;
     ngx_flag_t              publish_time_fix;
+    ngx_flag_t              busy;
     size_t                  out_queue;
     size_t                  out_cork;
 
@@ -503,6 +504,8 @@ ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in,
 /* AMF status sender */
 ngx_int_t ngx_rtmp_send_status(ngx_rtmp_session_t *s, char *code,
         char* level, char *desc);
+ngx_int_t ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code,
+        char* level, ngx_uint_t duration, ngx_uint_t bytes);
 
 
 /* Frame types */

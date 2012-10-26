@@ -46,9 +46,9 @@ typedef struct {
 
 
 typedef struct {
-    ngx_array_t            *rules;     /* array of ngx_rtmp_access_rule_t */
+    ngx_array_t             rules;     /* array of ngx_rtmp_access_rule_t */
 #if (NGX_HAVE_INET6)
-    ngx_array_t            *rules6;    /* array of ngx_rtmp_access_rule6_t */
+    ngx_array_t             rules6;    /* array of ngx_rtmp_access_rule6_t */
 #endif
 } ngx_rtmp_access_app_conf_t;
 
@@ -111,13 +111,67 @@ ngx_rtmp_access_create_app_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    if (ngx_array_init(&aacf->rules, cf->pool, 1,
+                       sizeof(ngx_rtmp_access_rule_t))
+        != NGX_OK)
+    {
+        return NULL;
+    }
+
+#if (NGX_HAVE_INET6)
+    if (ngx_array_init(&aacf->rules6, cf->pool, 1,
+                       sizeof(ngx_rtmp_access_rule6_t))
+        != NGX_OK)
+    {
+        return NULL;
+    }
+#endif
+
     return aacf;
+}
+
+
+static ngx_int_t
+ngx_rtmp_access_merge_rules(ngx_array_t *prev, ngx_array_t *rules)
+{
+    void   *p;
+
+    if (prev->nelts == 0) {
+        return NGX_OK;
+    }
+
+    if (rules->nelts == 0) {
+        *rules = *prev;
+        return NGX_OK;
+    }
+
+    p = ngx_array_push_n(rules, prev->nelts);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(p, prev->elts, prev->size * prev->nelts);
+
+    return NGX_OK;
 }
 
 
 static char *
 ngx_rtmp_access_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 {
+    ngx_rtmp_access_app_conf_t *prev = parent;
+    ngx_rtmp_access_app_conf_t *conf = child;
+
+    if (ngx_rtmp_access_merge_rules(&prev->rules, &conf->rules) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+#if (NGX_HAVE_INET6)
+    if (ngx_rtmp_access_merge_rules(&prev->rules6, &conf->rules6) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+#endif
+
     return NGX_CONF_OK;
 }
 
@@ -127,7 +181,7 @@ ngx_rtmp_access_found(ngx_rtmp_session_t *s, ngx_uint_t deny)
 {
     if (deny) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                "access forbidden by rule");
+                      "access forbidden by rule");
         return NGX_ERROR;
     }
 
@@ -136,23 +190,22 @@ ngx_rtmp_access_found(ngx_rtmp_session_t *s, ngx_uint_t deny)
 
 
 static ngx_int_t
-ngx_rtmp_access_inet(ngx_rtmp_session_t *s, 
-    ngx_rtmp_access_app_conf_t *ascf,
-    in_addr_t addr, ngx_uint_t flag)
+ngx_rtmp_access_inet(ngx_rtmp_session_t *s, in_addr_t addr, ngx_uint_t flag)
 {
     ngx_uint_t                  i;
     ngx_rtmp_access_rule_t     *rule;
+    ngx_rtmp_access_app_conf_t *ascf;
 
-    rule = ascf->rules->elts;
-    for (i = 0; i < ascf->rules->nelts; i++) {
+    ascf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_access_module);
+
+    rule = ascf->rules.elts;
+    for (i = 0; i < ascf->rules.nelts; i++) {
 
         ngx_log_debug3(NGX_LOG_DEBUG_HTTP, s->connection->log, 0,
                        "access: %08XD %08XD %08XD",
                        addr, rule[i].mask, rule[i].addr);
 
-        if ((addr & rule[i].mask) == rule[i].addr
-                && flag & rule[i].flags) 
-        {
+        if ((addr & rule[i].mask) == rule[i].addr && (flag & rule[i].flags)) {
             return ngx_rtmp_access_found(s, rule[i].deny);
         }
     }
@@ -164,16 +217,17 @@ ngx_rtmp_access_inet(ngx_rtmp_session_t *s,
 #if (NGX_HAVE_INET6)
 
 static ngx_int_t
-ngx_rtmp_access_inet6(ngx_rtmp_session_t *s, 
-    ngx_rtmp_access_app_conf_t *ascf,
-    u_char *p, ngx_uint_t flag)
+ngx_rtmp_access_inet6(ngx_rtmp_session_t *s, u_char *p, ngx_uint_t flag)
 {
     ngx_uint_t                  n;
     ngx_uint_t                  i;
     ngx_rtmp_access_rule6_t    *rule6;
+    ngx_rtmp_access_app_conf_t *ascf;
 
-    rule6 = ascf->rules6->elts;
-    for (i = 0; i < ascf->rules6->nelts; i++) {
+    ascf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_access_module);
+
+    rule6 = ascf->rules6.elts;
+    for (i = 0; i < ascf->rules6.nelts; i++) {
 
 #if (NGX_DEBUG)
         {
@@ -223,10 +277,9 @@ ngx_rtmp_access(ngx_rtmp_session_t *s, ngx_uint_t flag)
 #endif
 
     ascf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_access_module);
-
     if (ascf == NULL) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, s->connection->log, 0,
-                "access: NULL app conf");
+                       "access: NULL app conf");
         return NGX_ERROR;
     }
 
@@ -238,12 +291,8 @@ ngx_rtmp_access(ngx_rtmp_session_t *s, ngx_uint_t flag)
     switch (s->connection->sockaddr->sa_family) {
 
     case AF_INET:
-        if (ascf->rules) {
-            sin = (struct sockaddr_in *) s->connection->sockaddr;
-            return ngx_rtmp_access_inet(s, ascf, 
-                    sin->sin_addr.s_addr, flag);
-        }
-        break;
+        sin = (struct sockaddr_in *) s->connection->sockaddr;
+        return ngx_rtmp_access_inet(s, sin->sin_addr.s_addr, flag);
 
 #if (NGX_HAVE_INET6)
 
@@ -251,23 +300,20 @@ ngx_rtmp_access(ngx_rtmp_session_t *s, ngx_uint_t flag)
         sin6 = (struct sockaddr_in6 *) s->connection->sockaddr;
         p = sin6->sin6_addr.s6_addr;
 
-        if (ascf->rules && IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-            addr = p[12] << 24;
+        if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+            addr  = p[12] << 24;
             addr += p[13] << 16;
             addr += p[14] << 8;
             addr += p[15];
-            return ngx_rtmp_access_inet(s, ascf, htonl(addr), flag);
+            return ngx_rtmp_access_inet(s, htonl(addr), flag);
         }
 
-        if (ascf->rules6) {
-            return ngx_rtmp_access_inet6(s, ascf, p, flag);
-        }
+        return ngx_rtmp_access_inet6(s, p, flag);
 
 #endif
     }
 
     return NGX_OK;
-
 }
 
 
@@ -295,22 +341,23 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     flags = 0;
 
     if (cf->args->nelts == 2) {
+        
         flags = NGX_RTMP_ACCESS_PUBLISH | NGX_RTMP_ACCESS_PLAY;
 
     } else {
 
         for(; n < cf->args->nelts - 1; ++n) {
 
-            if (value[n].len == sizeof("publish") - 1
-                    && ngx_strcmp(value[1].data, "publish") == 0)
+            if (value[n].len == sizeof("publish") - 1 &&
+                ngx_strcmp(value[1].data, "publish") == 0)
             {
                 flags |= NGX_RTMP_ACCESS_PUBLISH;
                 continue;
 
             }
             
-            if (value[n].len == sizeof("play") - 1
-                    && ngx_strcmp(value[1].data, "play") == 0)
+            if (value[n].len == sizeof("play") - 1 &&
+                ngx_strcmp(value[1].data, "play") == 0)
             {
                 flags |= NGX_RTMP_ACCESS_PLAY;
                 continue;
@@ -318,7 +365,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
 
             ngx_log_error(NGX_LOG_ERR, cf->log, 0,
-                    "unexpected access specified: '%V'", &value[n]);
+                          "unexpected access specified: '%V'", &value[n]);
             return NGX_CONF_ERROR;
         }
     }
@@ -331,13 +378,14 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         if (rc == NGX_ERROR) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                         "invalid parameter \"%V\"", &value[1]);
+                               "invalid parameter \"%V\"", &value[1]);
             return NGX_CONF_ERROR;
         }
 
         if (rc == NGX_DONE) {
             ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                         "low address bits of %V are meaningless", &value[1]);
+                               "low address bits of %V are meaningless",
+                               &value[1]);
         }
     }
 
@@ -347,15 +395,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     case AF_INET6:
     case 0: /* all */
 
-        if (ascf->rules6 == NULL) {
-            ascf->rules6 = ngx_array_create(cf->pool, 4,
-                                            sizeof(ngx_rtmp_access_rule6_t));
-            if (ascf->rules6 == NULL) {
-                return NGX_CONF_ERROR;
-            }
-        }
-
-        rule6 = ngx_array_push(ascf->rules6);
+        rule6 = ngx_array_push(&ascf->rules6);
         if (rule6 == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -374,15 +414,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     default: /* AF_INET */
 
-        if (ascf->rules == NULL) {
-            ascf->rules = ngx_array_create(cf->pool, 4,
-                    sizeof(ngx_rtmp_access_rule_t));
-            if (ascf->rules == NULL) {
-                return NGX_CONF_ERROR;
-            }
-        }
-
-        rule = ngx_array_push(ascf->rules);
+        rule = ngx_array_push(&ascf->rules);
         if (rule == NULL) {
             return NGX_CONF_ERROR;
         }

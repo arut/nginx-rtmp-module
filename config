@@ -22,6 +22,23 @@ CORE_MODULES="$CORE_MODULES
 
 HTTP_MODULES="$HTTP_MODULES                                 \
                 ngx_rtmp_stat_module                        \
+                ngx_rtmp_control_module                     \
+                "
+
+
+NGX_ADDON_DEPS="$NGX_ADDON_DEPS                             \
+                $ngx_addon_dir/ngx_rtmp_amf.h               \
+                $ngx_addon_dir/ngx_rtmp_bandwidth.h         \
+                $ngx_addon_dir/ngx_rtmp_cmd_module.h        \
+                $ngx_addon_dir/ngx_rtmp_codec_module.h      \
+                $ngx_addon_dir/ngx_rtmp_eval.h              \
+                $ngx_addon_dir/ngx_rtmp.h                   \
+                $ngx_addon_dir/ngx_rtmp_live_module.h       \
+                $ngx_addon_dir/ngx_rtmp_netcall_module.h    \
+                $ngx_addon_dir/ngx_rtmp_play_module.h       \
+                $ngx_addon_dir/ngx_rtmp_record_module.h     \
+                $ngx_addon_dir/ngx_rtmp_relay_module.h      \
+                $ngx_addon_dir/ngx_rtmp_streams.h           \
                 "
 
 
@@ -45,6 +62,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_mp4_module.c        \
                 $ngx_addon_dir/ngx_rtmp_netcall_module.c    \
                 $ngx_addon_dir/ngx_rtmp_stat_module.c       \
+                $ngx_addon_dir/ngx_rtmp_control_module.c    \
                 $ngx_addon_dir/ngx_rtmp_relay_module.c      \
                 $ngx_addon_dir/ngx_rtmp_bandwidth.c         \
                 $ngx_addon_dir/ngx_rtmp_exec_module.c       \

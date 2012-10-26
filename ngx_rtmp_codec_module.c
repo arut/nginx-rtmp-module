@@ -158,10 +158,16 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t                       **header, **pheader;
     uint8_t                             fmt;
     ngx_rtmp_header_t                   ch, lh;
-    ngx_uint_t                         *version;
+    ngx_uint_t                         *version, idx;
+    u_char                             *p;
     static ngx_uint_t                   sample_rates[] = 
                                         { 5512, 11025, 22050, 44100 };
 
+    static ngx_uint_t                   aac_sample_rates[] = 
+                                        { 96000, 88200, 64000, 48000,
+                                          44100, 32000, 24000, 22050,
+                                          16000, 12000, 11025,  8000,
+                                           7350,     0,     0,    0 };
 
     if (h->type != NGX_RTMP_MSG_AUDIO && h->type != NGX_RTMP_MSG_VIDEO) {
         return NGX_OK;
@@ -183,7 +189,10 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->audio_codec_id = (fmt & 0xf0) >> 4;
         ctx->audio_channels = (fmt & 0x01) + 1;
         ctx->sample_size = (fmt & 0x02) ? 2 : 1;
-        ctx->sample_rate = sample_rates[(fmt & 0x0c) >> 2];
+
+        if (ctx->aac_sample_rate == 0) {
+            ctx->sample_rate = sample_rates[(fmt & 0x0c) >> 2];
+        }
     } else {
         ctx->video_codec_id = (fmt & 0x0f);
     }
@@ -207,8 +216,55 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             header = &ctx->aac_header;
             pheader = &ctx->aac_pheader;
             version = &ctx->aac_version;
-            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                    "codec: AAC header arrived");
+            
+            if (in->buf->last - in->buf->pos > 3) {
+                p = in->buf->pos + 2;
+
+                /* MPEG-4 Audio Specific Config
+
+                   5 bits: object type
+                   if (object type == 31)
+                   6 bits + 32: object type
+               --->4 bits: frequency index
+                   if (frequency index == 15)
+                   24 bits: frequency
+                   4 bits: channel configuration
+                   var bits: AOT Specific Config
+                 */
+
+                if ((p[0] >> 3) == 0x1f) {
+                    idx = (p[1] >> 1) & 0x0f;
+                } else {
+                    idx = ((p[0] << 1) & 0x0f) | (p[1] >> 7);
+                }
+
+#ifdef NGX_DEBUG
+                {
+                    u_char buf[256], *p, *pp;
+                    u_char hex[] = "01234567890abcdef";
+
+                    for (pp = buf, p = in->buf->pos;
+                         p < in->buf->last && pp < buf + sizeof(buf) - 1;
+                         ++p)
+                    {
+                        *pp++ = hex[*p >> 4];
+                        *pp++ = hex[*p & 0x0f];
+                    }
+
+                    *pp = 0;
+
+                    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                            "codec: AAC header: %s", buf);
+                }
+#endif
+
+                ctx->aac_sample_rate = aac_sample_rates[idx];
+                ctx->sample_rate = ctx->aac_sample_rate;
+            }
+
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "codec: AAC header arrived, sample_rate=%ui", 
+                           ctx->aac_sample_rate);
         }
     } else {
         if (ctx->video_codec_id == NGX_RTMP_VIDEO_H264) {
@@ -234,11 +290,11 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* equal headers; timeout diff is zero */
     ngx_memzero(&ch, sizeof(ch));
-    ch.msid = NGX_RTMP_LIVE_MSID;
+    ch.msid = NGX_RTMP_MSID;
     ch.type = h->type;
     ch.csid = (h->type == NGX_RTMP_MSG_VIDEO
-        ? NGX_RTMP_LIVE_CSID_VIDEO
-        : NGX_RTMP_LIVE_CSID_AUDIO);
+        ? NGX_RTMP_CSID_VIDEO
+        : NGX_RTMP_CSID_AUDIO);
     lh = ch;
     *header = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
     *pheader = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
@@ -372,8 +428,8 @@ ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
     }
 
     ngx_memzero(&h, sizeof(h));
-    h.csid = NGX_RTMP_LIVE_CSID_META;
-    h.msid = NGX_RTMP_LIVE_MSID;
+    h.csid = NGX_RTMP_CSID_AMF;
+    h.msid = NGX_RTMP_MSID;
     h.type = NGX_RTMP_MSG_AMF_META;
     ngx_rtmp_prepare_message(s, &h, NULL, ctx->meta);
 

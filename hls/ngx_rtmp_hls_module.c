@@ -73,6 +73,9 @@ typedef struct {
     ngx_int_t                           out_astream;
     int8_t                              nal_bytes;
 
+    int64_t                             aframe_base;
+    int64_t                             aframe_num;
+
     AVFormatContext                    *out_format;
 
 } ngx_rtmp_hls_ctx_t;
@@ -82,6 +85,7 @@ typedef struct {
     ngx_flag_t                          hls;
     ngx_msec_t                          fraglen;
     ngx_msec_t                          muxdelay;
+    ngx_msec_t                          sync;
     ngx_msec_t                          playlen;
     size_t                              nfrags;
     ngx_rtmp_hls_ctx_t                **ctx;
@@ -125,6 +129,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, muxdelay),
+      NULL },
+
+    { ngx_string("hls_sync"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, sync),
       NULL },
 
 
@@ -909,6 +920,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_hls_ctx_t             *ctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     AVPacket                        packet;
+    int64_t                         dts, ddts;
     static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -935,10 +947,40 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /* write to file */
     av_init_packet(&packet);
     packet.dts = h->timestamp * 90L;
-    packet.pts = packet.dts;
     packet.stream_index = ctx->out_astream;
     packet.data = buffer;
     packet.size = ngx_rtmp_hls_chain2buffer(buffer, sizeof(buffer), in, 1);
+
+    if (hacf->sync && codec_ctx->sample_rate) {
+        
+        /* TODO: We assume here AAC frame size is 1024
+         *       Need to handle AAC frames with frame size of 960 */
+
+        dts = ctx->aframe_base + ctx->aframe_num * 90000 * 1024 /
+                                 codec_ctx->sample_rate;
+        ddts = dts - packet.dts;
+
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: sync stat ddts=%L (%.5fs)",
+                       ddts, ddts / 90000.);
+
+        if (ddts > (int64_t) hacf->sync * 90 ||
+            ddts < (int64_t) hacf->sync * -90)
+        {
+            ctx->aframe_base = packet.dts;
+            ctx->aframe_num  = 0;
+
+            ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "hls: sync breakup ddts=%L (%.5fs)",
+                           ddts, ddts / 90000.);
+        } else {
+            packet.dts = dts;
+        }
+
+        ctx->aframe_num++;
+    }
+
+    packet.pts = packet.dts;
 
     if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
         if (packet.size == 0) {
@@ -1120,10 +1162,11 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->hls = NGX_CONF_UNSET;
     conf->fraglen = NGX_CONF_UNSET;
     conf->muxdelay = NGX_CONF_UNSET;
+    conf->sync = NGX_CONF_UNSET;
     conf->playlen = NGX_CONF_UNSET;
     conf->nbuckets = 1024;
 
-	return conf;
+    return conf;
 }
 
 
@@ -1136,6 +1179,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->hls, prev->hls, 0);
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
     ngx_conf_merge_msec_value(conf->muxdelay, prev->muxdelay, 700);
+    ngx_conf_merge_msec_value(conf->sync, prev->sync, 0);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
     ngx_conf_merge_str_value(conf->path, prev->path, "");
     conf->ctx = ngx_pcalloc(cf->pool, 

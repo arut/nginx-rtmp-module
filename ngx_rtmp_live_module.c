@@ -211,17 +211,19 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name,
     }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
-    if (ctx == NULL) {
-        ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_live_ctx_t));
-        ctx->session = s;
-        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_live_module);
-    }
-
-    if (ctx->stream) {
+    if (ctx && ctx->stream) {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 
                 0, "live: already joined");
         return;
     }
+
+    if (ctx == NULL) {
+        ctx = ngx_palloc(s->connection->pool, sizeof(ngx_rtmp_live_ctx_t));
+        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_live_module);
+    }
+
+    ngx_memzero(ctx, sizeof(*ctx));
+    ctx->session = s;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
             "live: join '%s'", name);
@@ -371,7 +373,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_memzero(&ch, sizeof(ch));
     ngx_memzero(&lh, sizeof(lh));
     ch.timestamp = timestamp;
-    ch.msid = NGX_RTMP_LIVE_MSID;
+    ch.msid = NGX_RTMP_MSID;
     ch.type = h->type;
     lh.msid = ch.msid;
 
@@ -387,14 +389,19 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     if (h->type == NGX_RTMP_MSG_VIDEO) {
         prio = ngx_rtmp_get_video_frame_type(in);
-        ch.csid = NGX_RTMP_LIVE_CSID_VIDEO;
+        ch.csid = NGX_RTMP_CSID_VIDEO;
     } else {
         prio = 0;
-        ch.csid = NGX_RTMP_LIVE_CSID_AUDIO;
+        ch.csid = NGX_RTMP_CSID_AUDIO;
     }
 
     if (lacf->interleave) {
-        ch.csid = NGX_RTMP_LIVE_CSID_VIDEO;
+        ch.csid = NGX_RTMP_CSID_VIDEO;
+    }
+
+    if ((ctx->msg_mask & (1 << h->type)) == 0) {
+        lh.timestamp = ch.timestamp;
+        ctx->msg_mask |= (1 << h->type);
     }
 
     lh.csid = ch.csid;
