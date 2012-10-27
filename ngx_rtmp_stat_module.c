@@ -309,11 +309,11 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                                 "%uz", ctx->dropped) - buf);
                     NGX_RTMP_STAT_L("</dropped>");
 
-                    NGX_RTMP_STAT_L("<avsync>");
+                    /*NGX_RTMP_STAT_L("<avsync>");
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
                                 "%L", (int64_t)ctx->last_audio 
                                 - ctx->last_video) - buf);
-                    NGX_RTMP_STAT_L("</avsync>");
+                    NGX_RTMP_STAT_L("</avsync>");*/
 
                     if (s->flashver.len) {
                         NGX_RTMP_STAT_L("<flashver>");
