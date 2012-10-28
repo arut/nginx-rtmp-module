@@ -377,10 +377,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     sync = 0;
     peers = 0;
-    header = NULL;
     aheader = NULL;
     rheader = NULL;
     apkt = NULL;
+    header = NULL;
     header_version = 0;
     meta = NULL;
     meta_version = 0;
@@ -460,13 +460,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ss = pctx->session;
         cs = &pctx->cs[csidx];
 
-        ch.timestamp = timestamp;
-        if (lacf->atc == 0) {
-            ch.timestamp -= (uint32_t) ss->epoch;
-        }
-
-        lh.timestamp = ch.timestamp - delta;
-
         /* send metadata */
 
         if (meta && meta_version != pctx->meta_version) {
@@ -480,27 +473,41 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         /* sync stream */
 
-        if (cs->active && 
-           (sync || (lacf->sync &&
-                    (int32_t) (cs->timestamp + lacf->sync - lh.timestamp) < 0)))
-        {
+        if (cs->active && (sync || (lacf->sync && cs->dropped > lacf->sync))) {
             ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
-                           "live: sync %s: %i",
-                           type_s, (ngx_int_t) (lh.timestamp - cs->timestamp));
+                           "live: sync %s dropped=%uD", type_s, cs->dropped);
             cs->active = 0;
+            cs->dropped = 0;
         }
 
         /* absolute packet */
 
         if (!cs->active) {
 
-            if (lacf->wait_key && h->type == NGX_RTMP_MSG_VIDEO &&
-                prio != NGX_RTMP_VIDEO_KEY_FRAME)
+            if (lacf->wait_key && prio != NGX_RTMP_VIDEO_KEY_FRAME &&
+               (lacf->interleave || h->type == NGX_RTMP_MSG_VIDEO))
             {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                "live: skip non-key");
                 continue;
+
             }
+
+            ch.timestamp = timestamp;
+            if (lacf->atc == 0) {
+                ch.timestamp -= (uint32_t) ss->epoch;
+            }
+
+            lh.timestamp = ch.timestamp - delta;
+
+            /*
+            if (ngx_rtmp_send_user_stream_eof(ss, NGX_RTMP_MSID) != NGX_OK) {
+                continue;
+            }
+
+            if (ngx_rtmp_send_user_stream_begin(ss, NGX_RTMP_MSID) != NGX_OK) {
+                continue;
+            }*/
 
             if (header) {
 
@@ -598,10 +605,14 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                        "live: rel %s packet delta=%uD",
                        type_s, delta);
 
-        if (ngx_rtmp_send_message(ss, rpkt, prio) == NGX_OK) {
-            cs->timestamp += delta;
-            ++peers;
+        if (ngx_rtmp_send_message(ss, rpkt, prio) != NGX_OK) {
+            ++pctx->ndropped;
+            cs->dropped += delta;
+            continue;
         }
+
+        cs->timestamp += delta;
+        ++peers;
     }
 
     if (rpkt) {

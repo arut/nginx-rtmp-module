@@ -306,19 +306,16 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
 
                     NGX_RTMP_STAT_L("<dropped>");
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                                "%uz", ctx->dropped) - buf);
+                                "%uz", ctx->ndropped) - buf);
                     NGX_RTMP_STAT_L("</dropped>");
 
-                    if (ctx->cs[0].active && ctx->cs[1].active) {
+                    NGX_RTMP_STAT_L("<avsync>");
 
-                        NGX_RTMP_STAT_L("<avsync>");
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                                "%uD/%uD", ctx->cs[0].dropped,
+                                           ctx->cs[1].dropped) - buf);
 
-                        NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                                "%L", (int64_t) ctx->cs[0].timestamp  -
-                                      (int64_t) ctx->cs[1].timestamp) - buf);
-
-                        NGX_RTMP_STAT_L("</avsync>");
-                    }
+                    NGX_RTMP_STAT_L("</avsync>");
 
                     if (s->flashver.len) {
                         NGX_RTMP_STAT_L("<flashver>");
