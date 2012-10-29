@@ -16,6 +16,8 @@
 
 
 static ngx_rtmp_connect_pt  next_connect;
+static ngx_str_t ngx_rtmp_authen_urlencoded =
+                 ngx_string("application/x-www-form-urlencoded");
 
 
 static char *ngx_rtmp_authen_on_connect(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -141,9 +143,10 @@ ngx_rtmp_authen_connect_create(ngx_rtmp_session_t *s, void *arg,
             addr_text->len, 0);
 
     /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(aacf->connect_url, pool,
-            cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
-            &ngx_rtmp_netcall_content_type_urlencoded);
+    hl = ngx_rtmp_netcall_http_format_header(NGX_RTMP_NETCALL_HTTP_POST,
+            &aacf->connect_url->uri, &aacf->connect_url->host,
+            pool, cl->buf->last - cl->buf->pos + (pl->buf->last - pl->buf->pos),
+            &ngx_rtmp_authen_urlencoded);
 
     if (hl == NULL) {
         return NULL;
