@@ -60,13 +60,6 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, sync),
       NULL },
 
-    { ngx_string("atc"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_flag_slot,
-      NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_live_app_conf_t, atc),
-      NULL },
-
     { ngx_string("interleave"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
@@ -128,7 +121,6 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->nbuckets = NGX_CONF_UNSET;
     lacf->buflen = NGX_CONF_UNSET;
     lacf->sync = NGX_CONF_UNSET;
-    lacf->atc = NGX_CONF_UNSET;
     lacf->interleave = NGX_CONF_UNSET;
     lacf->wait_key = NGX_CONF_UNSET;
 
@@ -147,7 +139,6 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 0);
-    ngx_conf_merge_value(conf->atc, prev->atc, 0);
     ngx_conf_merge_value(conf->interleave, prev->interleave, 0);
     ngx_conf_merge_value(conf->wait_key, prev->wait_key, 0);
 
@@ -210,7 +201,7 @@ static void
 ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name,
         ngx_uint_t flags)
 {
-    ngx_rtmp_live_ctx_t            *ctx;
+    ngx_rtmp_live_ctx_t            *ctx, *pctx;
     ngx_rtmp_live_stream_t        **stream;
     ngx_rtmp_live_app_conf_t       *lacf;
 
@@ -235,20 +226,30 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name,
     ctx->session = s;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-            "live: join '%s'", name);
+                   "live: join '%s'", name);
 
     stream = ngx_rtmp_live_get_stream(s, name, 1);
     if (stream == NULL) {
         return;
     }
+
     if (flags & NGX_RTMP_LIVE_PUBLISHING) {
         if ((*stream)->flags & NGX_RTMP_LIVE_PUBLISHING) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                    "live: already publishing");
+                          "live: already publishing");
             return;
         }
+
         (*stream)->flags |= NGX_RTMP_LIVE_PUBLISHING;
+
+        for (pctx = (*stream)->ctx; pctx; pctx = pctx->next) {
+            ngx_rtmp_send_user_stream_begin(pctx->session, NGX_RTMP_MSID);
+        }
+
+    } else if ((*stream)->flags & NGX_RTMP_LIVE_PUBLISHING) {
+        ngx_rtmp_send_user_stream_begin(s, NGX_RTMP_MSID);
     }
+
     ctx->stream = *stream;
     ctx->flags = flags;
     ctx->next = (*stream)->ctx;
@@ -289,17 +290,25 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "live: leave '%s'", ctx->stream->name);
 
-    if (ctx->stream->flags & NGX_RTMP_LIVE_PUBLISHING
-            && ctx->flags & NGX_RTMP_LIVE_PUBLISHING)
-    {
-        ctx->stream->flags &= ~NGX_RTMP_LIVE_PUBLISHING;
-    }
-
     for (cctx = &ctx->stream->ctx; *cctx; cctx = &(*cctx)->next) {
         if (*cctx == ctx) {
             *cctx = ctx->next;
             break;
         }
+    }
+
+    if (ctx->stream->flags & NGX_RTMP_LIVE_PUBLISHING &&
+        ctx->flags & NGX_RTMP_LIVE_PUBLISHING)
+    {
+        ctx->stream->flags &= ~NGX_RTMP_LIVE_PUBLISHING;
+
+        for (cctx = &ctx->stream->ctx; *cctx; cctx = &(*cctx)->next) {
+            ngx_rtmp_send_user_stream_eof((*cctx)->session, NGX_RTMP_MSID);
+            ngx_memzero((*cctx)->cs, sizeof((*cctx)->cs));
+        }
+
+    } else {
+        ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_MSID);
     }
 
     if (ctx->stream->ctx) {
@@ -338,12 +347,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
     ngx_rtmp_header_t               ch, lh;
-    ngx_int_t                       rc, sync;
+    ngx_int_t                       sync;
     ngx_uint_t                      prio;
     ngx_uint_t                      peers;
     ngx_uint_t                      header_version, meta_version;
     ngx_uint_t                      csidx, hvidx;
-    uint32_t                        timestamp, delta;
+    uint32_t                        delta;
     ngx_rtmp_live_chunk_stream_t   *cs;
 #ifdef NGX_DEBUG
     const char                     *type_s;
@@ -398,12 +407,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_memzero(&ch, sizeof(ch));
 
-    timestamp = h->timestamp;
-    if (lacf->atc == 0) {
-        timestamp += h->timeshift;
-    }
-
-    ch.timestamp = timestamp;
+    ch.timestamp = h->timestamp;
     ch.msid = NGX_RTMP_MSID;
     ch.csid = cs->csid;
     ch.type = h->type;
@@ -493,13 +497,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
             }
 
-            ch.timestamp = timestamp;
-            if (lacf->atc == 0) {
-                ch.timestamp -= (uint32_t) ss->epoch;
-            }
-
-            lh.timestamp = ch.timestamp - delta;
-
             /*
             if (ngx_rtmp_send_user_stream_eof(ss, NGX_RTMP_MSID) != NGX_OK) {
                 continue;
@@ -513,12 +510,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                 /* send absolute codec header */
 
-                if (lacf->atc == 0 && (int32_t) lh.timestamp < 0) {
-                    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
-                                   "live: abs %s header from the past", type_s);
-                    continue;
-                }
-
                 ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                "live: abs %s header timestamp=%uD",
                                type_s, lh.timestamp);
@@ -528,14 +519,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                     ngx_rtmp_prepare_message(s, &lh, NULL, aheader);
                 }
 
-                rc = ngx_rtmp_send_message(ss, aheader, 0);
-
-                if (!lacf->atc) {
-                    ngx_rtmp_free_shared_chain(cscf, aheader);
-                    aheader = NULL;
-                }
-
-                if (rc != NGX_OK) {
+                if (ngx_rtmp_send_message(ss, aheader, 0) != NGX_OK) {
                     continue;
                 }
 
@@ -548,12 +532,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                 /* send absolute packet */
 
-                if (lacf->atc == 0 && (int32_t) ch.timestamp < 0) {
-                    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
-                                   "live: abs %s packet from the past", type_s);
-                    continue;
-                }
-
                 ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                "live: abs %s packet timestamp=%uD",
                                type_s, ch.timestamp);
@@ -563,14 +541,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                     ngx_rtmp_prepare_message(s, &ch, NULL, apkt);
                 }
 
-                rc = ngx_rtmp_send_message(ss, apkt, prio);
-
-                if (!lacf->atc) {
-                    ngx_rtmp_free_shared_chain(cscf, apkt);
-                    apkt = NULL;
-                }
-
-                if (rc != NGX_OK) {
+                if (ngx_rtmp_send_message(ss, apkt, prio) != NGX_OK) {
                     continue;
                 }
 
