@@ -403,7 +403,6 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     st->dtime = timestamp;
                 } else {
                     h->timestamp = timestamp;
-                    h->timeshift = (uint32_t) ngx_current_msec - timestamp;
                     st->dtime = 0;
                 }
             }
