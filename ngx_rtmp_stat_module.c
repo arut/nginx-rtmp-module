@@ -312,8 +312,8 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                     NGX_RTMP_STAT_L("<avsync>");
 
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                                "%uD/%uD", ctx->cs[0].dropped,
-                                           ctx->cs[1].dropped) - buf);
+                                "%uD/%uD", ctx->cs[1].dropped,
+                                           ctx->cs[0].dropped) - buf);
 
                     NGX_RTMP_STAT_L("</avsync>");
 

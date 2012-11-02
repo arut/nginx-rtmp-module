@@ -585,7 +585,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     fmt = 0;
     if (lh && lh->csid && h->msid == lh->msid) {
         ++fmt;
-        if (h->type == lh->type && mlen == lh->mlen) {
+        if (h->type == lh->type && mlen && mlen == lh->mlen) {
             ++fmt;
             if (h->timestamp == lh->timestamp) {
                 ++fmt;

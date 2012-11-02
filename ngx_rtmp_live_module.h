@@ -23,6 +23,7 @@ typedef struct ngx_rtmp_live_stream_s ngx_rtmp_live_stream_t;
 
 typedef struct {
     unsigned                            active:1;
+    unsigned                            secondary:1;
     uint32_t                            timestamp;
     uint32_t                            csid;
     uint32_t                            dropped;
@@ -36,7 +37,6 @@ struct ngx_rtmp_live_ctx_s {
     ngx_uint_t                          flags;
     ngx_uint_t                          ndropped;
     ngx_rtmp_live_chunk_stream_t        cs[2];
-    ngx_uint_t                          header_versions[2];
     ngx_uint_t                          meta_version;
 };
 

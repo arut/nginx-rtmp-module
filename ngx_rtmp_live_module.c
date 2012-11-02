@@ -302,7 +302,7 @@ ngx_rtmp_live_sync_streams(ngx_rtmp_session_t *s)
     ngx_memzero(&ch, sizeof(ch));
 
     ch.msid = NGX_RTMP_MSID;
-    ch.type = NGX_RTMP_MSG_AMF_META;
+    ch.type = csidx ? NGX_RTMP_MSG_VIDEO : NGX_RTMP_MSG_AUDIO;
     ch.csid = ctx->cs[csidx].csid;
     ch.timestamp = ctx->cs[1 - csidx].timestamp;
 
@@ -415,19 +415,18 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
     ngx_chain_t                    *header, *meta,
-                                   *apkt, *rpkt/*,
-                                   *aheader, *rheader*/;
+                                   *apkt, *rpkt;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
     ngx_rtmp_header_t               ch, lh;
-    ngx_int_t                       rc;
+    ngx_int_t                       rc, mandatory;
     ngx_uint_t                      prio;
     ngx_uint_t                      peers;
-    ngx_uint_t                      header_version, meta_version;
-    ngx_uint_t                      csidx, hvidx;
+    ngx_uint_t                      meta_version;
+    ngx_uint_t                      csidx;
     uint32_t                        delta;
-    ngx_rtmp_live_chunk_stream_t   *cs;
+    ngx_rtmp_live_chunk_stream_t   *cs, *acs;
 #ifdef NGX_DEBUG
     const char                     *type_s;
 
@@ -459,13 +458,11 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                    type_s, h->timestamp);
 
     peers = 0;
-    /*aheader = NULL;*/
-    /*rheader = NULL;*/
     apkt = NULL;
     header = NULL;
-    header_version = 0;
     meta = NULL;
     meta_version = 0;
+    mandatory = 0;
 
     prio = (h->type == NGX_RTMP_MSG_VIDEO ?
             ngx_rtmp_get_video_frame_type(in) : 0);
@@ -474,9 +471,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     csidx = !(lacf->interleave || h->type == NGX_RTMP_MSG_VIDEO);
 
-    hvidx = (h->type == NGX_RTMP_MSG_VIDEO);
-
-    cs = &ctx->cs[csidx];
+    cs  = &ctx->cs[csidx];
+    acs = &ctx->cs[1 - csidx];
 
     ngx_memzero(&ch, sizeof(ch));
 
@@ -487,8 +483,11 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     lh = ch;
 
-    if (cs->active) {
+    if (cs->active || cs->secondary) {
         lh.timestamp = cs->timestamp;
+    } else if (!acs->active) {
+        acs->secondary = 1;
+        acs->timestamp = h->timestamp;
     }
 
     cs->active = 1;
@@ -498,9 +497,12 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     if (delta >> 31) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "live: non-monotonical timestamp %uD->%uD",
+                       "live: clipping non-monotonical timestamp %uD->%uD",
                        lh.timestamp, ch.timestamp);
-        return NGX_OK;
+
+        delta = 0;
+
+        ch.timestamp = lh.timestamp;
     }
 
     rpkt = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
@@ -512,17 +514,23 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (codec_ctx) {
 
         if (h->type == NGX_RTMP_MSG_AUDIO) {
-            
-            if (codec_ctx->aac_header) {
-                header = codec_ctx->aac_header;
-                header_version = codec_ctx->aac_version;
+            header = codec_ctx->aac_header;
+
+            if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC &&
+                in->buf->pos + 1 < in->buf->last && in->buf->pos[1] == 0)
+            {
+                prio = 0;
+                mandatory = 1;
             }
 
         } else {
+            header = codec_ctx->avc_header;
 
-            if (codec_ctx->avc_header) {
-                header = codec_ctx->avc_header;
-                header_version = codec_ctx->avc_version;
+            if (codec_ctx->audio_codec_id == NGX_RTMP_VIDEO_H264 &&
+                in->buf->pos + 1 < in->buf->last && in->buf->pos[1] == 0)
+            {
+                prio = 0;
+                mandatory = 1;
             }
         }
 
@@ -597,8 +605,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 cs->timestamp = lh.timestamp;
                 cs->active = 1;
 
-                pctx->header_versions[hvidx] = header_version;
-
             } else {
 
                 /* send absolute packet */
@@ -626,22 +632,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
         }
 
-        /* send codec header if newer header has arrived  */
-
-/*        if (header && pctx->header_versions[hvidx] != header_version) {
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
-                           "live: new %s header", type_s);
-
-            if (rheader == NULL) {
-                rheader = ngx_rtmp_append_shared_bufs(cscf, NULL, header);
-                ngx_rtmp_prepare_message(s, &ch, &ch, rheader);
-            }
-
-            if (ngx_rtmp_send_message(ss, rheader, 0) == NGX_OK) {
-                pctx->header_versions[hvidx] = header_version;
-            }
-        }
-*/
         /* send relative packet */
 
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
@@ -650,7 +640,15 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         if (ngx_rtmp_send_message(ss, rpkt, prio) != NGX_OK) {
             ++pctx->ndropped;
+
             cs->dropped += delta;
+
+            if (mandatory) {
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
+                               "live: mandatory packet failed");
+                ngx_rtmp_finalize_session(ss);
+            }
+
             continue;
         }
 
@@ -665,14 +663,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (apkt) {
         ngx_rtmp_free_shared_chain(cscf, apkt);
     }
-/*
-    if (rheader) {
-        ngx_rtmp_free_shared_chain(cscf, rheader);
-    }
-*/
-    /*if (aheader) {
-        ngx_rtmp_free_shared_chain(cscf, aheader);
-    }*/
 
     ngx_rtmp_update_bandwidth(&ctx->stream->bw_in, h->mlen);
     ngx_rtmp_update_bandwidth(&ctx->stream->bw_out, h->mlen * peers);
