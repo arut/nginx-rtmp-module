@@ -880,7 +880,7 @@ ngx_rtmp_mp4_parse_stsc(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
 
     t->chunks = (ngx_rtmp_mp4_chunks_t *) pos;
 
-    if (pos + sizeof(*t->chunks) + ngx_rtmp_r32(t->times->entry_count) * 
+    if (pos + sizeof(*t->chunks) + ngx_rtmp_r32(t->chunks->entry_count) * 
                                    sizeof(t->chunks->entries[0])
         <= last)
     {
