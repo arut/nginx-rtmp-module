@@ -100,6 +100,44 @@ ngx_module_t  ngx_rtmp_stat_module = {
 #define NGX_RTMP_STAT_BUFSIZE           256
 
 
+/* ngx_escape_html does not escape characters out of ASCII range
+ * which are bad for xslt */
+
+static void *
+ngx_rtmp_stat_escape(ngx_http_request_t *r, void *data, size_t len)
+{
+    u_char *p, *np;
+    void   *new_data;
+    size_t  n;
+
+    p = data;
+
+    for (n = 0; n < len; ++n, ++p) {
+        if (*p < 0x20 || *p >= 0x7f) {
+            break;
+        }
+    }
+
+    if (n == len) {
+        return data;
+    }
+
+    new_data = ngx_palloc(r->pool, len);
+    if (new_data == NULL) {
+        return NULL;
+    }
+
+    p  = data;
+    np = new_data;
+
+    for (n = 0; n < len; ++n, ++p, ++np) {
+        *np = (*p < 0x20 || *p >= 0x7f) ? (u_char) ' ' : *p;
+    }
+
+    return new_data;
+}
+
+
 static void
 ngx_rtmp_stat_output(ngx_http_request_t *r, ngx_chain_t ***lll,
         void *data, size_t len, ngx_uint_t escape)
@@ -110,6 +148,13 @@ ngx_rtmp_stat_output(ngx_http_request_t *r, ngx_chain_t ***lll,
 
     if (len == 0) {
         return;
+    }
+
+    if (escape) {
+        data = ngx_rtmp_stat_escape(r, data, len);
+        if (data == NULL) {
+            return;
+        }
     }
 
     real_len = escape
