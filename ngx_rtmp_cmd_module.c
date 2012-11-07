@@ -4,6 +4,7 @@
 
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_streams.h"
+#include "ngx_rtmp_authen_module.h"
 
 
 #define NGX_RTMP_FMS_VERSION        "FMS/3,0,1,123"
@@ -143,6 +144,15 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     static double               capabilities = NGX_RTMP_CAPABILITIES;
     static double               object_encoding = 0;
 
+    u_char                     *level_status  = "status";
+    u_char                     *level_error   = "error";
+    u_char                     *code_success  = "NetConnection.Connect.Success";
+    u_char                     *code_rejected = "NetConnection.Connect.Rejected";
+    u_char                     *desc_success  = "Connection succeeded.";
+
+    ngx_int_t                   ret = NGX_OK;
+    ngx_rtmp_authen_ctx_t      *authen_ctx;
+
     static ngx_rtmp_amf_elt_t  out_obj[] = {
 
         { NGX_RTMP_AMF_STRING, 
@@ -158,20 +168,34 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
         { NGX_RTMP_AMF_STRING, 
           ngx_string("level"),
-          "status", 0 },
+          NULL, 0 },
 
         { NGX_RTMP_AMF_STRING, 
           ngx_string("code"),
-          "NetConnection.Connect.Success", 0 }, 
+          NULL, 0 },
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("description"),
-          "Connection succeeded.", 0 },
+          NULL, 0 },
 
         { NGX_RTMP_AMF_NUMBER,
           ngx_string("objectEncoding"),
           &object_encoding, 0 }
     };
+
+    authen_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_authen_module);
+
+    if (authen_ctx && authen_ctx->conn_status != NGX_RTMP_CONN_ALLOW) {
+        out_inf[0].data = level_error;
+        out_inf[1].data = code_rejected;
+        out_inf[2].data = authen_ctx->conn_desc.len > 0 ?
+                authen_ctx->conn_desc.data : "[ AccessManager.Reject ]";
+        ret = NGX_ERROR;
+    } else {
+        out_inf[0].data = level_status;
+        out_inf[1].data = code_success;
+        out_inf[2].data = desc_success;
+    }
 
     static ngx_rtmp_amf_elt_t  out_elts[] = {
 
@@ -217,22 +241,23 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     h.csid = NGX_RTMP_CSID_AMF_INI;
     h.type = NGX_RTMP_MSG_AMF_CMD;
 
-
+    if (authen_ctx == NULL) {
 #define NGX_RTMP_SET_STRPAR(name)                                             \
     s->name.len = ngx_strlen(v->name);                                        \
     s->name.data = ngx_palloc(s->connection->pool, s->name.len);              \
     ngx_memcpy(s->name.data, v->name, s->name.len)
 
-    NGX_RTMP_SET_STRPAR(app);
-    NGX_RTMP_SET_STRPAR(flashver);
-    NGX_RTMP_SET_STRPAR(swf_url);
-    NGX_RTMP_SET_STRPAR(tc_url);
-    NGX_RTMP_SET_STRPAR(page_url);
+        NGX_RTMP_SET_STRPAR(app);
+        NGX_RTMP_SET_STRPAR(flashver);
+        NGX_RTMP_SET_STRPAR(swf_url);
+        NGX_RTMP_SET_STRPAR(tc_url);
+        NGX_RTMP_SET_STRPAR(page_url);
 
 #undef NGX_RTMP_SET_STRPAR
 
-    s->acodecs = v->acodecs;
-    s->vcodecs = v->vcodecs;
+        s->acodecs = v->acodecs;
+        s->vcodecs = v->vcodecs;
+    }
 
     /* find application & set app_conf */
     len = ngx_strlen(v->app);
@@ -264,7 +289,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
         || ngx_rtmp_send_amf(s, &h, out_elts,
                 sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK
         ? NGX_ERROR
-        : NGX_OK; 
+        : ret;
 }
 
 
