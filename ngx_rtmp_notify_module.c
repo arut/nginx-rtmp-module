@@ -817,7 +817,7 @@ ngx_rtmp_notify_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         nacf->method = NGX_RTMP_NETCALL_HTTP_POST;
 
     } else {
-        return "unexpected method";
+        return "got unexpected method";
     }
 
     return NGX_CONF_OK;
