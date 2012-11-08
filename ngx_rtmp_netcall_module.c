@@ -500,7 +500,7 @@ ngx_rtmp_netcall_http_format_request(ngx_int_t method, ngx_str_t *host,
     ngx_buf_t                      *b;
     size_t                          content_length;
     static const char              *methods[2] = { "GET", "POST" };
-    static const char               rq_tmpl[] = "HTTP/1.0\r\n"
+    static const char               rq_tmpl[] = " HTTP/1.0\r\n"
                                                 "Host: %V\r\n"
                                                 "Content-Type: %V\r\n"
                                                 "Connection: Close\r\n"
@@ -521,13 +521,13 @@ ngx_rtmp_netcall_http_format_request(ngx_int_t method, ngx_str_t *host,
     }
 
     b = ngx_create_temp_buf(pool, sizeof("POST") + /* longest method + 1 */
-                                  uri->len + 1);
+                                  uri->len);
     if (b == NULL) {
         return NULL;
     }
 
     b->last = ngx_snprintf(b->last, b->end - b->last, "%s %V",
-                           methods[method], &uri);
+                           methods[method], uri);
 
     al->buf = b;
 
@@ -555,7 +555,7 @@ ngx_rtmp_netcall_http_format_request(ngx_int_t method, ngx_str_t *host,
     bl->buf = b;
 
     b->last = ngx_snprintf(b->last, b->end - b->last, rq_tmpl,
-                           &host, content_type, content_length);
+                           host, content_type, content_length);
 
     al->next = bl;
     bl->next = body;
