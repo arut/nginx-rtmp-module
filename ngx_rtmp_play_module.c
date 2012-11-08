@@ -593,7 +593,6 @@ ngx_rtmp_play_remote_create(ngx_rtmp_session_t *s, void *arg, ngx_pool_t *pool)
 
     ngx_rtmp_play_app_conf_t       *pacf;
     ngx_rtmp_play_ctx_t            *ctx;
-    ngx_chain_t                    *hl;
     ngx_str_t                      *addr_text, uri;
     u_char                         *p;
     size_t                          args_len, len;
@@ -625,7 +624,8 @@ ngx_rtmp_play_remote_create(ngx_rtmp_session_t *s, void *arg, ngx_pool_t *pool)
 
     p = ngx_cpymem(p, ctx->name.data, ctx->name.len);
     p = ngx_cpymem(p, (u_char*)"?addr=", sizeof("&addr=") -1);
-    p = (u_char*)ngx_escape_uri(p, addr_text->data, addr_text->len, 0);
+    p = (u_char*)ngx_escape_uri(p, addr_text->data, addr_text->len,
+                                NGX_ESCAPE_ARGS);
     if (args_len) {
         *p++ = '&';
         p = (u_char *) ngx_cpymem(p, v->args, args_len);
@@ -633,15 +633,9 @@ ngx_rtmp_play_remote_create(ngx_rtmp_session_t *s, void *arg, ngx_pool_t *pool)
 
     uri.len = p - uri.data;
 
-    /* HTTP header */
-    hl = ngx_rtmp_netcall_http_format_header(NGX_RTMP_NETCALL_HTTP_GET,
-            &uri, &pacf->url->host, pool, 0, &text_plain);
-
-    if (hl == NULL) {
-        return NULL;
-    }
-
-    return hl;
+    return ngx_rtmp_netcall_http_format_request(NGX_RTMP_NETCALL_HTTP_GET,
+                                                &pacf->url->host, &uri,
+                                                NULL, NULL, pool, &text_plain);
 }
 
 
