@@ -536,7 +536,7 @@ ngx_rtmp_netcall_http_format_request(ngx_int_t method, ngx_str_t *host,
     if (args) {
         *b->last++ = '?';
         al->next = args;
-        al = args;
+        for (al = args; al->next; al = al->next);
     }
 
     /* create second buffer */
@@ -592,6 +592,7 @@ ngx_rtmp_netcall_http_format_session(ngx_rtmp_session_t *s, ngx_pool_t *pool)
     }
 
     cl->buf = b;
+    cl->next = NULL;
 
     b->last = ngx_cpymem(b->last, (u_char*) "app=", sizeof("app=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, s->app.data, s->app.len,
