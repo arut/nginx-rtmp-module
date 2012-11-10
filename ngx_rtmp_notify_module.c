@@ -27,7 +27,7 @@ static void * ngx_rtmp_notify_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_notify_merge_app_conf(ngx_conf_t *cf, 
        void *parent, void *child);
 static ngx_int_t ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, 
-       ngx_url_t *url);
+       ngx_uint_t url_idx);
 
 
 ngx_str_t   ngx_rtmp_notify_urlencoded = 
@@ -65,7 +65,7 @@ typedef struct {
 
 typedef struct {
     u_char                                     *cbname;
-    ngx_url_t                                  *url;
+    ngx_uint_t                                  url_idx;
 } ngx_rtmp_notify_done_t;
 
 
@@ -381,7 +381,7 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
         b->last = (u_char *) ngx_cpymem(b->last, ctx->args, args_len);
     }
 
-    return ngx_rtmp_notify_create_request(s, pool, NGX_RTMP_NOTIFY_DONE, pl);
+    return ngx_rtmp_notify_create_request(s, pool, ds->url_idx, pl);
 }
 
 
@@ -643,22 +643,16 @@ ngx_rtmp_notify_delete_stream(ngx_rtmp_session_t *s,
         goto next;
     }
 
-    if (nacf->url[NGX_RTMP_NOTIFY_PUBLISH_DONE] && 
-        (ctx->flags & NGX_RTMP_NOTIFY_PUBLISHING)) 
-    {
-        ngx_rtmp_notify_done(s, "publish_done",
-                             nacf->url[NGX_RTMP_NOTIFY_PUBLISH_DONE]);
+    if (ctx->flags & NGX_RTMP_NOTIFY_PUBLISHING) {
+        ngx_rtmp_notify_done(s, "publish_done", NGX_RTMP_NOTIFY_PUBLISH_DONE);
     }
 
-    if (nacf->url[NGX_RTMP_NOTIFY_PLAY_DONE] && 
-        (ctx->flags & NGX_RTMP_NOTIFY_PLAYING))
-    {
-        ngx_rtmp_notify_done(s, "play_done",
-                             nacf->url[NGX_RTMP_NOTIFY_PLAY_DONE]);
+    if (ctx->flags & NGX_RTMP_NOTIFY_PLAYING) {
+        ngx_rtmp_notify_done(s, "play_done", NGX_RTMP_NOTIFY_PLAY_DONE);
     }
 
-    if (nacf->url[NGX_RTMP_NOTIFY_DONE] && ctx->flags) {
-        ngx_rtmp_notify_done(s, "done", nacf->url[NGX_RTMP_NOTIFY_DONE]);
+    if (ctx->flags) {
+        ngx_rtmp_notify_done(s, "done", NGX_RTMP_NOTIFY_DONE);
     }
 
     ctx->flags = 0;
@@ -702,16 +696,26 @@ next:
 
 
 static ngx_int_t
-ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, ngx_url_t *url)
+ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, ngx_uint_t url_idx)
 {
     ngx_rtmp_netcall_init_t         ci;
     ngx_rtmp_notify_done_t          ds;
+    ngx_rtmp_notify_app_conf_t     *nacf;
+    ngx_url_t                      *url;
+
+    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
+
+    url = nacf->url[url_idx];
+
+    if (url == NULL) {
+        return NGX_OK;
+    }
 
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "notify: %s '%V'", cbname, &url->url);
 
     ds.cbname = (u_char *) cbname;
-    ds.url = url;
+    ds.url_idx = url_idx;
 
     ngx_memzero(&ci, sizeof(ci));
 
