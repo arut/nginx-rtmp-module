@@ -252,7 +252,7 @@ ngx_rtmp_control_record(ngx_http_request_t *r, ngx_str_t *method)
 
     /* find publisher context */
     for (lctx = live.ls->ctx; lctx; lctx = lctx->next) {
-        if (lctx->flags & NGX_RTMP_LIVE_PUBLISHING) {
+        if (lctx->publishing) {
             break;
         }
     }
@@ -358,7 +358,7 @@ ngx_rtmp_control_drop(ngx_http_request_t *r, ngx_str_t *method)
         ngx_strncmp(method->data, "publisher", method->len) == 0)
     {
         for (lctx = live.ls->ctx; lctx; lctx = lctx->next) {
-            if (lctx->flags & NGX_RTMP_LIVE_PUBLISHING) {
+            if (lctx->publishing) {
                 ngx_rtmp_finalize_session(lctx->session);
                 ++ndropped;
                 break;

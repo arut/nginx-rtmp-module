@@ -174,9 +174,7 @@ ngx_rtmp_ping(ngx_event_t *pev)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "ping: schedule %Mms", cscf->ping_timeout);
 
-    if (ngx_rtmp_send_user_ping_request(s, (uint32_t)ngx_current_msec) 
-            != NGX_OK)
-    {
+    if (ngx_rtmp_send_ping_request(s, (uint32_t)ngx_current_msec) != NGX_OK) {
         ngx_rtmp_finalize_session(s);
         return;
     }

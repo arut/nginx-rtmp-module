@@ -188,7 +188,7 @@ ngx_rtmp_play_send(ngx_event_t *e)
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "play: send done");
 
-    ngx_rtmp_send_user_stream_eof(s, NGX_RTMP_MSID);
+    ngx_rtmp_send_stream_eof(s, NGX_RTMP_MSID);
 
     ngx_rtmp_send_play_status(s, "NetStream.Play.Complete", "status", ts, 0);
 
@@ -349,6 +349,11 @@ ngx_rtmp_play_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     if (ctx->file.fd != NGX_INVALID_FILE) {
         ngx_close_file(ctx->file.fd);
         ctx->file.fd = NGX_INVALID_FILE;
+
+        ngx_rtmp_send_stream_eof(s, NGX_RTMP_MSID);
+
+        ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status",
+                             "Stop video on demand");
     }
 
 next:
@@ -366,7 +371,21 @@ ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
         goto next;
     }
 
+    if (ngx_rtmp_send_stream_eof(s, NGX_RTMP_MSID) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
     ngx_rtmp_play_do_seek(s, v->offset);
+
+    if (ngx_rtmp_send_status(s, "NetStream.Seek.Notify", "status", "Seeking")
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_send_stream_begin(s, NGX_RTMP_MSID) != NGX_OK) {
+        return NGX_ERROR;
+    }
 
 next:
     return next_seek(s, v);
@@ -389,8 +408,23 @@ ngx_rtmp_play_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
                    (ngx_int_t) v->pause, v->position);
 
     if (v->pause) {
+        if (ngx_rtmp_send_status(s, "NetStream.Pause.Notify", "status",
+                                 "Paused video on demand")
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
         ngx_rtmp_play_do_stop(s);
+
     } else {
+        if (ngx_rtmp_send_status(s, "NetStream.Unpause.Notify", "status",
+                                 "Unpaused video on demand")
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
         ngx_rtmp_play_do_start(s); /*TODO: v->position? */
     }
 
@@ -563,12 +597,23 @@ ngx_rtmp_play_open(ngx_rtmp_session_t *s, double start)
         return NGX_ERROR;
     }
 
+    if (ngx_rtmp_send_stream_begin(s, NGX_RTMP_MSID) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_send_status(s, "NetStream.Play.Start", "status",
+                             "Start video on demand")
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
     e = &ctx->send_evt;
     e->data = s;
     e->handler = ngx_rtmp_play_send;
     e->log = s->connection->log;
 
-    ngx_rtmp_send_user_recorded(s, 1);
+    ngx_rtmp_send_recorded(s, 1);
 
     if (ngx_rtmp_play_do_init(s) != NGX_OK) {
         return NGX_ERROR;

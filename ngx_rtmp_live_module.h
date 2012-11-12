@@ -13,17 +13,12 @@
 #include "ngx_rtmp_streams.h"
 
 
-/* session flags */
-#define NGX_RTMP_LIVE_PUBLISHING        0x01
-
-
 typedef struct ngx_rtmp_live_ctx_s ngx_rtmp_live_ctx_t;
 typedef struct ngx_rtmp_live_stream_s ngx_rtmp_live_stream_t;
 
 
 typedef struct {
     unsigned                            active:1;
-    unsigned                            secondary:1;
     uint32_t                            timestamp;
     uint32_t                            csid;
     uint32_t                            dropped;
@@ -34,10 +29,12 @@ struct ngx_rtmp_live_ctx_s {
     ngx_rtmp_session_t                 *session;
     ngx_rtmp_live_stream_t             *stream;
     ngx_rtmp_live_ctx_t                *next;
-    ngx_uint_t                          flags;
     ngx_uint_t                          ndropped;
     ngx_rtmp_live_chunk_stream_t        cs[2];
     ngx_uint_t                          meta_version;
+    unsigned                            active:1;
+    unsigned                            publishing:1;
+    unsigned                            silent:1;
 };
 
 
@@ -45,10 +42,11 @@ struct ngx_rtmp_live_stream_s {
     u_char                              name[NGX_RTMP_MAX_NAME];
     ngx_rtmp_live_stream_t             *next;
     ngx_rtmp_live_ctx_t                *ctx;
-    ngx_uint_t                          flags;
     ngx_rtmp_bandwidth_t                bw_in;
     ngx_rtmp_bandwidth_t                bw_out;
     ngx_msec_t                          epoch;
+    unsigned                            active:1;
+    unsigned                            publishing:1;
 };
 
 

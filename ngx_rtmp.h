@@ -462,6 +462,17 @@ ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 #define NGX_RTMP_LIMIT_DYNAMIC      2
 
 /* Protocol control messages */
+ngx_chain_t * ngx_rtmp_create_chunk_size(ngx_rtmp_session_t *s, 
+        uint32_t chunk_size);
+ngx_chain_t * ngx_rtmp_create_abort(ngx_rtmp_session_t *s, 
+        uint32_t csid);
+ngx_chain_t * ngx_rtmp_create_ack(ngx_rtmp_session_t *s, 
+        uint32_t seq);
+ngx_chain_t * ngx_rtmp_create_ack_size(ngx_rtmp_session_t *s, 
+        uint32_t ack_size);
+ngx_chain_t * ngx_rtmp_create_bandwidth(ngx_rtmp_session_t *s, 
+        uint32_t ack_size, uint8_t limit_type);
+
 ngx_int_t ngx_rtmp_send_chunk_size(ngx_rtmp_session_t *s, 
         uint32_t chunk_size);
 ngx_int_t ngx_rtmp_send_abort(ngx_rtmp_session_t *s, 
@@ -474,37 +485,60 @@ ngx_int_t ngx_rtmp_send_bandwidth(ngx_rtmp_session_t *s,
         uint32_t ack_size, uint8_t limit_type);
 
 /* User control messages */
-ngx_int_t ngx_rtmp_send_user_stream_begin(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_stream_begin(ngx_rtmp_session_t *s, 
         uint32_t msid);
-ngx_int_t ngx_rtmp_send_user_stream_eof(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_stream_eof(ngx_rtmp_session_t *s, 
         uint32_t msid);
-ngx_int_t ngx_rtmp_send_user_stream_dry(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_stream_dry(ngx_rtmp_session_t *s, 
         uint32_t msid);
-ngx_int_t ngx_rtmp_send_user_set_buflen(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_set_buflen(ngx_rtmp_session_t *s, 
         uint32_t msid, uint32_t buflen_msec);
-ngx_int_t ngx_rtmp_send_user_recorded(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_recorded(ngx_rtmp_session_t *s, 
         uint32_t msid);
-ngx_int_t ngx_rtmp_send_user_ping_request(ngx_rtmp_session_t *s,
+ngx_chain_t * ngx_rtmp_create_ping_request(ngx_rtmp_session_t *s,
         uint32_t timestamp);
-ngx_int_t ngx_rtmp_send_user_ping_response(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_ping_response(ngx_rtmp_session_t *s, 
         uint32_t timestamp);
-ngx_int_t ngx_rtmp_send_user_unknown(ngx_rtmp_session_t *s, 
+
+ngx_int_t ngx_rtmp_send_stream_begin(ngx_rtmp_session_t *s, 
+        uint32_t msid);
+ngx_int_t ngx_rtmp_send_stream_eof(ngx_rtmp_session_t *s, 
+        uint32_t msid);
+ngx_int_t ngx_rtmp_send_stream_dry(ngx_rtmp_session_t *s, 
+        uint32_t msid);
+ngx_int_t ngx_rtmp_send_set_buflen(ngx_rtmp_session_t *s, 
+        uint32_t msid, uint32_t buflen_msec);
+ngx_int_t ngx_rtmp_send_recorded(ngx_rtmp_session_t *s, 
+        uint32_t msid);
+ngx_int_t ngx_rtmp_send_ping_request(ngx_rtmp_session_t *s,
+        uint32_t timestamp);
+ngx_int_t ngx_rtmp_send_ping_response(ngx_rtmp_session_t *s, 
         uint32_t timestamp);
 
 /* AMF sender/receiver */
 ngx_int_t ngx_rtmp_append_amf(ngx_rtmp_session_t *s,
         ngx_chain_t **first, ngx_chain_t **last, 
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
-ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
-        ngx_rtmp_amf_elt_t *elts, size_t nelts);
 ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in, 
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
 
+ngx_chain_t * ngx_rtmp_create_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_rtmp_amf_elt_t *elts, size_t nelts);
+ngx_int_t ngx_rtmp_send_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_rtmp_amf_elt_t *elts, size_t nelts);
+
 /* AMF status sender */
+ngx_chain_t * ngx_rtmp_create_status(ngx_rtmp_session_t *s, char *code,
+        char* level, char *desc);
+ngx_chain_t * ngx_rtmp_create_play_status(ngx_rtmp_session_t *s, char *code,
+        char* level, ngx_uint_t duration, ngx_uint_t bytes);
+ngx_chain_t * ngx_rtmp_create_sample_access(ngx_rtmp_session_t *s);
+
 ngx_int_t ngx_rtmp_send_status(ngx_rtmp_session_t *s, char *code,
         char* level, char *desc);
 ngx_int_t ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code,
         char* level, ngx_uint_t duration, ngx_uint_t bytes);
+ngx_int_t ngx_rtmp_send_sample_access(ngx_rtmp_session_t *s);
 
 
 /* Frame types */

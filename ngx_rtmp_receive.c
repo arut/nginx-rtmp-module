@@ -113,10 +113,14 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
     switch(evt) {
         case NGX_RTMP_USER_STREAM_BEGIN:
             /* use =val as stream id which started */
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "stream begin msid=%uD", val);
             break;
 
         case NGX_RTMP_USER_STREAM_EOF:
             /* use =val as stream id which is over */
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "stream eof msid=%uD", val);
             break;
 
         case NGX_RTMP_USER_STREAM_DRY:
@@ -144,7 +148,7 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
             break;
 
         case NGX_RTMP_USER_PING_REQUEST:
-            ngx_rtmp_send_user_ping_response(s, val);
+            ngx_rtmp_send_ping_response(s, val);
             break;
 
         case NGX_RTMP_USER_PING_RESPONSE:

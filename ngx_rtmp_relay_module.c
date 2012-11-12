@@ -952,7 +952,7 @@ ngx_rtmp_relay_send_play(ngx_rtmp_session_t *s)
 
     return ngx_rtmp_send_amf(s, &h, out_elts,
             sizeof(out_elts) / sizeof(out_elts[0])) != NGX_OK
-           || ngx_rtmp_send_user_set_buflen(s, NGX_RTMP_RELAY_MSID, 
+           || ngx_rtmp_send_set_buflen(s, NGX_RTMP_RELAY_MSID, 
                    racf->buflen) != NGX_OK
            ? NGX_ERROR
            : NGX_OK;
