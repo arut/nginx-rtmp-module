@@ -258,7 +258,6 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     ngx_rtmp_session_t             *s;
     ngx_int_t                       n;
     size_t                          nclients, total_nclients;
-    ngx_int_t                       publishing;
     u_char                          buf[NGX_OFF_T_LEN + 1];
     ngx_rtmp_stat_loc_conf_t       *slcf;
     u_char                         *cname;
@@ -270,7 +269,6 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     total_nclients = 0;
     for (n = 0; n < lacf->nbuckets; ++n) {
         for (stream = lacf->streams[n]; stream; stream = stream->next) {
-            publishing = 0;
             NGX_RTMP_STAT_L("<stream>\r\n");
 
             NGX_RTMP_STAT_L("<name>");
@@ -346,7 +344,6 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                     NGX_RTMP_STAT_L("</client>\r\n");
                 }
                 if (ctx->publishing) {
-                    publishing = 1;
                     codec = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
                 }
             }
@@ -393,8 +390,12 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                         "%uz", nclients) - buf);
             NGX_RTMP_STAT_L("</nclients>\r\n");
 
-            if (publishing) {
+            if (stream->publishing) {
                 NGX_RTMP_STAT_L("<publishing/>\r\n");
+            }
+
+            if (stream->active) {
+                NGX_RTMP_STAT_L("<active/>\r\n");
             }
 
             NGX_RTMP_STAT_L("</stream>\r\n");

@@ -16,7 +16,9 @@ static ngx_rtmp_close_stream_pt         next_close_stream;
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_live_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, 
-        void *parent, void *child);
+       void *parent, void *child);
+static char *ngx_rtmp_live_sync(ngx_conf_t *cf, ngx_command_t *cmd,
+       void *conf);
 
 
 #define NGX_RTMP_LIVE_TIME_ABSOLUTE     0x01
@@ -55,7 +57,7 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
 
     { ngx_string("sync"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_msec_slot,
+      ngx_rtmp_live_sync,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_live_app_conf_t, sync),
       NULL },
@@ -154,7 +156,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->meta, prev->meta, 1);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
-    ngx_conf_merge_msec_value(conf->sync, prev->sync, 0);
+    ngx_conf_merge_msec_value(conf->sync, prev->sync, 300);
     ngx_conf_merge_value(conf->interleave, prev->interleave, 0);
     ngx_conf_merge_value(conf->wait_key, prev->wait_key, 0);
     ngx_conf_merge_value(conf->publish_notify, prev->publish_notify, 0);
@@ -169,6 +171,25 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
             sizeof(ngx_rtmp_live_stream_t *) * conf->nbuckets);
 
     return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_rtmp_live_sync(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_rtmp_live_app_conf_t   *lacf = conf;
+    ngx_str_t                  *value;
+
+    value = cf->args->elts;
+
+    if (value->len == sizeof("off") - 1 &&
+        ngx_strncasecmp(value->data, (u_char *) "off", value->len))
+    {
+        lacf->sync = 0;
+        return NGX_CONF_OK;
+    }
+
+    return ngx_conf_set_msec_slot(cf, cmd, conf);
 }
 
 
