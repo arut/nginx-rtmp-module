@@ -21,10 +21,6 @@ static char *ngx_rtmp_live_sync(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 
 
-#define NGX_RTMP_LIVE_TIME_ABSOLUTE     0x01
-#define NGX_RTMP_LIVE_TIME_RELATIVE     0x02
-
-
 static ngx_command_t  ngx_rtmp_live_commands[] = {
 
     { ngx_string("live"),
