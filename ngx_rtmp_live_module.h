@@ -59,6 +59,8 @@ typedef struct {
     ngx_flag_t                          atc;
     ngx_flag_t                          interleave;
     ngx_flag_t                          wait_key;
+    ngx_flag_t                          publish_notify;
+    ngx_flag_t                          play_restart;
     ngx_msec_t                          buflen;
     ngx_pool_t                         *pool;
     ngx_rtmp_live_stream_t             *free_streams;
