@@ -55,7 +55,7 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_rtmp_live_sync,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_live_app_conf_t, sync),
+      0,
       NULL },
 
     { ngx_string("interleave"),
@@ -178,8 +178,8 @@ ngx_rtmp_live_sync(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    if (value->len == sizeof("off") - 1 &&
-        ngx_strncasecmp(value->data, (u_char *) "off", value->len))
+    if (value[1].len == sizeof("off") - 1 &&
+        ngx_strncasecmp(value[1].data, (u_char *) "off", value[1].len) == 0)
     {
         lacf->sync = 0;
         return NGX_CONF_OK;
