@@ -11,6 +11,8 @@
 static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_close_stream_pt         next_close_stream;
+static ngx_rtmp_stream_begin_pt         next_stream_begin;
+static ngx_rtmp_stream_eof_pt           next_stream_eof;
 
 
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
@@ -19,6 +21,8 @@ static char * ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf,
        void *parent, void *child);
 static char *ngx_rtmp_live_sync(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
+static void ngx_rtmp_live_start(ngx_rtmp_session_t *s);
+static void ngx_rtmp_live_stop(ngx_rtmp_session_t *s);
 
 
 static ngx_command_t  ngx_rtmp_live_commands[] = {
@@ -296,11 +300,8 @@ ngx_rtmp_live_set_status(ngx_rtmp_session_t *s, ngx_chain_t *control,
 }
 
 
-/*TODO: intercept stream begin/eof for publishers & call these functions */
-
-
 static void
-ngx_rtmp_live_stream_begin(ngx_rtmp_session_t *s)
+ngx_rtmp_live_start(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_live_app_conf_t   *lacf;
@@ -342,7 +343,7 @@ ngx_rtmp_live_stream_begin(ngx_rtmp_session_t *s)
 
 
 static void
-ngx_rtmp_live_stream_eof(ngx_rtmp_session_t *s)
+ngx_rtmp_live_stop(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_live_app_conf_t   *lacf;
@@ -378,6 +379,48 @@ ngx_rtmp_live_stream_eof(ngx_rtmp_session_t *s)
     for (n = 0; n < nstatus; ++n) {
         ngx_rtmp_free_shared_chain(cscf, status[n]);
     }
+}
+
+
+static ngx_int_t
+ngx_rtmp_live_stream_begin(ngx_rtmp_session_t *s, ngx_rtmp_stream_begin_t *v)
+{
+    ngx_rtmp_live_ctx_t    *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+
+    if (ctx == NULL || ctx->stream == NULL || !ctx->publishing) {
+        goto next;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "live: stream_begin");
+
+    ngx_rtmp_live_start(s);
+
+next:
+    return next_stream_begin(s, v);
+}
+
+
+static ngx_int_t
+ngx_rtmp_live_stream_eof(ngx_rtmp_session_t *s, ngx_rtmp_stream_eof_t *v)
+{
+    ngx_rtmp_live_ctx_t    *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+
+    if (ctx == NULL || ctx->stream == NULL || !ctx->publishing) {
+        goto next;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "live: stream_eof");
+
+    ngx_rtmp_live_stop(s);
+
+next:
+    return next_stream_eof(s, v);
 }
 
 
@@ -440,8 +483,8 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
     ctx->cs[0].csid = NGX_RTMP_MSG_AUDIO;
     ctx->cs[1].csid = NGX_RTMP_MSG_VIDEO;
 
-    if (ctx->publishing || ctx->stream->active) {
-        ngx_rtmp_live_stream_begin(s);
+    if (!ctx->publishing && ctx->stream->active) {
+        ngx_rtmp_live_start(s);
     }
 }
 
@@ -484,7 +527,7 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     }
 
     if (ctx->publishing || ctx->stream->active) {
-        ngx_rtmp_live_stream_eof(s);
+        ngx_rtmp_live_stop(s);
     }
 
     if (ctx->stream->ctx) {
@@ -558,6 +601,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "live: %s from non-publisher", type_s);
         return NGX_OK;
+    }
+
+    if (!ctx->stream->active) {
+        ngx_rtmp_live_start(s);
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -874,6 +921,12 @@ ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 
     next_close_stream = ngx_rtmp_close_stream;
     ngx_rtmp_close_stream = ngx_rtmp_live_close_stream;
+
+    next_stream_begin = ngx_rtmp_stream_begin;
+    ngx_rtmp_stream_begin = ngx_rtmp_live_stream_begin;
+
+    next_stream_eof = ngx_rtmp_stream_eof;
+    ngx_rtmp_stream_eof = ngx_rtmp_live_stream_eof;
 
     return NGX_OK;
 }
