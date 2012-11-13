@@ -272,6 +272,8 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
     ngx_str_t                       v, *uri;
     u_char                         *first, *last, *p;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "relay: create remote context");
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_relay_module);
 
@@ -326,6 +328,10 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
 
             /* deduce app */
             p = ngx_strlchr(first, last, '/');
+            if (p == NULL) {
+                p = last;
+            }
+
             if (rctx->app.len == 0 && first != p) {
                 v.data = first;
                 v.len = p - first;
@@ -335,7 +341,10 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
             }
 
             /* deduce play_path */
-            ++p;
+            if (p != last) {
+                ++p;
+            }
+
             if (rctx->play_path.len == 0 && p != last) {
                 v.data = p;
                 v.len = last - p;
@@ -417,6 +426,9 @@ ngx_rtmp_relay_create_local_ctx(ngx_rtmp_session_t *s, ngx_str_t *name,
         ngx_rtmp_relay_target_t *target)
 {
     ngx_rtmp_relay_ctx_t           *ctx;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                   "relay: create local context");
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx == NULL) {
