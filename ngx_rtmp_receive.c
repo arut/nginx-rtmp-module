@@ -5,6 +5,7 @@
 
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_amf.h"
+#include "ngx_rtmp_cmd_module.h"
 #include <string.h>
 
 
@@ -79,32 +80,34 @@ ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
 
 
 ngx_int_t 
-ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
-        ngx_rtmp_header_t *h, ngx_chain_t *in)
+ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+                              ngx_chain_t *in)
 {
     ngx_buf_t              *b;
     u_char                 *p; 
     uint16_t                evt;
-    uint32_t                val, arg;
+    uint32_t                val;
 
     b = in->buf;
 
     if (b->last - b->pos < 6) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                "too small buffer for user message: %d",
-                b->last - b->pos);
+                       "too small buffer for user message: %d",
+                       b->last - b->pos);
         return NGX_OK;
     }
 
     p = (u_char*)&evt;
+
     p[0] = b->pos[1];
     p[1] = b->pos[0];
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-            "RTMP recv user evt %s (%d)", 
-            ngx_rtmp_user_message_type(evt), (int)evt);
+                   "RTMP recv user evt %s (%i)", 
+                   ngx_rtmp_user_message_type(evt), (ngx_int_t) evt);
 
-    p = (u_char*)&val;
+    p = (u_char *) &val;
+
     p[0] = b->pos[5];
     p[1] = b->pos[4];
     p[2] = b->pos[3];
@@ -112,54 +115,95 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
 
     switch(evt) {
         case NGX_RTMP_USER_STREAM_BEGIN:
-            /* use =val as stream id which started */
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "stream begin msid=%uD", val);
-            break;
+            {
+                ngx_rtmp_stream_begin_t     v;
+
+                v.msid = val;
+
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                               "receive: stream_begin msid=%uD", v.msid);
+
+                return ngx_rtmp_stream_begin(s, &v);
+            }
 
         case NGX_RTMP_USER_STREAM_EOF:
-            /* use =val as stream id which is over */
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "stream eof msid=%uD", val);
-            break;
+            {
+                ngx_rtmp_stream_eof_t       v;
+
+                v.msid = val;
+
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                               "receive: stream_eof msid=%uD", v.msid);
+
+                return ngx_rtmp_stream_eof(s, &v);
+            }
 
         case NGX_RTMP_USER_STREAM_DRY:
-            /* stream =val is dry */
-            break;
+            {
+                ngx_rtmp_stream_dry_t       v;
+
+                v.msid = val;
+
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                               "receive: stream_dry msid=%uD", v.msid);
+
+                return ngx_rtmp_stream_dry(s, &v);
+            }
 
         case NGX_RTMP_USER_SET_BUFLEN:
-            if (b->last - b->pos >= 10) {
-                p = (u_char*)&arg;
+            {
+                ngx_rtmp_set_buflen_t       v;
+
+                v.msid = val;
+
+                if (b->last - b->pos < 10) {
+                    return NGX_OK;
+                }
+
+                p = (u_char *) &v.buflen;
+
                 p[0] = b->pos[9];
                 p[1] = b->pos[8];
                 p[2] = b->pos[7];
                 p[3] = b->pos[6];
 
-                /* use =val as stream id && arg as buflen in msec*/
                 ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                        "msid=%uD buflen: %uD (msec)", val, arg);
+                               "receive: set_buflen msid=%uD buflen=%uD",
+                               v.msid, v.buflen);
 
-                s->buflen = arg;
+                /*TODO: move this to play module */
+                s->buflen = v.buflen;
+
+                return ngx_rtmp_set_buflen(s, &v);
+            }
+
+        case NGX_RTMP_USER_RECORDED:
+            {
+                ngx_rtmp_recorded_t       v;
+
+                v.msid = val;
+
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                               "receive: recorded msid=%uD", v.msid);
+
+                return ngx_rtmp_recorded(s, &v);
             }
             break;
 
-        case NGX_RTMP_USER_RECORDED:
-            /* stream =val is recorded */
-            break;
-
         case NGX_RTMP_USER_PING_REQUEST:
-            ngx_rtmp_send_ping_response(s, val);
-            break;
+            return ngx_rtmp_send_ping_response(s, val);
 
         case NGX_RTMP_USER_PING_RESPONSE:
-            /* use =val as incoming timestamp */
+
+            /* val = incoming timestamp */
+
             ngx_rtmp_reset_ping(s);
-            break;
+
+            return NGX_OK;
 
         default:
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                "unexpected user event: %d",
-                (int)evt);
+                           "unexpected user event: %i", (ngx_int_t) evt);
 
             return NGX_OK;
     }
@@ -265,5 +309,4 @@ ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in,
     act.log = s->connection->log;
 
     return ngx_rtmp_amf_read(&act, elts, nelts);
-}
-
+} 
