@@ -1,12 +1,15 @@
-- option to start live streaming with a keyframe
-
-- interleaved mode
-
-- vod seamless pause
-
 - DNS round-robin url
 
+- multiple streams per connection
 
-- a/v merge from different sources
+- VOD HLS
 
-- multiple streams perconnection
+- dynamic relay
+
+- plain on_connect, on_update
+
+- disconnect dead streams
+
+- non-existent/already-published stream handling (NetStream.Publish.BadName)
+
+- force pull
