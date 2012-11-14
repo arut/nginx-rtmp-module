@@ -10,6 +10,8 @@
 
 - disconnect dead streams
 
-- non-existent/already-published stream handling (NetStream.Publish.BadName)
+- more RTMP statuses/error (non-existent/already-published stream handling (NetStream.Publish.BadName)/NetStream.Record.Failed)
 
 - force pull
+
+- sync exec
