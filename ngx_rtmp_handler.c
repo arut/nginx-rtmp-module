@@ -594,10 +594,10 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         timestamp = h->timestamp;
     }
 
-    if (lh) {
+    /*if (lh) {
         *lh = *h;
         lh->mlen = mlen;
-    }
+    }*/
 
     hsize = hdrsize[fmt];
 
