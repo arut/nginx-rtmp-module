@@ -11,6 +11,7 @@
 static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_close_stream_pt         next_close_stream;
+static ngx_rtmp_pause_pt                next_pause;
 static ngx_rtmp_stream_begin_pt         next_stream_begin;
 static ngx_rtmp_stream_eof_pt           next_stream_eof;
 
@@ -556,7 +557,51 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 next:
     return next_close_stream(s, v);
 }
-                           
+
+
+static ngx_int_t
+ngx_rtmp_live_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
+{
+    ngx_rtmp_live_ctx_t            *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+
+    if (ctx == NULL || ctx->stream == NULL) {
+        goto next;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "live: pause=%i timestamp=%f",
+                   (ngx_int_t) v->pause, v->position);
+
+    if (v->pause) {
+        if (ngx_rtmp_send_status(s, "NetStream.Pause.Notify", "status",
+                                 "Paused live")
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
+        ctx->paused = 1;
+
+        ngx_rtmp_live_stop(s);
+
+    } else {
+        if (ngx_rtmp_send_status(s, "NetStream.Unpause.Notify", "status",
+                                 "Unpaused live")
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
+        ctx->paused = 0;
+
+        ngx_rtmp_live_start(s);
+    }
+
+next:
+    return next_pause(s, v);
+}
 
 static ngx_int_t
 ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
@@ -693,7 +738,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /* broadcast to all subscribers */
 
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
-        if (pctx == ctx) {
+        if (pctx == ctx || pctx->paused) {
             continue;
         }
 
@@ -921,6 +966,9 @@ ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
 
     next_close_stream = ngx_rtmp_close_stream;
     ngx_rtmp_close_stream = ngx_rtmp_live_close_stream;
+
+    next_pause = ngx_rtmp_pause;
+    ngx_rtmp_pause = ngx_rtmp_live_pause;
 
     next_stream_begin = ngx_rtmp_stream_begin;
     ngx_rtmp_stream_begin = ngx_rtmp_live_stream_begin;

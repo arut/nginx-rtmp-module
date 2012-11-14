@@ -35,6 +35,7 @@ struct ngx_rtmp_live_ctx_s {
     unsigned                            active:1;
     unsigned                            publishing:1;
     unsigned                            silent:1;
+    unsigned                            paused:1;
 };
 
 
