@@ -147,7 +147,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_codec_ctx_t               *ctx;
     ngx_chain_t                       **header;
     uint8_t                             fmt;
-    ngx_uint_t                         *version, idx;
+    ngx_uint_t                          idx;
     u_char                             *p;
     static ngx_uint_t                   sample_rates[] = 
                                         { 5512, 11025, 22050, 44100 };
@@ -198,11 +198,9 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     header = NULL;
-    version = NULL;
     if (h->type == NGX_RTMP_MSG_AUDIO) {
         if (ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
             header = &ctx->aac_header;
-            version = &ctx->aac_version;
             
             if (in->buf->last - in->buf->pos > 3) {
                 p = in->buf->pos + 2;
@@ -256,7 +254,6 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     } else {
         if (ctx->video_codec_id == NGX_RTMP_VIDEO_H264) {
             header = &ctx->avc_header;
-            version = &ctx->avc_version;
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                     "codec: AVC/H264 header arrived");
         }
@@ -271,9 +268,6 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     *header = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
-
-    /* don't want zero as version value */
-    *version = ngx_rtmp_codec_get_next_version();
 
     return NGX_OK;
 }
