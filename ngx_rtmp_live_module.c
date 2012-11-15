@@ -465,6 +465,10 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
         if ((*stream)->publishing) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "live: already publishing");
+
+            ngx_rtmp_send_status(s, "NetStream.Publish.BadName", "error",
+                                 "Already publishing");
+
             return;
         }
 
