@@ -19,7 +19,7 @@
 
 static ngx_rtmp_publish_pt                      next_publish;
 static ngx_rtmp_play_pt                         next_play;
-static ngx_rtmp_delete_stream_pt                next_delete_stream;
+static ngx_rtmp_close_stream_pt                 next_close_stream;
 static ngx_rtmp_record_done_pt                  next_record_done;
 
 
@@ -402,7 +402,7 @@ next:
 
 
 static ngx_int_t
-ngx_rtmp_enotify_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t 
+ngx_rtmp_enotify_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t
         *v)
 {
     ngx_rtmp_enotify_ctx_t         *ctx;
@@ -450,7 +450,7 @@ ngx_rtmp_enotify_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t
     ctx->flags = 0;
 
 next:
-    return next_delete_stream(s, v);
+    return next_close_stream(s, v);
 }
 
 
@@ -567,8 +567,8 @@ ngx_rtmp_enotify_postconfiguration(ngx_conf_t *cf)
     next_play = ngx_rtmp_play;
     ngx_rtmp_play = ngx_rtmp_enotify_play;
 
-    next_delete_stream = ngx_rtmp_delete_stream;
-    ngx_rtmp_delete_stream = ngx_rtmp_enotify_delete_stream;
+    next_close_stream = ngx_rtmp_close_stream;
+    ngx_rtmp_close_stream = ngx_rtmp_enotify_close_stream;
 
     next_record_done = ngx_rtmp_record_done;
     ngx_rtmp_record_done = ngx_rtmp_enotify_record_done;
