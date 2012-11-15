@@ -385,6 +385,19 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
 }
 
 
+static void
+ngx_rtmp_record_notify_error(ngx_rtmp_session_t *s,
+                             ngx_rtmp_record_app_conf_t *rracf)
+{
+    if (!rracf->notify) {
+        return;
+    }
+
+    ngx_rtmp_send_status(s, "NetStream.Record.Failed", "error",
+                         rracf->id.data ? (char *) rracf->id.data : "");
+}
+
+
 static ngx_int_t
 ngx_rtmp_record_node_open(ngx_rtmp_session_t *s, 
                           ngx_rtmp_record_rec_ctx_t *rctx)
@@ -424,6 +437,8 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
                           "record: %V failed to open file '%V'",
                           &rracf->id, &path);
         }
+
+        ngx_rtmp_record_notify_error(s, rracf);
 
         return NGX_OK;
     }
@@ -572,6 +587,8 @@ ngx_rtmp_record_node_close(ngx_rtmp_session_t *s,
         err = ngx_errno;
         ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
                       "record: %V error closing file", &rracf->id);
+
+        ngx_rtmp_record_notify_error(s, rracf);
     }
 
     rctx->file.fd = NGX_INVALID_FILE;
@@ -673,6 +690,10 @@ ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s,
     if (ngx_write_file(&rctx->file, hdr, ph - hdr, rctx->file.offset)
         == NGX_ERROR) 
     {
+        ngx_rtmp_record_notify_error(s, rracf);
+
+        ngx_close_file(rctx->file.fd);
+
         return NGX_ERROR;
     }
 
