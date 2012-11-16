@@ -10,11 +10,18 @@
 
   https://github.com/arut/nginx-rtmp-module/wiki/Directives
 
+### Google group
+
+  https://groups.google.com/group/nginx-rtmp
+
+  https://groups.google.com/group/nginx-rtmp-ru (Russian)
+
 ### Features:
 
 * Live streaming of video/audio
 
-* Video on demand FLV/MP4
+* Video on demand FLV/MP4,
+  playing from local filesystem or HTTP
 
 * Stream relay support for distributed
   streaming: push & pull models
@@ -29,9 +36,11 @@
   requires recent libavformat 
   (>= 53.31.100) from ffmpeg (ffmpeg.org)
 
-* HTTP callbacks (publish/play/record etc)
+* HTTP callbacks (publish/play/record/update etc)
 
 * Running external programs on certain events (exec)
+
+* HTTP control module for recording audio/video and dropping clients
 
 * Advanced buffering techniques
   to keep memory allocations at a minimum
