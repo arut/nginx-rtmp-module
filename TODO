@@ -6,12 +6,8 @@
 
 - dynamic relay
 
-- plain on_connect, on_update
-
-- disconnect dead streams
-
-- more RTMP statuses/error (non-existent/already-published stream handling (NetStream.Publish.BadName)/NetStream.Record.Failed)
-
 - force pull
 
 - sync exec
+
+- update relay engine; add relay rooms; use closeStream instead of deleteStream; add to stat
