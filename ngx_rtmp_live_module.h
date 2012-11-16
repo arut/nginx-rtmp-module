@@ -32,6 +32,7 @@ struct ngx_rtmp_live_ctx_s {
     ngx_uint_t                          ndropped;
     ngx_rtmp_live_chunk_stream_t        cs[2];
     ngx_uint_t                          meta_version;
+    ngx_event_t                         idle_evt;
     unsigned                            active:1;
     unsigned                            publishing:1;
     unsigned                            silent:1;
@@ -57,6 +58,7 @@ typedef struct {
     ngx_flag_t                          live;
     ngx_flag_t                          meta;
     ngx_msec_t                          sync;
+    ngx_msec_t                          idle_timeout;
     ngx_flag_t                          atc;
     ngx_flag_t                          interleave;
     ngx_flag_t                          wait_key;

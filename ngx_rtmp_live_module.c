@@ -20,7 +20,7 @@ static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_live_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, 
        void *parent, void *child);
-static char *ngx_rtmp_live_sync(ngx_conf_t *cf, ngx_command_t *cmd,
+static char *ngx_rtmp_live_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 static void ngx_rtmp_live_start(ngx_rtmp_session_t *s);
 static void ngx_rtmp_live_stop(ngx_rtmp_session_t *s);
@@ -58,9 +58,9 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
 
     { ngx_string("sync"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_rtmp_live_sync,
+      ngx_rtmp_live_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      0,
+      offsetof(ngx_rtmp_live_app_conf_t, sync),
       NULL },
 
     { ngx_string("interleave"),
@@ -89,6 +89,13 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       ngx_conf_set_flag_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_live_app_conf_t, play_restart),
+      NULL },
+
+    { ngx_string("drop_idle_publisher"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_rtmp_live_set_msec_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, idle_timeout),
       NULL },
 
       ngx_null_command
@@ -138,6 +145,7 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->nbuckets = NGX_CONF_UNSET;
     lacf->buflen = NGX_CONF_UNSET;
     lacf->sync = NGX_CONF_UNSET;
+    lacf->idle_timeout = NGX_CONF_UNSET;
     lacf->interleave = NGX_CONF_UNSET;
     lacf->wait_key = NGX_CONF_UNSET;
     lacf->publish_notify = NGX_CONF_UNSET;
@@ -158,6 +166,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 300);
+    ngx_conf_merge_msec_value(conf->idle_timeout, prev->idle_timeout, 0);
     ngx_conf_merge_value(conf->interleave, prev->interleave, 0);
     ngx_conf_merge_value(conf->wait_key, prev->wait_key, 0);
     ngx_conf_merge_value(conf->publish_notify, prev->publish_notify, 0);
@@ -176,17 +185,20 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
 static char *
-ngx_rtmp_live_sync(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_rtmp_live_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_rtmp_live_app_conf_t   *lacf = conf;
+    char                       *p = conf;
     ngx_str_t                  *value;
+    ngx_msec_t                 *msp;
+
+    msp = (ngx_msec_t *) (p + cmd->offset);
 
     value = cf->args->elts;
 
     if (value[1].len == sizeof("off") - 1 &&
         ngx_strncasecmp(value[1].data, (u_char *) "off", value[1].len) == 0)
     {
-        lacf->sync = 0;
+        *msp = 0;
         return NGX_CONF_OK;
     }
 
@@ -237,14 +249,34 @@ ngx_rtmp_live_get_stream(ngx_rtmp_session_t *s, u_char *name, int create)
 }
 
 
+static void 
+ngx_rtmp_live_idle(ngx_event_t *pev)
+{
+    ngx_connection_t           *c;
+    ngx_rtmp_session_t         *s;
+
+    c = pev->data;
+    s = c->data;
+
+    ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                  "live: drop idle publisher");
+
+    ngx_rtmp_finalize_session(s);
+}
+
+
 static void
 ngx_rtmp_live_set_status(ngx_rtmp_session_t *s, ngx_chain_t *control,
                          ngx_chain_t **status, size_t nstatus,
                          unsigned active)
 {
+    ngx_rtmp_live_app_conf_t   *lacf;
     ngx_rtmp_live_ctx_t        *ctx, *pctx;
     ngx_chain_t               **cl;
+    ngx_event_t                *e;
     size_t                      n;
+
+    lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
 
@@ -262,6 +294,21 @@ ngx_rtmp_live_set_status(ngx_rtmp_session_t *s, ngx_chain_t *control,
     if (ctx->publishing) {
 
         /* publisher */
+
+        if (lacf->idle_timeout) {
+            e = &ctx->idle_evt;
+
+            if (active && !ctx->idle_evt.timer_set) {
+                e->data = s->connection;
+                e->log = s->connection->log;
+                e->handler = ngx_rtmp_live_idle;
+
+                ngx_add_timer(e, lacf->idle_timeout);
+
+            } else if (!active && ctx->idle_evt.timer_set) {
+                ngx_del_timer(e);
+            }
+        }
 
         ctx->stream->active = active;
 
@@ -654,6 +701,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     if (!ctx->stream->active) {
         ngx_rtmp_live_start(s);
+    }
+
+    if (ctx->idle_evt.timer_set) {
+        ngx_add_timer(&ctx->idle_evt, lacf->idle_timeout);
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
