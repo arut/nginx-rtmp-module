@@ -554,9 +554,15 @@ ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s,
     }
 
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "notify: invalid HTTP response");
+            "notify: empty or broken HTTP response");
 
-    return NGX_ERROR;
+    /* 
+     * not enough data;
+     * it can happen in case of empty or broken reply;
+     * let the caller decide if that's an error or not
+     */
+
+    return NGX_DONE;
 }
 
 
@@ -591,7 +597,12 @@ ngx_rtmp_notify_update_handle(ngx_rtmp_session_t *s,
     ngx_rtmp_notify_app_conf_t *nacf;
     ngx_rtmp_notify_ctx_t      *ctx;
 
-    if (ngx_rtmp_notify_parse_http_retcode(s, in) != NGX_OK) {
+    /* 
+     * check only for NGX_ERROR;
+     * empty or broken reply is not an error in this case
+     */
+
+    if (ngx_rtmp_notify_parse_http_retcode(s, in) == NGX_ERROR) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: update failed");
 
@@ -637,7 +648,13 @@ ngx_rtmp_notify_update(ngx_event_t *e)
     ci.create = ngx_rtmp_notify_update_create;
     ci.handle = ngx_rtmp_notify_update_handle;
 
-    ngx_rtmp_netcall_create(s, &ci);
+    if (ngx_rtmp_netcall_create(s, &ci) == NGX_OK) {
+        return;
+    }
+
+    /* schedule next update on connection error */
+
+    ngx_rtmp_notify_update_handle(s, NULL, NULL);
 }
 
 
