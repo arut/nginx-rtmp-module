@@ -2,11 +2,11 @@
 ## nginx-rtmp-module
 
 
-### Project blog:
+### Project blog
 
   http://rarut.wordpress.com
 
-### Wiki manual:
+### Wiki manual
 
   https://github.com/arut/nginx-rtmp-module/wiki/Directives
 
@@ -16,7 +16,7 @@
 
   https://groups.google.com/group/nginx-rtmp-ru (Russian)
 
-### Features:
+### Features
 
 * Live streaming of video/audio
 
@@ -58,7 +58,7 @@
 * Linux/FreeBSD/MacOS
 
 
-### Build:
+### Build
 
 cd to NGINX source directory & run this:
 
@@ -66,8 +66,11 @@ cd to NGINX source directory & run this:
     make
     make install
 
+See this article about building nginx-rtmp with HLS support:
+https://github.com/arut/nginx-rtmp-module/wiki/Building-nginx-rtmp-with-HLS-support
 
-### RTMP URL format:
+
+### RTMP URL format
 
     rtmp://rtmp.example.com/app[/name]
 
@@ -86,7 +89,7 @@ to nginx workers. This option is toggled with
 rtmp_auto_push directive.
 
 
-### Example nginx.conf:
+### Example nginx.conf
 
     rtmp {
 
@@ -271,8 +274,8 @@ rtmp_auto_push directive.
     }
 
 
+### Multi-worker streaming example
 
-    # Multi-worker streaming
     rtmp_auto_push on;
 
     rtmp {
