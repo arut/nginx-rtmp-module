@@ -55,6 +55,7 @@ typedef struct {
     ngx_flag_t                                  active;
     ngx_uint_t                                  method;
     ngx_msec_t                                  update_timeout;
+    ngx_flag_t                                  update_strict;
 } ngx_rtmp_notify_app_conf_t;
 
 
@@ -138,6 +139,13 @@ static ngx_command_t  ngx_rtmp_notify_commands[] = {
       offsetof(ngx_rtmp_notify_app_conf_t, update_timeout),
       NULL },
 
+    { ngx_string("notify_update_strict"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_notify_app_conf_t, update_strict),
+      NULL },
+
       ngx_null_command
 };
 
@@ -187,6 +195,7 @@ ngx_rtmp_notify_create_app_conf(ngx_conf_t *cf)
 
     nacf->method = NGX_CONF_UNSET;
     nacf->update_timeout = NGX_CONF_UNSET;
+    nacf->update_strict = NGX_CONF_UNSET;
 
     return nacf;
 }
@@ -214,6 +223,7 @@ ngx_rtmp_notify_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
                               NGX_RTMP_NETCALL_HTTP_POST);
     ngx_conf_merge_msec_value(conf->update_timeout, prev->update_timeout,
                               30000);
+    ngx_conf_merge_value(conf->update_strict, prev->update_strict, 0);
 
     return NGX_CONF_OK;
 }
@@ -596,20 +606,20 @@ ngx_rtmp_notify_update_handle(ngx_rtmp_session_t *s,
 {
     ngx_rtmp_notify_app_conf_t *nacf;
     ngx_rtmp_notify_ctx_t      *ctx;
+    ngx_int_t                   rc;
 
-    /* 
-     * check only for NGX_ERROR;
-     * empty or broken reply is not an error in this case
-     */
+    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
-    if (ngx_rtmp_notify_parse_http_retcode(s, in) == NGX_ERROR) {
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    
+    if ((!nacf->update_strict && rc == NGX_ERROR) ||
+         (nacf->update_strict && rc != NGX_OK))
+    {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: update failed");
 
         return NGX_ERROR;
     }
-
-    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
 
