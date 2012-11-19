@@ -12,13 +12,15 @@ static ngx_rtmp_play_pt                 next_play;
 static ngx_rtmp_close_stream_pt         next_close_stream;
 
 
+static ngx_int_t ngx_rtmp_room_init_process(ngx_cycle_t *cycle);
 static char *ngx_rtmp_room_persistent(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 static void * ngx_rtmp_room_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_room_merge_app_conf(ngx_conf_t *cf, void *parent,
        void *child);
 static ngx_int_t ngx_rtmp_room_postconfiguration(ngx_conf_t *cf);
-static void ngx_rtmp_room_create_persistent(ngx_event_t *ev);
+static void ngx_rtmp_room_create_persistent(ngx_rtmp_room_app_conf_t *racf,
+       ngx_str_t *appname);
 static ngx_rtmp_room_t ** ngx_rtmp_room_get_room(ngx_rtmp_room_app_conf_t *racf,
        ngx_str_t *name);
 static ngx_rtmp_room_t * ngx_rtmp_room_create(ngx_rtmp_room_app_conf_t *racf,
@@ -107,7 +109,7 @@ ngx_module_t  ngx_rtmp_room_module = {
     NGX_RTMP_MODULE,                        /* module type */
     NULL,                                   /* init master */
     NULL,                                   /* init module */
-    NULL,                                   /* init process */
+    ngx_rtmp_room_init_process,             /* init process */
     NULL,                                   /* init thread */
     NULL,                                   /* exit thread */
     NULL,                                   /* exit process */
@@ -128,7 +130,7 @@ ngx_rtmp_room_create_app_conf(ngx_conf_t *cf)
 
     racf->active = NGX_CONF_UNSET;
     racf->nbuckets = NGX_CONF_UNSET;
-    racf->log = &cf->cycle->new_log; /*TODO*/
+    racf->log = &cf->cycle->new_log;
 
     if (ngx_array_init(&racf->persistent, cf->pool, 1, sizeof(ngx_str_t))
         != NGX_OK)
@@ -145,7 +147,6 @@ ngx_rtmp_room_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_rtmp_room_app_conf_t *prev = parent;
     ngx_rtmp_room_app_conf_t *conf = child;
-    ngx_event_t              *e;
 
     ngx_conf_merge_value(conf->active, prev->active, 0);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
@@ -157,19 +158,33 @@ ngx_rtmp_room_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     conf->ctx = cf->ctx;
 
-    /* Persistent list is only allowed in application context;
-     * no merge required. Besides it's safe to post activation
-     * handler here */
+    return NGX_CONF_OK;
+}
 
-    if (conf->persistent.nelts) {
-        e = &conf->persistent_evt;
-        e->log = &cf->cycle->new_log;
-        e->data = conf;
-        e->handler = ngx_rtmp_room_create_persistent;
-        ngx_post_event(e, &ngx_posted_events);
+
+static ngx_int_t
+ngx_rtmp_room_init_process(ngx_cycle_t *cycle)
+{
+    ngx_rtmp_core_main_conf_t  *cmcf;
+    ngx_rtmp_core_srv_conf_t  **cscf;
+    ngx_rtmp_core_app_conf_t  **cacf;
+    ngx_rtmp_room_app_conf_t   *racf;
+    ngx_uint_t                  n, m;
+
+    cmcf = ngx_rtmp_core_main_conf;
+
+    cscf = cmcf->servers.elts;
+    for (n = 0; n < cmcf->servers.nelts; ++n, ++cscf) {
+        cacf = (*cscf)->applications.elts;
+        for (m = 0; m < (*cscf)->applications.nelts; ++m, ++cacf) {
+            racf = (*cacf)->app_conf[ngx_rtmp_room_module.ctx_index];
+            if (racf && racf->persistent.nelts) {
+                ngx_rtmp_room_create_persistent(racf, &(*cacf)->name);
+            }
+        }
     }
 
-    return NGX_CONF_OK;
+    return NGX_OK;
 }
 
 
@@ -185,7 +200,6 @@ ngx_rtmp_room_persistent(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (dst == NULL) {
         return NGX_CONF_ERROR;
     }
-
     *dst = value[1];
 
     return NGX_CONF_OK;
@@ -193,25 +207,23 @@ ngx_rtmp_room_persistent(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static void
-ngx_rtmp_room_create_persistent(ngx_event_t *ev)
+ngx_rtmp_room_create_persistent(ngx_rtmp_room_app_conf_t *racf,
+                                ngx_str_t *appname)
 {
-    ngx_rtmp_room_app_conf_t   *racf;
     ngx_str_t                  *value;
     ngx_rtmp_room_t           **rr, *r;
     size_t                      n;
 
-    racf = ev->data;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ev->log, 0,
-                   "room: create %uz persistent rooms",
-                   racf->persistent.nelts);
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, racf->log, 0,
+                   "room: create %uz persistent rooms in application '%V'",
+                   racf->persistent.nelts, appname);
 
     value = racf->persistent.elts;
     for (n = 0; n < racf->persistent.nelts; ++n, ++value) {
 
         rr = ngx_rtmp_room_get_room(racf, value);
         if (rr == NULL || *rr) {
-            ngx_log_error(NGX_LOG_ERR, ev->log, 0,
+            ngx_log_error(NGX_LOG_ERR, racf->log, 0,
                           "room: error creating persistent '%V'", value);
         }
 
@@ -424,8 +436,6 @@ ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     }
 
     if (ctx->room == NULL) {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "room: not joined");
         goto next;
     }
 
@@ -451,8 +461,8 @@ ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 
     /* non-persistent room is empty*/
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "room: delete empty room '%V'", &r->name);
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, racf->log, 0,
+                   "room: delete room '%V'", &r->name);
 
     rr = ngx_rtmp_room_get_room(racf, &r->name);
     if (rr == NULL) {

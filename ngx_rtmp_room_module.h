@@ -44,7 +44,6 @@ typedef struct {
     ngx_log_t                          *log;
     ngx_rtmp_conf_ctx_t                *ctx;
     ngx_array_t                         persistent; /* ngx_str_t */
-    ngx_event_t                         persistent_evt;
 } ngx_rtmp_room_app_conf_t;
 
 
