@@ -17,7 +17,7 @@ typedef struct ngx_rtmp_room_s          ngx_rtmp_room_t;
 struct ngx_rtmp_room_ctx_s {
     ngx_rtmp_session_t                 *session;
     ngx_rtmp_room_t                    *room;
-    ngx_rtmp_live_ctx_t                *next;
+    ngx_rtmp_room_ctx_t                *next;
     unsigned                            weak:1;
     unsigned                            publishing:1;
 };
