@@ -455,14 +455,28 @@ ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 
     ngx_rtmp_leave_room(r, s);
 
-    if (r->first_ctx || r->persistent) {
+    if (r->persistent) {
         goto next;
     }
 
-    /* non-persistent room is empty*/
+    for (ctx = r->first_ctx; ctx; ctx = ctx->next) {
+        if (!ctx->weak) {
+            goto next;
+        }
+    }
+
+    /* non-persistent room is empty or contains only weak sessions */
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, racf->log, 0,
                    "room: delete room '%V'", &r->name);
+
+    /* finalize weak sessions */
+
+    for (ctx = r->first_ctx; ctx; ctx = ctx->next) {
+        ngx_rtmp_leave_room(r, ctx->session);
+        ctx->room = NULL;
+        ngx_rtmp_finalize_session(ctx->session);
+    }
 
     rr = ngx_rtmp_room_get_room(racf, &r->name);
     if (rr == NULL) {
