@@ -9,7 +9,7 @@
 
 #include "ngx_rtmp.h"
 
-
+/* TODO: rename to ngx_rtmp_relay_t */
 typedef struct {
     ngx_url_t                       url;
     ngx_str_t                       app;
@@ -22,6 +22,7 @@ typedef struct {
     ngx_int_t                       live;
     ngx_int_t                       start;
     ngx_int_t                       stop;
+    unsigned                        push:1;
 
     void                           *tag;    /* usually module reference */
     void                           *data;   /* module-specific data */
@@ -54,6 +55,11 @@ struct ngx_rtmp_relay_ctx_s {
     void                           *tag;
     void                           *data;
 };
+
+
+typedef struct {
+    ngx_array_t                     relays; /* ngx_rtmp_relay_target_t */
+} ngx_rtmp_relay_room_ctx_t;
 
 
 extern ngx_module_t                 ngx_rtmp_relay_module;

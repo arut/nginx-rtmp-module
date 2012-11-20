@@ -4,12 +4,14 @@
 
 
 #include "ngx_rtmp_relay_module.h"
+#include "ngx_rtmp_room_module.h"
 #include "ngx_rtmp_cmd_module.h"
 
 
-static ngx_rtmp_publish_pt          next_publish;
-static ngx_rtmp_play_pt             next_play;
-static ngx_rtmp_delete_stream_pt    next_delete_stream;
+static ngx_rtmp_create_room_pt      next_create_room;
+static ngx_rtmp_delete_room_pt      next_delete_room;
+static ngx_rtmp_join_room_pt        next_join_room;
+static ngx_rtmp_leave_room_pt       next_leave_room;
 
 
 static ngx_int_t ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf);
@@ -256,10 +258,12 @@ ngx_rtmp_relay_copy_str(ngx_pool_t *pool, ngx_str_t *dst, ngx_str_t *src)
 }
 
 
-static ngx_rtmp_relay_ctx_t *
-ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
-        ngx_rtmp_relay_target_t *target)
+static ngx_int_t
+ngx_rtmp_relay_create(ngx_rtmp_room_t *r, ngx_uint_t nrelay)
 {
+    ngx_rtmp_relay_target_t        *relay;
+    ngx_rtmp_relay_room_ctx_t      *rctx;
+
     ngx_rtmp_relay_ctx_t           *rctx;
     ngx_rtmp_addr_conf_t           *addr_conf;
     ngx_rtmp_conf_ctx_t            *addr_ctx;
@@ -273,7 +277,10 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
     u_char                         *first, *last, *p;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                   "relay: create remote context");
+                   "relay: create");
+
+    rctx
+
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_relay_module);
 
@@ -541,15 +548,21 @@ ngx_rtmp_relay_push(ngx_rtmp_session_t *s, ngx_str_t *name,
 
 
 static ngx_int_t
-ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
+ngx_rtmp_relay_create_room(ngx_rtmp_room_t *r)
 {
     ngx_rtmp_relay_app_conf_t      *racf;
     ngx_rtmp_relay_target_t        *target, **t;
     ngx_str_t                       name;
     size_t                          n;
+
     ngx_rtmp_relay_ctx_t           *ctx;
 
     if (s->auto_pushed) {
+        goto next;
+    }
+
+    racf = ngx_rtmp_get_module_app_conf(r, ngx_rtmp_relay_module);
+    if (racf == NULL || racf->pushes.nelts == 0) {
         goto next;
     }
 
@@ -558,10 +571,6 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_relay_module);
-    if (racf == NULL || racf->pushes.nelts == 0) {
-        goto next;
-    }
 
     name.len = ngx_strlen(v->name);
     name.data = v->name;
@@ -592,7 +601,7 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     }
 
 next:
-    return next_publish(s, v);
+    return next_create_room(r);
 }
 
 
@@ -1410,14 +1419,17 @@ ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf)
     *h = ngx_rtmp_relay_handshake_done;
 
 
-    next_publish = ngx_rtmp_publish;
-    ngx_rtmp_publish = ngx_rtmp_relay_publish;
+    next_create_room = ngx_rtmp_create_room;
+    ngx_rtmp_create_room = ngx_rtmp_relay_create_room;
 
-    next_play = ngx_rtmp_play;
-    ngx_rtmp_play = ngx_rtmp_relay_play;
+    next_delete_room = ngx_rtmp_delete_room;
+    ngx_rtmp_delete_room = ngx_rtmp_relay_delete_room;
 
-    next_delete_stream = ngx_rtmp_delete_stream;
-    ngx_rtmp_delete_stream = ngx_rtmp_relay_delete_stream;
+    next_join_room = ngx_rtmp_join_room;
+    ngx_rtmp_join_room = ngx_rtmp_relay_join_room;
+
+    next_leave_room = ngx_rtmp_leave_room;
+    ngx_rtmp_leave_room = ngx_rtmp_relay_leave_room;
 
 
     ch = ngx_array_push(&cmcf->amf);
