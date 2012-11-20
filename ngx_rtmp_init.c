@@ -293,6 +293,9 @@ ngx_rtmp_finalize_session(ngx_rtmp_session_t *s)
     ngx_connection_t   *c;
 
     c = s->connection;
+    if (c->destroyed) {
+        return;
+    }
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, "finalize session");
 
