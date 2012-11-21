@@ -122,7 +122,7 @@
         <xsl:attribute name="id">
             <xsl:value-of select="../../name"/>-<xsl:value-of select="name"/>
         </xsl:attribute>
-        <td colspan="7" ngcolor="#eeeeee">
+        <td colspan="12" ngcolor="#eeeeee">
             <table cellspacing="1" cellpadding="5">
                 <tr>
                     <th>State</th>
