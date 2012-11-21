@@ -23,42 +23,36 @@ typedef struct {
     ngx_int_t                       start;
     ngx_int_t                       stop;
     unsigned                        push:1;
-
+#if 0
     void                           *tag;    /* usually module reference */
     void                           *data;   /* module-specific data */
+#endif
+    ngx_rtmp_relay_get_peer_pt     *get_peer;
+    void                           *get_peer_arg;
 } ngx_rtmp_relay_target_t;
 
 
 typedef struct ngx_rtmp_relay_ctx_s ngx_rtmp_relay_ctx_t;
 
 struct ngx_rtmp_relay_ctx_s {
-    ngx_str_t                       name;
-    ngx_str_t                       url;
-    ngx_log_t                       log;
-    ngx_rtmp_session_t             *session;
-    ngx_rtmp_relay_ctx_t           *publish;
-    ngx_rtmp_relay_ctx_t           *play;
-    ngx_rtmp_relay_ctx_t           *next;
-    unsigned                        relay:1;
+    ngx_rtmp_relay_target_t        *relay;
 
-    ngx_str_t                       app;
-    ngx_str_t                       tc_url;
-    ngx_str_t                       page_url;
-    ngx_str_t                       swf_url;
-    ngx_str_t                       flash_ver;
-    ngx_str_t                       play_path;
-    ngx_int_t                       live;
-    ngx_int_t                       start;
-    ngx_int_t                       stop;
-
-    ngx_event_t                     push_evt;
     void                           *tag;
     void                           *data;
+} ngx_rtmp_relay_ctx_t;
+
+
+enum {
+    NGX_RTMP_RELAY_PENDING,
+    NGX_RTMP_RELAY_RUNNING,
+    NGX_RTMP_RELAY_STOPPED
 };
 
 
 typedef struct {
-    ngx_array_t                     relays; /* ngx_rtmp_relay_target_t */
+    ngx_array_t                     relays; /* ngx_rtmp_relay_target_t * */
+    ngx_array_t                     states; /* ngx_uint_t */
+    ngx_event_t                     sync_evt;
 } ngx_rtmp_relay_room_ctx_t;
 
 
