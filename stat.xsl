@@ -78,7 +78,13 @@
 </xsl:template>
 
 <xsl:template match="stream">
-    <tr valign="top" bgcolor="#cccccc">
+    <tr valign="top">
+        <xsl:attribute name="bgcolor">
+            <xsl:choose>
+                <xsl:when test="active">#cccccc</xsl:when>
+                <xsl:otherwise>#dddddd</xsl:otherwise>
+            </xsl:choose>
+        </xsl:attribute>
         <td>
             <a href="">
                 <xsl:attribute name="onclick">
