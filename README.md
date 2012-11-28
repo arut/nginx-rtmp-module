@@ -16,6 +16,13 @@
 
   https://groups.google.com/group/nginx-rtmp-ru (Russian)
 
+
+### Project page at github
+
+  Project features, examples, donation information
+
+  http://arut.github.com/nginx-rtmp-module/
+
 ### Features
 
 * Live streaming of video/audio

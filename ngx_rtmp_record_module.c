@@ -389,8 +389,12 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
 
 static void
 ngx_rtmp_record_notify_error(ngx_rtmp_session_t *s,
-                             ngx_rtmp_record_app_conf_t *rracf)
+                             ngx_rtmp_record_rec_ctx_t *rctx)
 {
+    ngx_rtmp_record_app_conf_t *rracf = rctx->conf;
+
+    rctx->failed = 1;
+
     if (!rracf->notify) {
         return;
     }
@@ -427,6 +431,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
 
     rctx->last = *ngx_cached_time;
     rctx->file.offset = 0;
+    rctx->failed = 0;
     rctx->file.log = s->connection->log;
     rctx->file.fd = ngx_open_file(path.data, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE,
                                   NGX_FILE_DEFAULT_ACCESS);
@@ -440,7 +445,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
                           &rracf->id, &path);
         }
 
-        ngx_rtmp_record_notify_error(s, rracf);
+        ngx_rtmp_record_notify_error(s, rctx);
 
         return NGX_OK;
     }
@@ -673,7 +678,7 @@ ngx_rtmp_record_node_close(ngx_rtmp_session_t *s,
         ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
                       "record: %V error closing file", &rracf->id);
 
-        ngx_rtmp_record_notify_error(s, rracf);
+        ngx_rtmp_record_notify_error(s, rctx);
     }
 
     rctx->file.fd = NGX_INVALID_FILE;
@@ -764,7 +769,7 @@ ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s,
     if (ngx_write_file(&rctx->file, hdr, ph - hdr, rctx->file.offset)
         == NGX_ERROR) 
     {
-        ngx_rtmp_record_notify_error(s, rracf);
+        ngx_rtmp_record_notify_error(s, rctx);
 
         ngx_close_file(rctx->file.fd);
 
@@ -898,7 +903,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
                 ngx_rtmp_record_node_open(s, rctx);
             }
 
-        } else {
+        } else if (!rctx->failed) {
             ngx_rtmp_record_node_open(s, rctx);
         }
     }
