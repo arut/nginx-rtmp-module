@@ -297,8 +297,8 @@ ngx_rtmp_room_create(ngx_rtmp_room_app_conf_t *racf, ngx_str_t *name)
     }
     ngx_memcpy(r->name.data, name->data, name->len);
 
-    if (ngx_rtmp_room_create_room(r) != NGX_OK) {
-        ngx_rtmp_room_delete_room(r);
+    if (ngx_rtmp_create_room(r) != NGX_OK) {
+        ngx_rtmp_delete_room(r);
         goto error;
     }
 
