@@ -125,6 +125,7 @@
         <td colspan="12" ngcolor="#eeeeee">
             <table cellspacing="1" cellpadding="5">
                 <tr>
+                    <th>Id</th>
                     <th>State</th>
                     <th>Address</th>
                     <th>Flash version</th>
@@ -187,6 +188,7 @@
                 <xsl:otherwise>#eeeeee</xsl:otherwise>
             </xsl:choose>
         </xsl:attribute>
+        <td><xsl:value-of select="id"/></td>
         <td><xsl:call-template name="clientstate"/></td>
         <td><xsl:value-of select="address"/></td>
         <td><xsl:value-of select="flashver"/></td>

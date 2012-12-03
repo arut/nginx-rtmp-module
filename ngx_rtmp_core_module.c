@@ -252,7 +252,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_core_srv_conf_t *conf = child;
 
     ngx_conf_merge_msec_value(conf->timeout, prev->timeout, 60000);
-    ngx_conf_merge_msec_value(conf->ping, prev->ping, 0);
+    ngx_conf_merge_msec_value(conf->ping, prev->ping, 1);
     ngx_conf_merge_msec_value(conf->ping_timeout, prev->ping_timeout, 30000);
 
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
