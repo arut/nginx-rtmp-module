@@ -78,7 +78,13 @@
 </xsl:template>
 
 <xsl:template match="stream">
-    <tr valign="top" bgcolor="#cccccc">
+    <tr valign="top">
+        <xsl:attribute name="bgcolor">
+            <xsl:choose>
+                <xsl:when test="active">#cccccc</xsl:when>
+                <xsl:otherwise>#dddddd</xsl:otherwise>
+            </xsl:choose>
+        </xsl:attribute>
         <td>
             <a href="">
                 <xsl:attribute name="onclick">
@@ -116,9 +122,10 @@
         <xsl:attribute name="id">
             <xsl:value-of select="../../name"/>-<xsl:value-of select="name"/>
         </xsl:attribute>
-        <td colspan="7" ngcolor="#eeeeee">
+        <td colspan="12" ngcolor="#eeeeee">
             <table cellspacing="1" cellpadding="5">
                 <tr>
+                    <th>Id</th>
                     <th>State</th>
                     <th>Address</th>
                     <th>Flash version</th>
@@ -181,6 +188,7 @@
                 <xsl:otherwise>#eeeeee</xsl:otherwise>
             </xsl:choose>
         </xsl:attribute>
+        <td><xsl:value-of select="id"/></td>
         <td><xsl:call-template name="clientstate"/></td>
         <td><xsl:value-of select="address"/></td>
         <td><xsl:value-of select="flashver"/></td>

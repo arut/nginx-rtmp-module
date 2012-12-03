@@ -41,6 +41,7 @@ typedef struct {
     uint32_t                            epoch;
     ngx_time_t                          last;
     time_t                              timestamp;
+    unsigned                            failed:1;
 } ngx_rtmp_record_rec_ctx_t;
 
 

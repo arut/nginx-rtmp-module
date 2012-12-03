@@ -337,27 +337,35 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
 #ifdef NGX_RTMP_POOL_DEBUG
                     ngx_rtmp_stat_dump_pool(r, lll, s->connection->pool);
 #endif
+                    NGX_RTMP_STAT_L("<id>");
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%ui",
+                                       (ngx_uint_t) s->connection->number)
+                                       - buf);
+                    NGX_RTMP_STAT_L("</id>");
 
                     NGX_RTMP_STAT_L("<address>");
                     NGX_RTMP_STAT_S(&s->connection->addr_text);
                     NGX_RTMP_STAT_L("</address>");
 
                     NGX_RTMP_STAT_L("<time>");
-                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
-                                "%M", ngx_current_msec - s->epoch) - buf);
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%M",
+                                                    ngx_current_msec - s->epoch)
+                                       - buf);
                     NGX_RTMP_STAT_L("</time>");
 
                     NGX_RTMP_STAT_L("<dropped>");
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                                "%uz", ctx->ndropped) - buf);
+                                "%uD/%uD", ctx->cs[1].dropped,
+                                           ctx->cs[0].dropped) - buf);
                     NGX_RTMP_STAT_L("</dropped>");
 
                     NGX_RTMP_STAT_L("<avsync>");
-
-                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                                "%uD/%uD", ctx->cs[1].dropped,
-                                           ctx->cs[0].dropped) - buf);
-
+                    if (!lacf->interleave) {
+                        NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                                      "%L", (int64_t) ctx->cs[1].timestamp -
+                                            (int64_t) ctx->cs[0].timestamp)
+                                           - buf);
+                    }
                     NGX_RTMP_STAT_L("</avsync>");
 
                     if (s->flashver.len) {
