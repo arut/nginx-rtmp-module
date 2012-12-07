@@ -135,6 +135,11 @@ ngx_rtmp_codec_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->meta = NULL;
     }
 
+    if (ctx->video_key) {
+        ngx_rtmp_free_shared_chain(cscf, ctx->video_key);
+        ctx->video_key = NULL;
+    }
+
     return NGX_OK;
 }
 
@@ -186,6 +191,23 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->video_codec_id = (fmt & 0x0f);
     }
 
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
+    /* save video key */
+    if (h->type == NGX_RTMP_MSG_VIDEO &&
+        ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME &&
+        (ctx->video_codec_id != NGX_RTMP_VIDEO_H264 ||
+        (in->buf->pos + 1 < in->buf->last && in->buf->pos[1] == 1)))
+    {
+        if (ctx->video_key) {
+            ngx_rtmp_free_shared_chain(cscf, ctx->video_key);
+        }
+        ctx->video_key = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
+
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "codec: video key arrived");
+    }
+
     /* save AVC/AAC header */
     if (in->buf->last - in->buf->pos < 2) {
         return NGX_OK;
@@ -196,7 +218,6 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     header = NULL;
     if (h->type == NGX_RTMP_MSG_AUDIO) {
         if (ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {

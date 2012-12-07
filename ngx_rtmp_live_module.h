@@ -19,8 +19,9 @@ typedef struct ngx_rtmp_live_stream_s ngx_rtmp_live_stream_t;
 
 typedef struct {
     unsigned                            active:1;
+    unsigned                            vabs:1;
+    unsigned                            aabs:1;
     uint32_t                            timestamp;
-    uint32_t                            csid;
     uint32_t                            dropped;
 } ngx_rtmp_live_chunk_stream_t;
 
@@ -37,6 +38,7 @@ struct ngx_rtmp_live_ctx_s {
     unsigned                            publishing:1;
     unsigned                            silent:1;
     unsigned                            paused:1;
+    unsigned                            initialized:1;
 };
 
 
