@@ -197,7 +197,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
     ngx_buf_t                  *b;
     u_char                     *p, *pp, *old_pos;
     size_t                      size, fsize, old_size;
-    uint8_t                     fmt;
+    uint8_t                     fmt, ext;
     uint32_t                    csid, timestamp;
 
     c = rev->data;
@@ -338,6 +338,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 h->csid = csid;
             }
 
+            ext = st->ext;
             timestamp = st->dtime;
             if (fmt <= 2 ) {
                 if (b->last - p < 3)
@@ -349,6 +350,8 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 pp[1] = *p++;
                 pp[0] = *p++;
                 pp[3] = 0;
+
+                ext = (timestamp == 0x00ffffff);
 
                 if (fmt <= 1) {
                     if (b->last - p < 4)
@@ -379,24 +382,23 @@ ngx_rtmp_recv(ngx_event_t *rev)
             }
 
             /* extended header */
-            if (timestamp >= 0x00ffffff) {
+            if (ext) {
+                if (b->last - p < 4)
+                    continue;
+                pp = (u_char*)&timestamp;
+                pp[3] = *p++;
+                pp[2] = *p++;
+                pp[1] = *p++;
+                pp[0] = *p++;
+            }
+
+            if (st->len == 0) {
                 /* Messages with type=3 should
                  * never have ext timestamp field
                  * according to standard.
                  * However that's not always the case
                  * in real life */
-                if (fmt <= 2 || cscf->publish_time_fix) {
-                    if (b->last - p < 4)
-                        continue;
-                    pp = (u_char*)&timestamp;
-                    pp[3] = *p++;
-                    pp[2] = *p++;
-                    pp[1] = *p++;
-                    pp[0] = *p++;
-                }
-            }
-
-            if (st->len == 0) {
+                st->ext = (ext && cscf->publish_time_fix);
                 if (fmt) {
                     st->dtime = timestamp;
                 } else {
