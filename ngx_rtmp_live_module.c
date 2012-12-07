@@ -77,6 +77,13 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, wait_key),
       NULL },
 
+    { ngx_string("wait_video"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, wait_video),
+      NULL },
+
     { ngx_string("publish_notify"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
@@ -148,6 +155,7 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->idle_timeout = NGX_CONF_UNSET;
     lacf->interleave = NGX_CONF_UNSET;
     lacf->wait_key = NGX_CONF_UNSET;
+    lacf->wait_video = NGX_CONF_UNSET;
     lacf->publish_notify = NGX_CONF_UNSET;
     lacf->play_restart = NGX_CONF_UNSET;
 
@@ -169,6 +177,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->idle_timeout, prev->idle_timeout, 0);
     ngx_conf_merge_value(conf->interleave, prev->interleave, 0);
     ngx_conf_merge_value(conf->wait_key, prev->wait_key, 0);
+    ngx_conf_merge_value(conf->wait_video, prev->wait_video, 0);
     ngx_conf_merge_value(conf->publish_notify, prev->publish_notify, 0);
     ngx_conf_merge_value(conf->play_restart, prev->play_restart, 1);
 
@@ -532,8 +541,8 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
         s->out_buffer = 1;
     }
 
-    ctx->cs[0].csid = NGX_RTMP_MSG_AUDIO;
-    ctx->cs[1].csid = NGX_RTMP_MSG_VIDEO;
+    ctx->cs[0].csid = NGX_RTMP_CSID_AUDIO;
+    ctx->cs[1].csid = NGX_RTMP_CSID_VIDEO;
 
     if (!ctx->publishing && ctx->stream->active) {
         ngx_rtmp_live_start(s);
@@ -665,7 +674,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
-    ngx_rtmp_header_t               ch, lh;
+    ngx_rtmp_header_t               ch, lh, clh;
     ngx_int_t                       rc, mandatory;
     ngx_uint_t                      prio;
     ngx_uint_t                      peers;
@@ -742,6 +751,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         lh.timestamp = cs->timestamp;
     }
 
+    clh = ch;
+    clh.type = (h->type == NGX_RTMP_MSG_AUDIO ? NGX_RTMP_MSG_VIDEO :
+                                                NGX_RTMP_MSG_AUDIO);
+
     cs->active = 1;
     cs->timestamp = ch.timestamp;
 
@@ -786,7 +799,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 coheader = codec_ctx->aac_header;
             }
 
-            if (codec_ctx->audio_codec_id == NGX_RTMP_VIDEO_H264 &&
+            if (codec_ctx->video_codec_id == NGX_RTMP_VIDEO_H264 &&
                 in->buf->pos + 1 < in->buf->last && in->buf->pos[1] == 0)
             {
                 prio = 0;
@@ -835,6 +848,20 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         if (!cs->active) {
 
+            if (mandatory) {
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
+                               "live: skipping header");
+                continue;
+            }
+
+            if (lacf->wait_video && h->type == NGX_RTMP_MSG_AUDIO &&
+                !pctx->cs[0].active)
+            {
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
+                               "live: waiting for video");
+                continue;
+            }
+
             if (lacf->wait_key && prio != NGX_RTMP_VIDEO_KEY_FRAME &&
                (lacf->interleave || h->type == NGX_RTMP_MSG_VIDEO))
             {
@@ -866,7 +893,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 if (coheader) {
                     if (acopkt == NULL) {
                         acopkt = ngx_rtmp_append_shared_bufs(cscf, NULL, coheader);
-                        ngx_rtmp_prepare_message(s, &lh, NULL, acopkt);
+                        ngx_rtmp_prepare_message(s, &clh, NULL, acopkt);
                     }
 
                     rc = ngx_rtmp_send_message(ss, acopkt, 0);
