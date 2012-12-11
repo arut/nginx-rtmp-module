@@ -443,7 +443,7 @@ ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
           ngx_null_string,
           &v.name, sizeof(v.name) },
 
-        { NGX_RTMP_AMF_STRING,
+        { NGX_RTMP_AMF_OPTIONAL | NGX_RTMP_AMF_STRING,
           ngx_null_string,
           &v.type, sizeof(v.type) },
     };
