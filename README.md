@@ -241,6 +241,7 @@ rtmp_auto_push directive.
             # If you need to transcode live stream use 'exec' feature.
             #
             application hls {
+                live on;
                 hls on;
                 hls_path /tmp/app;
                 hls_fragment 5s;
