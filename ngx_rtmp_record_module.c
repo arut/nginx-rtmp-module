@@ -1018,6 +1018,15 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
                            "record: %V skipping until keyframe", &rracf->id);
             return NGX_OK;
         }
+
+    } else {
+        if (codec_ctx && codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC &&
+            !rctx->aac_header_sent)
+        {
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+                           "record: %V skipping until AAC header", &rracf->id);
+            return NGX_OK;
+        }
     }
 
     return ngx_rtmp_record_write_frame(s, rctx, h, in, 1);
