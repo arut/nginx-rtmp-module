@@ -422,16 +422,14 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
                    "record: %V opening", &rracf->id);
 
     ngx_memzero(rctx, sizeof(*rctx));
-
+    rctx->conf = rracf;
+    rctx->last = *ngx_cached_time;
     rctx->timestamp = ngx_cached_time->sec;
 
     ngx_rtmp_record_make_path(s, rctx, &path);
 
     ngx_memzero(&rctx->file, sizeof(rctx->file));
-
-    rctx->last = *ngx_cached_time;
     rctx->file.offset = 0;
-    rctx->failed = 0;
     rctx->file.log = s->connection->log;
     rctx->file.fd = ngx_open_file(path.data, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE,
                                   NGX_FILE_DEFAULT_ACCESS);
@@ -970,7 +968,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
 
             if (ngx_rtmp_record_write_frame(s, rctx, &ch,
                                             codec_ctx->aac_header, 0)
-                    != NGX_OK) 
+                != NGX_OK) 
             {
                 return NGX_OK;
             }
@@ -1009,7 +1007,10 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
             return NGX_OK;
         }
 
-        if (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME) {
+        if (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME &&
+            (codec_ctx->video_codec_id != NGX_RTMP_VIDEO_H264 ||
+             !ngx_rtmp_is_codec_header(in)))
+        {
             rctx->video_key_sent = 1;
         }
         

@@ -192,7 +192,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     /* no conf */
-    if (in->buf->pos[1]) {
+    if (!ngx_rtmp_is_codec_header(in)) {
         return NGX_OK;
     }
 
