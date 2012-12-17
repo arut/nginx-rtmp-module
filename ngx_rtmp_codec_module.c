@@ -187,7 +187,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     /* save AVC/AAC header */
-    if (in->buf->last - in->buf->pos < 2) {
+    if (in->buf->last - in->buf->pos < 3) {
         return NGX_OK;
     }
 

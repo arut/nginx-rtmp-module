@@ -417,6 +417,10 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_USER]);
     *eh = ngx_rtmp_user_message_handler;
 
+    /* aggregate to audio/video map */
+    eh = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AGGREGATE]);
+    *eh = ngx_rtmp_aggregate_message_handler;
+
     /* init amf callbacks */
     ngx_array_init(&cmcf->amf_arrays, cf->pool, 1, sizeof(ngx_hash_key_t));
 
