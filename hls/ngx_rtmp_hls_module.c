@@ -300,13 +300,13 @@ ngx_rtmp_hls_init_video(ngx_rtmp_session_t *s)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "hls: video stream: %i", ctx->out_vstream);
 
-    if (ctx->header_sent) {
+    /*if (ctx->header_sent) {
         if (av_write_trailer(ctx->out_format) < 0) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "hls: av_write_trailer failed");
         }
         ctx->header_sent = 0;
-    }
+    }*/
 
     return NGX_OK;
 }
@@ -359,7 +359,7 @@ ngx_rtmp_hls_init_audio(ngx_rtmp_session_t *s)
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "hls: audio stream: %i %iHz", 
             ctx->out_astream, codec_ctx->sample_rate);
-
+/*
     if (ctx->header_sent) {
         if (av_write_trailer(ctx->out_format) < 0) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
@@ -367,7 +367,7 @@ ngx_rtmp_hls_init_audio(ngx_rtmp_session_t *s)
         }
         ctx->header_sent = 0;
     }
-
+*/
     return NGX_OK;
 }
 
@@ -717,11 +717,11 @@ ngx_rtmp_hls_close_file(ngx_rtmp_session_t *s)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
-    /*
     if (av_write_trailer(ctx->out_format) < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "hls: av_write_trailer failed");
-    }*/
+    }
+    ctx->header_sent = 0;
 
     avio_flush(ctx->out_format->pb);
 
