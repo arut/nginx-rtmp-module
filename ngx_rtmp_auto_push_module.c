@@ -477,8 +477,8 @@ ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
     slot = (ngx_process_t *) rctx->data - &ngx_processes[0];
 
     ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                   "auto_push: disconnect slot=%i app='%V' name='%s'",
-                   slot, &rctx->app, rctx->name);
+                   "auto_push: disconnect slot=%i app='%V' name='%V'",
+                   slot, &rctx->app, &rctx->name);
 
     pctx = ngx_rtmp_get_module_ctx(rctx->publish->session, 
                                    ngx_rtmp_auto_push_module);
