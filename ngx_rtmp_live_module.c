@@ -1040,13 +1040,9 @@ ngx_rtmp_live_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ctx->silent = v->silent;
 
-    if (!ctx->silent) {
-        ngx_rtmp_send_status(s, "NetStream.Play.Reset",
-                             "status", "Playing and resetting");
-        if (!lacf->play_restart) {
-            ngx_rtmp_send_status(s, "NetStream.Play.Start",
-                                 "status", "Start live");
-        }
+    if (!ctx->silent && !lacf->play_restart) {
+        ngx_rtmp_send_status(s, "NetStream.Play.Start",
+                             "status", "Start live");
     }
 
 next:
