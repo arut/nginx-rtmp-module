@@ -63,12 +63,25 @@
         </td>
     </tr>
     <xsl:apply-templates select="live"/>
+    <xsl:apply-templates select="play"/>
 </xsl:template>
 
 <xsl:template match="live">
     <tr bgcolor="#aaaaaa">
         <td>
             <i>live streams</i>
+        </td>
+        <td align="middle">
+            <xsl:value-of select="nclients"/>
+        </td>
+    </tr>
+    <xsl:apply-templates select="stream"/>
+</xsl:template>
+
+<xsl:template match="play">
+    <tr bgcolor="#aaaaaa">
+        <td>
+            <i>VOD streams</i>
         </td>
         <td align="middle">
             <xsl:value-of select="nclients"/>
