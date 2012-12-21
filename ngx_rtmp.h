@@ -139,6 +139,7 @@ typedef struct {
 #define NGX_RTMP_USER_PING_REQUEST      6
 #define NGX_RTMP_USER_PING_RESPONSE     7
 #define NGX_RTMP_USER_UNKNOWN           8
+#define NGX_RTMP_USER_BUFFER_END        31
 
 
 /* Chunk header:
@@ -183,6 +184,7 @@ typedef struct {
 
     /* client buffer time in msec */
     uint32_t                buflen;
+    uint32_t                ack_size;
 
     /* connection parameters */
     ngx_str_t               app;
@@ -408,9 +410,13 @@ ngx_rtmp_r64(uint64_t n)
 
 
 /* Receiving messages */
+ngx_int_t ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
+ngx_int_t ngx_rtmp_aggregate_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);

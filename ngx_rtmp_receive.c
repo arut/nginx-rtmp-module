@@ -53,6 +53,7 @@ ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
             /* receive window size =val */
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "receive ack_size=%uD", val);
+            s->ack_size = val;
             break;
 
         case NGX_RTMP_MSG_BANDWIDTH:
@@ -206,6 +207,157 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                            "unexpected user event: %i", (ngx_int_t) evt);
 
             return NGX_OK;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_fetch(ngx_chain_t **in, u_char *ret)
+{
+    while (*in && (*in)->buf->pos >= (*in)->buf->last) {
+        *in = (*in)->next;
+    }
+
+    if (*in == NULL) {
+        return NGX_DONE;
+    }
+
+    *ret = *(*in)->buf->pos++;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_fetch_uint8(ngx_chain_t **in, uint8_t *ret)
+{
+    return ngx_rtmp_fetch(in, (u_char *) ret);
+}
+
+
+static ngx_int_t
+ngx_rtmp_fetch_uint32(ngx_chain_t **in, uint32_t *ret, ngx_int_t n)
+{
+    u_char     *r = (u_char *) ret;
+    ngx_int_t   rc;
+
+    *ret = 0;
+
+    while (--n >= 0) {
+        rc = ngx_rtmp_fetch(in, &r[n]);
+        if (rc != NGX_OK) {
+            return rc;
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t 
+ngx_rtmp_aggregate_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+                                   ngx_chain_t *in)
+{
+    uint32_t            base_time, timestamp, prev_size;
+    size_t              len;
+    ngx_int_t           first;
+    u_char             *last;
+    ngx_int_t           rc;
+    ngx_buf_t          *b;
+    ngx_chain_t        *cl, *next;
+    ngx_rtmp_header_t   ch;
+
+    ch = *h;
+
+    first = 1;
+    base_time = 0;
+
+    while (in) {
+        if (ngx_rtmp_fetch_uint8(&in, &ch.type) != NGX_OK) {
+            return NGX_OK;
+        }
+
+        if (ngx_rtmp_fetch_uint32(&in, &ch.mlen, 3) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (ngx_rtmp_fetch_uint32(&in, &timestamp, 3) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (ngx_rtmp_fetch_uint8(&in, (uint8_t *) &timestamp + 3) != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
+        if (ngx_rtmp_fetch_uint32(&in, &ch.msid, 3) != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
+        if (first) {
+            base_time = timestamp;
+            first = 0;
+        }
+
+        ngx_log_debug6(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "RTMP aggregate %s (%d) len=%uD time=%uD (+%D) msid=%uD",
+                       ngx_rtmp_message_type(ch.type),
+                       (ngx_int_t) ch.type, ch.mlen, ch.timestamp,
+                       timestamp - base_time, ch.msid);
+
+        /* limit chain */
+
+        len = 0;
+        cl = in;
+        while (cl) {
+            b = cl->buf;
+            len += (b->last - b->pos);
+            if (len > ch.mlen) {
+                break;
+            }
+            cl = cl->next;
+        }
+
+        if (cl == NULL) {
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
+                          "RTMP error parsing aggregate");
+            return NGX_ERROR;
+        }
+
+        next = cl->next;
+        cl->next = NULL;
+        b = cl->buf;
+        last = b->last;
+        b->last -= (len - ch.mlen);
+
+        /* handle aggregated message */
+
+        ch.timestamp = h->timestamp + timestamp - base_time;
+
+        rc = ngx_rtmp_receive_message(s, &ch, in);
+
+        /* restore chain before checking the result */
+
+        in = cl;
+        in->next = next;
+        b->pos = b->last;
+        b->last = last;
+
+        if (rc != NGX_OK) {
+            return rc;
+        }
+
+        /* read 32-bit previous tag size */
+
+        if (ngx_rtmp_fetch_uint32(&in, &prev_size, 4) != NGX_OK) {
+            return NGX_OK;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "RTMP aggregate prev_size=%uD", prev_size);
     }
 
     return NGX_OK;

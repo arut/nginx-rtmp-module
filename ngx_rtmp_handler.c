@@ -10,8 +10,6 @@
 static void ngx_rtmp_recv(ngx_event_t *rev);
 static void ngx_rtmp_send(ngx_event_t *rev);
 static void ngx_rtmp_ping(ngx_event_t *rev);
-static ngx_int_t ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
-       ngx_rtmp_header_t *h, ngx_chain_t *in);
 static ngx_int_t ngx_rtmp_finalize_set_chunk_size(ngx_rtmp_session_t *s);
 
 
@@ -64,6 +62,7 @@ ngx_rtmp_user_message_type(uint16_t evt)
         "stream dry",
         "set_buflen",
         "recorded",
+        "",
         "ping_request",
         "ping_response",
     };
@@ -267,7 +266,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             b->last += n;
             s->in_bytes += n;
 
-            if (s->in_bytes - s->in_last_ack >= cscf->ack_window) {
+            if (s->ack_size && s->in_bytes - s->in_last_ack >= s->ack_size) {
                 
                 s->in_last_ack = s->in_bytes;
 
@@ -736,7 +735,7 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 }
 
 
-static ngx_int_t 
+ngx_int_t 
 ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
@@ -764,7 +763,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
     }
 #endif
 
-    if (h->type >= NGX_RTMP_MSG_MAX) {
+    if (h->type > NGX_RTMP_MSG_MAX) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "unexpected RTMP message type: %d", (int)h->type);
         return NGX_OK;
