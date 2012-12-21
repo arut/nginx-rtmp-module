@@ -4,12 +4,6 @@
 
 
 #include "ngx_rtmp_room_module.h"
-#include "ngx_rtmp_cmd_module.h"
-
-
-static ngx_rtmp_publish_pt              next_publish;
-static ngx_rtmp_play_pt                 next_play;
-static ngx_rtmp_close_stream_pt         next_close_stream;
 
 
 static ngx_int_t ngx_rtmp_room_init_process(ngx_cycle_t *cycle);
@@ -18,7 +12,6 @@ static char *ngx_rtmp_room_persistent(ngx_conf_t *cf, ngx_command_t *cmd,
 static void * ngx_rtmp_room_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_room_merge_app_conf(ngx_conf_t *cf, void *parent,
        void *child);
-static ngx_int_t ngx_rtmp_room_postconfiguration(ngx_conf_t *cf);
 static void ngx_rtmp_room_create_persistent(ngx_rtmp_room_app_conf_t *racf,
        ngx_str_t *appname);
 static ngx_rtmp_room_t ** ngx_rtmp_room_get_room(ngx_rtmp_room_app_conf_t *racf,
@@ -92,7 +85,7 @@ static ngx_command_t  ngx_rtmp_room_commands[] = {
 
 static ngx_rtmp_module_t  ngx_rtmp_room_module_ctx = {
     NULL,                                   /* preconfiguration */
-    ngx_rtmp_room_postconfiguration,        /* postconfiguration */
+    NULL,                                   /* postconfiguration */
     NULL,                                   /* create main configuration */
     NULL,                                   /* init main configuration */
     NULL,                                   /* create server configuration */
@@ -173,11 +166,14 @@ ngx_rtmp_room_init_process(ngx_cycle_t *cycle)
 
     cmcf = ngx_rtmp_core_main_conf;
 
+    /* create persistent rooms */
     cscf = cmcf->servers.elts;
     for (n = 0; n < cmcf->servers.nelts; ++n, ++cscf) {
         cacf = (*cscf)->applications.elts;
+
         for (m = 0; m < (*cscf)->applications.nelts; ++m, ++cacf) {
             racf = (*cacf)->app_conf[ngx_rtmp_room_module.ctx_index];
+
             if (racf && racf->persistent.nelts) {
                 ngx_rtmp_room_create_persistent(racf, &(*cacf)->name);
             }
@@ -311,18 +307,14 @@ error:
 }
 
 
-static ngx_int_t
-ngx_rtmp_room_join(ngx_rtmp_session_t *s, u_char *sname, unsigned publishing)
+ngx_int_t
+ngx_rtmp_room_join(ngx_rtmp_session_t *s, ngx_str_t *name)
 {
     ngx_rtmp_room_app_conf_t       *racf;
     ngx_rtmp_room_t               **rr, *r;
     ngx_rtmp_room_ctx_t            *ctx;
-    ngx_str_t                       name;
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_room_module);
-
-    name.data = sname;
-    name.len = ngx_strlen(sname);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_room_module);
     if (ctx && ctx->room) {
@@ -341,15 +333,15 @@ ngx_rtmp_room_join(ngx_rtmp_session_t *s, u_char *sname, unsigned publishing)
     ctx->session = s;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                   "room: join '%V'", &name);
+                   "room: join '%V'", name);
 
-    rr = ngx_rtmp_room_get_room(racf, &name);
+    rr = ngx_rtmp_room_get_room(racf, name);
     if (rr == NULL) {
         return NGX_ERROR;
     }
 
     if (*rr == NULL) {
-        *rr = ngx_rtmp_room_create(racf, &name);
+        *rr = ngx_rtmp_room_create(racf, name);
         if (*rr == NULL) {
             return NGX_ERROR;
         }
@@ -358,7 +350,6 @@ ngx_rtmp_room_join(ngx_rtmp_session_t *s, u_char *sname, unsigned publishing)
     r = *rr;
 
     ctx->room = r;
-    ctx->publishing = publishing;
 
     ctx->next = r->first_ctx;
     r->first_ctx = ctx;
@@ -367,59 +358,8 @@ ngx_rtmp_room_join(ngx_rtmp_session_t *s, u_char *sname, unsigned publishing)
 }
 
 
-static ngx_int_t
-ngx_rtmp_room_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
-{
-    ngx_rtmp_room_app_conf_t       *racf;
-
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_room_module);
-    if (racf == NULL || !racf->active) {
-        goto next;
-    }
-
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "room: publish: name='%s' type='%s'",
-                   v->name, v->type);
-
-    /* join stream as publisher */
-
-    if (ngx_rtmp_room_join(s, v->name, 1) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-next:
-    return next_publish(s, v);
-}
-
-
-static ngx_int_t
-ngx_rtmp_room_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
-{
-    ngx_rtmp_room_app_conf_t       *racf;
-
-    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_room_module);
-    if (racf == NULL || !racf->active) {
-        goto next;
-    }
-
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "room: play: name='%s' start=%uD duration=%uD reset=%d",
-                   v->name, (uint32_t) v->start, 
-                   (uint32_t) v->duration, (uint32_t) v->reset);
-
-    /* join stream as subscriber */
-
-    if (ngx_rtmp_room_join(s, v->name, 0) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-next:
-    return next_play(s, v);
-}
-
-
-static ngx_int_t
-ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
+ngx_int_t
+ngx_rtmp_room_leave(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_room_app_conf_t       *racf;
     ngx_rtmp_room_ctx_t           **cctx, *ctx;
@@ -427,16 +367,16 @@ ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_room_module);
     if (racf == NULL || !racf->active) {
-        goto next;
+        return NGX_OK;
     }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_room_module);
     if (ctx == NULL) {
-        goto next;
+        return NGX_OK;
     }
 
     if (ctx->room == NULL) {
-        goto next;
+        return NGX_OK;
     }
 
     r = ctx->room;
@@ -456,12 +396,12 @@ ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     ngx_rtmp_leave_room(r, s);
 
     if (r->persistent) {
-        goto next;
+        return NGX_OK;
     }
 
     for (ctx = r->first_ctx; ctx; ctx = ctx->next) {
         if (!ctx->weak) {
-            goto next;
+            return NGX_OK;
         }
     }
 
@@ -480,7 +420,7 @@ ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 
     rr = ngx_rtmp_room_get_room(racf, &r->name);
     if (rr == NULL) {
-        goto next;
+        return NGX_OK;
     }
 
     *rr = (*rr)->next;
@@ -488,23 +428,6 @@ ngx_rtmp_room_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     ngx_rtmp_delete_room(r);
 
     ngx_destroy_pool(r->pool);
-
-next:
-    return next_close_stream(s, v);
-}
-
-
-static ngx_int_t
-ngx_rtmp_room_postconfiguration(ngx_conf_t *cf)
-{
-    next_publish = ngx_rtmp_publish;
-    ngx_rtmp_publish = ngx_rtmp_room_publish;
-
-    next_play = ngx_rtmp_play;
-    ngx_rtmp_play = ngx_rtmp_room_play;
-
-    next_close_stream = ngx_rtmp_close_stream;
-    ngx_rtmp_close_stream = ngx_rtmp_room_close_stream;
 
     return NGX_OK;
 }

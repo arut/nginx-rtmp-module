@@ -436,7 +436,6 @@ ngx_rtmp_relay_create_room(ngx_rtmp_room_t *r)
 {
     ngx_rtmp_relay_app_conf_t      *racf;
     ngx_rtmp_relay_target_t        *target, **t;
-    ngx_str_t                       name;
     size_t                          n;
 
     ngx_rtmp_relay_ctx_t           *ctx;
@@ -456,27 +455,24 @@ ngx_rtmp_relay_create_room(ngx_rtmp_room_t *r)
     }
 
 
-    name.len = ngx_strlen(v->name);
-    name.data = v->name;
-
     t = racf->pushes.elts;
     for (n = 0; n < racf->pushes.nelts; ++n, ++t) {
         target = *t;
 
-        if (target->name.len && (name.len != target->name.len ||
-            ngx_memcmp(name.data, target->name.data, name.len)))
+        if (target->name.len && (r->name.len != target->name.len ||
+            ngx_memcmp(r->name.data, target->name.data, r->name.len)))
         {
             continue;
         }
 
-        if (ngx_rtmp_relay_push(s, &name, target) == NGX_OK) {
+        if (ngx_rtmp_relay_push(s, &r->name, target) == NGX_OK) {
             continue;
         }
 
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "relay: push failed name='%V' app='%V' "
                 "playpath='%V' url='%V'",
-                &name, &target->app, &target->play_path, 
+                &r->name, &target->app, &target->play_path, 
                 &target->url.url);
 
         if (!ctx->push_evt.timer_set) {

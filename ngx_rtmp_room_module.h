@@ -19,7 +19,6 @@ struct ngx_rtmp_room_ctx_s {
     ngx_rtmp_room_t                    *room;
     ngx_rtmp_room_ctx_t                *next;
     unsigned                            weak:1;
-    unsigned                            publishing:1;
 };
 
 
@@ -45,6 +44,10 @@ typedef struct {
     ngx_rtmp_conf_ctx_t                *ctx;
     ngx_array_t                         persistent; /* ngx_str_t */
 } ngx_rtmp_room_app_conf_t;
+
+
+ngx_int_t ngx_rtmp_room_join(ngx_rtmp_session_t *s, ngx_str_t *name);
+ngx_int_t ngx_rtmp_room_leave(ngx_rtmp_session_t *s);
 
 
 typedef ngx_int_t (*ngx_rtmp_create_room_pt)(ngx_rtmp_room_t *);
