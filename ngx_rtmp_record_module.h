@@ -42,6 +42,9 @@ typedef struct {
     ngx_time_t                          last;
     time_t                              timestamp;
     unsigned                            failed:1;
+    unsigned                            aac_header_sent:1;
+    unsigned                            avc_header_sent:1;
+    unsigned                            video_key_sent:1;
 } ngx_rtmp_record_rec_ctx_t;
 
 
