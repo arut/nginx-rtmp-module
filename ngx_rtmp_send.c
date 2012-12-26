@@ -437,11 +437,11 @@ ngx_rtmp_create_status(ngx_rtmp_session_t *s, char *code, char* level,
     static ngx_rtmp_amf_elt_t       out_inf[] = {
 
         { NGX_RTMP_AMF_STRING, 
-          ngx_string("code"),
+          ngx_string("level"),
           NULL, 0 },
 
         { NGX_RTMP_AMF_STRING, 
-          ngx_string("level"),
+          ngx_string("code"),
           NULL, 0 },
 
         { NGX_RTMP_AMF_STRING, 
