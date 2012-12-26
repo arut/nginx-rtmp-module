@@ -473,8 +473,8 @@ ngx_rtmp_create_status(ngx_rtmp_session_t *s, char *code, char* level,
                    "create: status code='%s' level='%s' desc='%s'",
                    code, level, desc);
 
-    out_inf[0].data = code;
-    out_inf[1].data = level;
+    out_inf[0].data = level;
+    out_inf[1].data = code;
     out_inf[2].data = desc;
 
     memset(&h, 0, sizeof(h));
