@@ -1,13 +1,14 @@
+- access log
+
+- rooms (+force pull)
+
+- fix auto-pushing to cache manager
+
+
 - DNS round-robin url
 
 - multiple streams per connection
 
 - VOD HLS
 
-- dynamic relay
-
-- force pull
-
 - sync exec
-
-- update relay engine; add relay rooms; use closeStream instead of deleteStream; add to stat
