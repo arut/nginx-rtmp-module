@@ -103,6 +103,9 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
     size_t                      n;
     ngx_file_info_t             fi;
 
+    if (ngx_process != NGX_PROCESS_WORKER) {
+        return NGX_OK;
+    }
 
     apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(cycle->conf_ctx, 
                                                     ngx_rtmp_auto_push_module);
@@ -110,13 +113,11 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
         return NGX_OK;
     }
 
-
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_auto_push_publish;
 
     next_delete_stream = ngx_rtmp_delete_stream;
     ngx_rtmp_delete_stream = ngx_rtmp_auto_push_delete_stream;
-
 
     reuseaddr = 1;
     s = (ngx_socket_t) -1;
@@ -341,7 +342,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
         }
 
         pid = ngx_processes[n].pid;
-        if (pid == 0 || pid == -1) {
+        if (pid == 0 || pid == NGX_INVALID_PID) {
             continue;
         }
 
