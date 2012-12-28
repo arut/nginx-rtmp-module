@@ -379,7 +379,7 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
 
     if (rev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, 
-                "handshake: client timed out");
+                "handshake: recv: client timed out");
         c->timedout = 1;
         ngx_rtmp_finalize_session(s);
         return;
@@ -494,7 +494,7 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
 
     if (wev->timedout) {
         ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, 
-                "handshake: client timed out");
+                "handshake: send: client timed out");
         c->timedout = 1;
         ngx_rtmp_finalize_session(s);
         return;
@@ -609,10 +609,7 @@ ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async)
     }
 
     if (async) {
-        ngx_add_timer(c->write, s->timeout);
-        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
-            ngx_rtmp_finalize_session(s);
-        }
+        ngx_post_event(c->write, &ngx_posted_events);
         return;
     }
 
