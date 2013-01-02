@@ -43,6 +43,7 @@ static ngx_conf_bitmask_t           ngx_rtmp_stat_masks[] = {
     { ngx_string("global"),         NGX_RTMP_STAT_GLOBAL        },
     { ngx_string("live"),           NGX_RTMP_STAT_LIVE          },
     { ngx_string("clients"),        NGX_RTMP_STAT_CLIENTS       },
+    { ngx_string("play"),           NGX_RTMP_STAT_PLAY          },
     { ngx_null_string,              0 }
 }; 
 
