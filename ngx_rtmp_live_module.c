@@ -56,13 +56,6 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, buflen),
       NULL },
 
-    { ngx_string("sync"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_rtmp_live_set_msec_slot,
-      NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_live_app_conf_t, sync),
-      NULL },
-
     { ngx_string("interleave"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
@@ -151,7 +144,6 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->meta = NGX_CONF_UNSET;
     lacf->nbuckets = NGX_CONF_UNSET;
     lacf->buflen = NGX_CONF_UNSET;
-    lacf->sync = NGX_CONF_UNSET;
     lacf->idle_timeout = NGX_CONF_UNSET;
     lacf->interleave = NGX_CONF_UNSET;
     lacf->wait_key = NGX_CONF_UNSET;
@@ -173,7 +165,6 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->meta, prev->meta, 1);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
-    ngx_conf_merge_msec_value(conf->sync, prev->sync, 300);
     ngx_conf_merge_msec_value(conf->idle_timeout, prev->idle_timeout, 0);
     ngx_conf_merge_value(conf->interleave, prev->interleave, 0);
     ngx_conf_merge_value(conf->wait_key, prev->wait_key, 0);
@@ -350,10 +341,8 @@ ngx_rtmp_live_set_status(ngx_rtmp_session_t *s, ngx_chain_t *control,
     }
 
     ctx->cs[0].active = 0;
-    ctx->cs[0].dropped = 0;
 
     ctx->cs[1].active = 0;
-    ctx->cs[1].dropped = 0;
 }
 
 
@@ -834,16 +823,6 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
         }
 
-        /* sync stream */
-
-        if (cs->active && (lacf->sync && cs->dropped > lacf->sync)) {
-            ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
-                           "live: sync %s dropped=%uD", type_s, cs->dropped);
-
-            cs->active = 0;
-            cs->dropped = 0;
-        }
-
         /* absolute packet */
 
         if (!cs->active) {
@@ -941,7 +920,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         if (ngx_rtmp_send_message(ss, rpkt, prio) != NGX_OK) {
             ++pctx->ndropped;
 
-            cs->dropped += delta;
+            cs->active = 0;
 
             if (mandatory) {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
