@@ -1,12 +1,12 @@
 - exec_init
 
-- wrong framerate in metadata (like 1000 etc)
-
 - improve drop engine to restart at key frame
 
 - access log
 
 - rooms (+force pull)
+
+- auto_push for pull
 
 - fix auto-pushing to cache manager
 
