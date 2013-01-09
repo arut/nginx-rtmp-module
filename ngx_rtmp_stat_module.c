@@ -354,7 +354,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                     NGX_RTMP_STAT_L("</time>");
 
                     NGX_RTMP_STAT_L("<dropped>");
-                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%%uD",
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%uD",
                                                     ctx->ndropped)
                                        - buf);
                     NGX_RTMP_STAT_L("</dropped>");
