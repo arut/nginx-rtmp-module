@@ -43,7 +43,13 @@ ngx_rtmp_hls_av_log_callback(void* avcl, int level, const char* fmt,
         }
     }
 
-    ngx_log_error_core(NGX_LOG_ERR, ngx_rtmp_hls_log, 0, "hls: av: %s", buf);
+    if (level <= AV_LOG_ERROR) {
+        ngx_log_error_core(NGX_LOG_ERR, ngx_rtmp_hls_log, 0, "hls: av: %s",
+                           buf);
+        return;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_rtmp_hls_log, 0, "hls: av: %s", buf);
 }
 
 
