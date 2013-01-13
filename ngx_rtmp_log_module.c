@@ -132,8 +132,8 @@ ngx_module_t  ngx_rtmp_log_module = {
 
 
 static ngx_str_t ngx_rtmp_combined_fmt =
-    ngx_string("$remote_addr [$time_local] \"$app\" \"$name\" \"$args\" "
-               "$bytes_sent $bytes_received "
+    ngx_string("$remote_addr - \"$app\" \"$name\" \"$args\" [$time_local] "
+               "$bytes_received $bytes_sent "
                "\"$pageurl\" \"$flashver\" $session_time");
 
 
@@ -143,11 +143,12 @@ ngx_rtmp_log_var_default_getlen(ngx_rtmp_session_t *s, ngx_rtmp_log_op_t *op)
     return op->value.len;
 }
 
+
 static u_char *
 ngx_rtmp_log_var_default_getdata(ngx_rtmp_session_t *s, u_char *buf,
     ngx_rtmp_log_op_t *op)
 {
-    return op->value.data;
+    return ngx_cpymem(buf, op->value.data, op->value.len);
 }
 
 
@@ -268,7 +269,7 @@ static u_char *
 ngx_rtmp_log_var_session_time_getdata(ngx_rtmp_session_t *s, u_char *buf,
     ngx_rtmp_log_op_t *op)
 {
-    return ngx_sprintf(buf, "%L", (int64_t) (ngx_current_msec - s->epoch));
+    return ngx_sprintf(buf, "%L", (int64_t) (ngx_current_msec - s->epoch) / 1000);
 }
 
 
@@ -571,7 +572,7 @@ ngx_rtmp_log_compile_format(ngx_conf_t *cf, ngx_array_t *ops, ngx_array_t *args,
         len = value[s].len;
         d = value[s].data;
 
-        while (i < value[i].len) {
+        while (i < len) {
 
             op = ngx_array_push(ops);
             if (op == NULL) {
