@@ -1,3 +1,5 @@
+- improve session epoch variable
+
 - exec_init
 
 - improve drop engine to restart at key frame

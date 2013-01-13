@@ -232,6 +232,7 @@ typedef struct {
 
     /* circular buffer of RTMP message pointers */
     ngx_msec_t              timeout;
+    uint32_t                out_bytes;
     size_t                  out_pos, out_last;
     ngx_chain_t            *out_chain;
     u_char                 *out_bpos;
