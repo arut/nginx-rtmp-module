@@ -220,6 +220,7 @@ ngx_rtmp_log_var_command_getdata(ngx_rtmp_session_t *s, u_char *buf,
 {
     ngx_rtmp_log_ctx_t *ctx;
     ngx_str_t          *cmd;
+    ngx_uint_t          n;
 
     static ngx_str_t    commands[] = {
         ngx_string("NONE"),
@@ -229,11 +230,10 @@ ngx_rtmp_log_var_command_getdata(ngx_rtmp_session_t *s, u_char *buf,
     };
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_log_module);
-    if (ctx == NULL) {
-        return buf;
-    }
 
-    cmd = &commands[ctx->play + ctx->publish * 2];
+    n = ctx ? (ctx->play + ctx->publish * 2) : 0;
+
+    cmd = &commands[n];
 
     return ngx_cpymem(buf, cmd->data, cmd->len);
 }
