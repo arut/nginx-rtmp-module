@@ -521,6 +521,7 @@ ngx_rtmp_send(ngx_event_t *wev)
             return;
         }
 
+        s->out_bytes += n;
         s->ping_reset = 1;
         ngx_rtmp_update_bandwidth(&ngx_rtmp_bw_out, n);
         s->out_bpos += n;
