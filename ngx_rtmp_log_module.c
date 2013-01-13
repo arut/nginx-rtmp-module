@@ -134,7 +134,7 @@ ngx_module_t  ngx_rtmp_log_module = {
 static ngx_str_t ngx_rtmp_combined_fmt =
     ngx_string("$remote_addr - \"$app\" \"$name\" \"$args\" [$time_local] "
                "$bytes_received $bytes_sent "
-               "\"$pageurl\" \"$flashver\" $session_time");
+               "\"$pageurl\" \"$flashver\" ($session_readable_time)");
 
 
 static size_t
@@ -269,7 +269,48 @@ static u_char *
 ngx_rtmp_log_var_session_time_getdata(ngx_rtmp_session_t *s, u_char *buf,
     ngx_rtmp_log_op_t *op)
 {
-    return ngx_sprintf(buf, "%L", (int64_t) (ngx_current_msec - s->epoch) / 1000);
+    return ngx_sprintf(buf, "%L",
+                       (int64_t) (ngx_current_msec - s->epoch) / 1000);
+}
+
+
+static size_t
+ngx_rtmp_log_var_session_readable_time_getlen(ngx_rtmp_session_t *s,
+    ngx_rtmp_log_op_t *op)
+{
+    return NGX_OFF_T_LEN + sizeof("d 23h 59m 59s") - 1;
+}
+
+
+static u_char *
+ngx_rtmp_log_var_session_readable_time_getdata(ngx_rtmp_session_t *s,
+    u_char *buf, ngx_rtmp_log_op_t *op)
+{
+    int64_t     v;
+    ngx_uint_t  days, hours, minutes, seconds;
+
+    v = (ngx_current_msec - s->epoch) / 1000;
+
+    days = (ngx_uint_t) (v / (60 * 60 * 24));
+    hours = (ngx_uint_t) (v / (60 * 60) % 24);
+    minutes = (ngx_uint_t) (v / 60 % 60);
+    seconds = (ngx_uint_t) (v % 60);
+
+    if (days) {
+        buf = ngx_sprintf(buf, "%uid ", days);
+    }
+
+    if (days || hours) {
+        buf = ngx_sprintf(buf, "%uih ", hours);
+    }
+
+    if (days || hours || minutes) {
+        buf = ngx_sprintf(buf, "%uim ", minutes);
+    }
+
+    buf = ngx_sprintf(buf, "%uis", seconds);
+
+    return buf;
 }
 
 
@@ -337,6 +378,11 @@ static ngx_rtmp_log_var_t ngx_rtmp_log_vars[] = {
     { ngx_string("session_time"),
       ngx_rtmp_log_var_session_time_getlen,
       ngx_rtmp_log_var_session_time_getdata,
+      0 },
+
+    { ngx_string("session_readable_time"),
+      ngx_rtmp_log_var_session_readable_time_getlen,
+      ngx_rtmp_log_var_session_readable_time_getdata,
       0 },
 
     { ngx_null_string, NULL, NULL, 0 }
