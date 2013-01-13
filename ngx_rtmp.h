@@ -310,7 +310,7 @@ typedef struct {
 typedef struct {
     ngx_str_t              *client;
     ngx_rtmp_session_t     *session;
-} ngx_rtmp_log_ctx_t;
+} ngx_rtmp_error_log_ctx_t;
 
 
 typedef struct {

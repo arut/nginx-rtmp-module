@@ -49,35 +49,37 @@ typedef struct {
 
 
 typedef struct {
-    ngx_str_t           name;
-    ngx_array_t        *ops; /* ngx_rtmp_log_op_t */
+    ngx_str_t                   name;
+    ngx_array_t                *ops; /* ngx_rtmp_log_op_t */
 } ngx_rtmp_log_fmt_t;
 
 
 typedef struct {
-    ngx_open_file_t    *file;
-    time_t              disk_full_time;
-    time_t              error_log_time;
+    ngx_open_file_t            *file;
+    time_t                      disk_full_time;
+    time_t                      error_log_time;
     ngx_rtmp_log_fmt_t *format;
 } ngx_rtmp_log_t;
 
 
 typedef struct {
-    ngx_array_t        *logs; /* ngx_rtmp_log_t */
-    ngx_uint_t          off;
+    ngx_array_t                *logs; /* ngx_rtmp_log_t */
+    ngx_uint_t                  off;
 } ngx_rtmp_log_app_conf_t;
 
 
 typedef struct {
-    ngx_array_t         formats; /* ngx_rtmp_log_fmt_t */
-    ngx_uint_t          combined_used;
+    ngx_array_t                 formats; /* ngx_rtmp_log_fmt_t */
+    ngx_uint_t                  combined_used;
 } ngx_rtmp_log_main_conf_t;
 
 
 typedef struct {
-    u_char              name[NGX_RTMP_MAX_NAME];
-    u_char              args[NGX_RTMP_MAX_NAME];
-} ngx_rtmp_log_ctx_struct_t;
+    unsigned                    play:1;
+    unsigned                    publish:1;
+    u_char                      name[NGX_RTMP_MAX_NAME];
+    u_char                      args[NGX_RTMP_MAX_ARGS];
+} ngx_rtmp_log_ctx_t;
 
 
 static ngx_str_t ngx_rtmp_access_log = ngx_string(NGX_HTTP_LOG_PATH);
@@ -132,7 +134,8 @@ ngx_module_t  ngx_rtmp_log_module = {
 
 
 static ngx_str_t ngx_rtmp_combined_fmt =
-    ngx_string("$remote_addr - \"$app\" \"$name\" \"$args\" [$time_local] "
+    ngx_string("$remote_addr [$time_local] $command "
+               "\"$app\" \"$name\" \"$args\" - "
                "$bytes_received $bytes_sent "
                "\"$pageurl\" \"$flashver\" ($session_readable_time)");
 
@@ -150,7 +153,6 @@ ngx_rtmp_log_var_default_getdata(ngx_rtmp_session_t *s, u_char *buf,
 {
     return ngx_cpymem(buf, op->value.data, op->value.len);
 }
-
 
 
 static size_t
@@ -205,10 +207,43 @@ ngx_rtmp_log_var_session_string_getdata(ngx_rtmp_session_t *s, u_char *buf,
 
 
 static size_t
+ngx_rtmp_log_var_command_getlen(ngx_rtmp_session_t *s,
+    ngx_rtmp_log_op_t *op)
+{
+    return sizeof("PLAY+PUBLISH") - 1;
+}
+
+
+static u_char *
+ngx_rtmp_log_var_command_getdata(ngx_rtmp_session_t *s, u_char *buf,
+    ngx_rtmp_log_op_t *op)
+{
+    ngx_rtmp_log_ctx_t *ctx;
+    ngx_str_t          *cmd;
+
+    static ngx_str_t    commands[] = {
+        ngx_string("NONE"),
+        ngx_string("PLAY"),
+        ngx_string("PUBLISH"),
+        ngx_string("PLAY+PUBLISH")
+    };
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_log_module);
+    if (ctx == NULL) {
+        return buf;
+    }
+
+    cmd = &commands[ctx->play + ctx->publish * 2];
+
+    return ngx_cpymem(buf, cmd->data, cmd->len);
+}
+
+
+static size_t
 ngx_rtmp_log_var_context_cstring_getlen(ngx_rtmp_session_t *s,
     ngx_rtmp_log_op_t *op)
 {
-    return 0; /*TODO*/
+    return ngx_max(NGX_RTMP_MAX_NAME, NGX_RTMP_MAX_ARGS);
 }
 
 
@@ -216,7 +251,20 @@ static u_char *
 ngx_rtmp_log_var_context_cstring_getdata(ngx_rtmp_session_t *s, u_char *buf,
     ngx_rtmp_log_op_t *op)
 {
-    return buf; /*TODO*/
+    ngx_rtmp_log_ctx_t *ctx;
+    u_char             *p;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_log_module);
+    if (ctx == NULL) {
+        return buf;
+    }
+
+    p = (u_char *) ctx + op->offset;
+    while (*p) {
+        *buf++ = *p++;
+    }
+
+    return buf;
 }
 
 
@@ -350,15 +398,20 @@ static ngx_rtmp_log_var_t ngx_rtmp_log_vars[] = {
       ngx_rtmp_log_var_session_string_getdata,
       offsetof(ngx_rtmp_session_t, page_url) },
 
+    { ngx_string("command"),
+      ngx_rtmp_log_var_command_getlen,
+      ngx_rtmp_log_var_command_getdata,
+      0 },
+
     { ngx_string("name"),
       ngx_rtmp_log_var_context_cstring_getlen,
       ngx_rtmp_log_var_context_cstring_getdata,
-      offsetof(ngx_rtmp_log_ctx_struct_t, name) },
+      offsetof(ngx_rtmp_log_ctx_t, name) },
 
     { ngx_string("args"),
       ngx_rtmp_log_var_context_cstring_getlen,
       ngx_rtmp_log_var_context_cstring_getdata,
-      offsetof(ngx_rtmp_log_ctx_struct_t, args) },
+      offsetof(ngx_rtmp_log_ctx_t, args) },
 
     { ngx_string("bytes_sent"),
       ngx_rtmp_log_var_session_uint32_getlen,
@@ -726,12 +779,43 @@ invalid:
 }
 
 
+static ngx_rtmp_log_ctx_t *
+ngx_rtmp_log_set_names(ngx_rtmp_session_t *s, u_char *name, u_char *args)
+{
+    ngx_rtmp_log_ctx_t *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_log_module);
+    if (ctx == NULL) {
+        ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_log_ctx_t));
+        if (ctx == NULL) {
+            return NULL;
+        }
+
+        ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_log_module);
+    }
+
+    ngx_memcpy(ctx->name, name, NGX_RTMP_MAX_NAME);
+    ngx_memcpy(ctx->args, args, NGX_RTMP_MAX_ARGS);
+
+    return ctx;
+}
+
+
 static ngx_int_t
 ngx_rtmp_log_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
+    ngx_rtmp_log_ctx_t *ctx;
+
     if (s->auto_pushed) {
         goto next;
     }
+
+    ctx = ngx_rtmp_log_set_names(s, v->name, v->args);
+    if (ctx == NULL) {
+        goto next;
+    }
+
+    ctx->publish = 1;
 
 next:
     return next_publish(s, v);
@@ -741,9 +825,18 @@ next:
 static ngx_int_t
 ngx_rtmp_log_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 {
+    ngx_rtmp_log_ctx_t *ctx;
+
     if (s->auto_pushed) {
         goto next;
     }
+
+    ctx = ngx_rtmp_log_set_names(s, v->name, v->args);
+    if (ctx == NULL) {
+        goto next;
+    }
+
+    ctx->play = 1;
 
 next:
     return next_play(s, v);
