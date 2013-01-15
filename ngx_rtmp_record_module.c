@@ -89,6 +89,14 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       offsetof(ngx_rtmp_record_app_conf_t, unique),
       NULL },
 
+    { ngx_string("record_lock"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, lock_file),
+      NULL },
+
     { ngx_string("record_max_size"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
                          NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
@@ -176,6 +184,7 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     racf->max_frames = NGX_CONF_UNSET;
     racf->interval   = NGX_CONF_UNSET;
     racf->unique     = NGX_CONF_UNSET;
+    racf->lock_file  = NGX_CONF_UNSET;
     racf->notify     = NGX_CONF_UNSET;
     racf->url        = NGX_CONF_UNSET_PTR;
 
@@ -199,6 +208,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
     ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
     ngx_conf_merge_value(conf->unique, prev->unique, 0);
+    ngx_conf_merge_value(conf->lock_file, prev->lock_file, 0);
     ngx_conf_merge_value(conf->notify, prev->notify, 0);
     ngx_conf_merge_msec_value(conf->interval, prev->interval, 
                               (ngx_msec_t) NGX_CONF_UNSET);
@@ -446,6 +456,14 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
         ngx_rtmp_record_notify_error(s, rctx);
 
         return NGX_OK;
+    }
+
+    if (rracf->lock_file) {
+        err = ngx_lock_fd(rctx->file.fd);
+        if (err) {
+            ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
+                          "record: %V lock failed", &rracf->id);
+        }
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
