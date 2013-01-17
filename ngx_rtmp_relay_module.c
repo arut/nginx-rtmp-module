@@ -1552,20 +1552,19 @@ ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
     ngx_rtmp_core_srv_conf_t  **pcscf, *cscf;
     ngx_rtmp_core_app_conf_t  **pcacf, *cacf;
     ngx_rtmp_relay_app_conf_t  *racf;
-    ngx_uint_t                  n, m, k;
+    ngx_uint_t                  n, m, k, cnt;
     ngx_rtmp_relay_static_t    *rs;
     ngx_rtmp_listen_t          *lst;
     ngx_event_t               **pevent, *event;
+    ngx_core_conf_t            *ccf;
 
     if (cmcf->listen.nelts == 0) {
         return NGX_OK;
     }
 
-    /* only first worker does static pulling */
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
-    if (ngx_process_slot) {
-        return NGX_OK;
-    }
+    cnt = 0;
 
     lst = cmcf->listen.elts;
 
@@ -1582,6 +1581,14 @@ ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
             pevent = racf->static_events.elts;
 
             for (k = 0; k < racf->static_events.nelts; ++k, ++pevent) {
+
+                /* distribute among all workers */
+                if ((cnt++ % ccf->worker_processes) !=
+                    (ngx_uint_t) ngx_rtmp_worker_id)
+                {
+                    continue;
+                }
+
                 event = *pevent;
 
                 rs = event->data;

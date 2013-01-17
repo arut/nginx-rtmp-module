@@ -11,6 +11,7 @@ static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
 
 
+static ngx_int_t ngx_rtmp_auto_push_init_module(ngx_cycle_t *cycle);
 static ngx_int_t ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle);
 static void ngx_rtmp_auto_push_exit_process(ngx_cycle_t *cycle);
 static void * ngx_rtmp_auto_push_create_conf(ngx_cycle_t *cf);
@@ -78,7 +79,7 @@ ngx_module_t  ngx_rtmp_auto_push_module = {
     ngx_rtmp_auto_push_commands,            /* module directives */
     NGX_CORE_MODULE,                        /* module type */
     NULL,                                   /* init master */
-    NULL,                                   /* init module */
+    ngx_rtmp_auto_push_init_module,         /* init module */
     ngx_rtmp_auto_push_init_process,        /* init process */
     NULL,                                   /* init thread */
     NULL,                                   /* exit thread */
@@ -88,7 +89,50 @@ ngx_module_t  ngx_rtmp_auto_push_module = {
 };
 
 
+ngx_int_t   ngx_rtmp_worker_id = -1;
+
+
 #define NGX_RTMP_AUTO_PUSH_SOCKNAME         "nginx-rtmp"
+
+
+static ngx_int_t
+ngx_rtmp_auto_push_init_module(ngx_cycle_t *cycle)
+{
+    ngx_rtmp_auto_push_conf_t  *apcf;
+    int                         fd;
+    u_char                      path[NGX_MAX_PATH];
+
+    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(cycle->conf_ctx, 
+                                                    ngx_rtmp_auto_push_module);
+    if (apcf->auto_push == 0) {
+        return NGX_OK;
+    }
+
+
+    if (apcf->socket_dir.len + sizeof("NGX_RTMP_AUTO_PUSH_SOCKNAME") >
+        sizeof(path))
+    {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "too long path");
+        return NGX_ERROR;
+    }
+
+    *ngx_snprintf(path, sizeof(path), "%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME
+                                      ".worker",
+                  &apcf->socket_dir) = 0;
+
+    fd = ngx_open_file(path, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE,
+                       NGX_FILE_DEFAULT_ACCESS);
+
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      "failed to create '%s'", path);
+        return NGX_ERROR;
+    }
+
+    close(fd);
+
+    return NGX_OK;
+}
 
 
 static ngx_int_t
@@ -98,10 +142,13 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
     ngx_rtmp_auto_push_conf_t  *apcf;
     ngx_listening_t            *ls, *lss;
     struct sockaddr_un         *sun;
-    int                         reuseaddr;
+    int                         reuseaddr, fd;
     ngx_socket_t                s;
     size_t                      n;
     ngx_file_info_t             fi;
+    u_char                      path[NGX_MAX_PATH];
+    struct flock                fl;
+    ngx_int_t                   i;
 
     if (ngx_process != NGX_PROCESS_WORKER) {
         return NGX_OK;
@@ -112,6 +159,44 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
     if (apcf->auto_push == 0) {
         return NGX_OK;
     }
+
+    *ngx_snprintf(path, sizeof(path), "%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME
+                                      ".worker",
+                  &apcf->socket_dir) = 0;
+
+    fd = ngx_open_file(path, NGX_FILE_WRONLY, NGX_FILE_APPEND,
+                       NGX_FILE_DEFAULT_ACCESS);
+
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      "auto_push: failed to open '%s'", path);
+        return NGX_ERROR;
+    }
+
+    for (i = 0; i < NGX_MAX_PROCESSES; ++i) {
+        ngx_memzero(&fl, sizeof(struct flock));
+
+        fl.l_type = F_WRLCK;
+        fl.l_whence = SEEK_SET;
+        fl.l_len = 1;
+        fl.l_start = (off_t) i;
+
+        if (fcntl(fd, F_SETLK, &fl) == 0) {
+            break;
+        }
+    }
+
+    if (i == NGX_MAX_PROCESSES) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      "auto_push: failed to find worker id");
+        return NGX_ERROR;
+    }
+
+    ngx_rtmp_worker_id = i;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, cycle->log, 0,
+                   "auto_push: worker_id %i", ngx_rtmp_worker_id);
+
 
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_auto_push_publish;

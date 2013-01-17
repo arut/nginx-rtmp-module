@@ -573,6 +573,7 @@ extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_out;
 extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_in;
 
 
+extern ngx_int_t                            ngx_rtmp_worker_id;
 extern ngx_uint_t                           ngx_rtmp_max_module;
 extern ngx_module_t                         ngx_rtmp_core_module;
 
