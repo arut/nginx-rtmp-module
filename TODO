@@ -2,18 +2,9 @@
 
 - exec_init
 
-- improve drop engine to restart at key frame
-
-- access log
-
-- rooms (+force pull)
-
-- auto_push for pull
-
 - fix auto-pushing to cache manager
 
 - HDS
-
 
 - DNS round-robin url
 
