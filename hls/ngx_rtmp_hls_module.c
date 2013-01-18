@@ -53,7 +53,7 @@ ngx_rtmp_hls_av_log_callback(void* avcl, int level, const char* fmt,
 }
 
 
-#define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
+#define NGX_RTMP_HLS_BUFSIZE            (10*1024*1024)
 
 #define NGX_RTMP_HLS_DIR_ACCESS         0744
 
