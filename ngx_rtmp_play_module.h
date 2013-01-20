@@ -8,6 +8,7 @@
 
 
 #include "ngx_rtmp.h"
+#include "ngx_rtmp_cmd_module.h"
 
 
 typedef ngx_int_t (*ngx_rtmp_play_init_pt)  (ngx_rtmp_session_t *s, 
@@ -38,20 +39,28 @@ typedef struct {
 } ngx_rtmp_play_fmt_t;
 
 
-typedef struct {
+typedef struct ngx_rtmp_play_ctx_s ngx_rtmp_play_ctx_t;
+
+
+struct ngx_rtmp_play_ctx_s {
+    ngx_rtmp_session_t     *session;
     ngx_file_t              file;
     ngx_rtmp_play_fmt_t    *fmt;
     ngx_event_t             send_evt;
     unsigned                playing:1;
     ngx_uint_t              ncrs;
-    ngx_str_t               name;
-} ngx_rtmp_play_ctx_t;
+    u_char                  name[NGX_RTMP_MAX_NAME];
+    ngx_str_t               fname;
+    ngx_rtmp_play_ctx_t    *next;
+};
 
 
 typedef struct {
     ngx_str_t               root;
     ngx_str_t               temp_path;
     ngx_url_t              *url;
+    ngx_uint_t              nbuckets;
+    ngx_rtmp_play_ctx_t   **ctx;
 } ngx_rtmp_play_app_conf_t;
 
 
