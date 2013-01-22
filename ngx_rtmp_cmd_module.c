@@ -134,8 +134,8 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_core_app_conf_t  **cacfp;
     ngx_uint_t                  n;
-    size_t                      len;
     ngx_rtmp_header_t           h;
+    u_char                     *p;
 
     static double               trans;
     static double               capabilities = NGX_RTMP_CAPABILITIES;
@@ -229,16 +229,19 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
 #undef NGX_RTMP_SET_STRPAR
 
+    p = ngx_strlchr(s->app.data, s->app.data + s->app.len, '?');
+    if (p) {
+        s->app.len = (p - s->app.data);
+    }
+
     s->acodecs = v->acodecs;
     s->vcodecs = v->vcodecs;
 
     /* find application & set app_conf */
-    len = ngx_strlen(v->app);
-
     cacfp = cscf->applications.elts;
     for(n = 0; n < cscf->applications.nelts; ++n, ++cacfp) {
-        if ((*cacfp)->name.len == len
-                && !ngx_strncmp((*cacfp)->name.data, v->app, len))
+        if ((*cacfp)->name.len == s->app.len &&
+            ngx_strncmp((*cacfp)->name.data, s->app.data, s->app.len) == 0)
         {
             /* found app! */
             s->app_conf = (*cacfp)->app_conf;
@@ -248,7 +251,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
     if (s->app_conf == NULL) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
-                      "connect: application not found: '%s'", v->app);
+                      "connect: application not found: '%V'", &s->app);
         return NGX_ERROR;
     }
 
