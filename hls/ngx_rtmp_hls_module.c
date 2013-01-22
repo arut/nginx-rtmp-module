@@ -1185,7 +1185,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->hls, prev->hls, 0);
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
     ngx_conf_merge_msec_value(conf->muxdelay, prev->muxdelay, 700);
-    ngx_conf_merge_msec_value(conf->sync, prev->sync, 0);
+    ngx_conf_merge_msec_value(conf->sync, prev->sync, 300);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
     ngx_conf_merge_str_value(conf->path, prev->path, "");
     conf->ctx = ngx_pcalloc(cf->pool, 
