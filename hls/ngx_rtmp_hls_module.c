@@ -424,6 +424,7 @@ retry:
     p = ngx_snprintf(buffer, sizeof(buffer), 
             "#EXTM3U\r\n"
             "#EXT-X-TARGETDURATION:%i\r\n"
+            "#EXT-X-ALLOW-CACHE:NO\r\n"
             "#EXT-X-MEDIA-SEQUENCE:%i\r\n\r\n",
             /*TODO: float*/(ngx_int_t)(hacf->fraglen / 1000), ffrag);
     n = write(fd, buffer, p - buffer);
