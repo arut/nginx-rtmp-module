@@ -882,7 +882,20 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     size_t                          len;
     u_char                         *p;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: pre-publishing#1");
+
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: pre-publishing#2 hacf=%p", hacf);
+
+    if (hacf) {
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: pre-publishing#3 hls=%d path='%V'",
+                       (ngx_int_t) hacf->hls, &hacf->path);
+    }
+
     if (hacf == NULL || !hacf->hls || hacf->path.len == 0) {
         goto next;
     }
