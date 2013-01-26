@@ -11,7 +11,7 @@
 
 
 typedef ngx_int_t (*ngx_rtmp_play_init_pt)  (ngx_rtmp_session_t *s, 
-        ngx_file_t *f);
+        ngx_file_t *f, ngx_int_t aindex, ngx_int_t vindex);
 typedef ngx_int_t (*ngx_rtmp_play_done_pt)  (ngx_rtmp_session_t *s,
         ngx_file_t *f);
 typedef ngx_int_t (*ngx_rtmp_play_start_pt) (ngx_rtmp_session_t *s, 
@@ -45,6 +45,7 @@ typedef struct {
     unsigned                playing:1;
     ngx_uint_t              ncrs;
     ngx_str_t               name;
+    ngx_int_t               aindex, vindex;
 } ngx_rtmp_play_ctx_t;
 
 

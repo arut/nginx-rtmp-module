@@ -208,7 +208,7 @@ ngx_rtmp_play_do_init(ngx_rtmp_session_t *s)
     }
 
     if (ctx->fmt && ctx->fmt->init &&
-        ctx->fmt->init(s, &ctx->file) != NGX_OK)
+        ctx->fmt->init(s, &ctx->file, ctx->aindex, ctx->vindex) != NGX_OK)
     {
         return NGX_ERROR;
     }
@@ -434,6 +434,33 @@ next:
 
 
 static ngx_int_t
+ngx_rtmp_play_parse_index(char type, u_char *args)
+{
+    u_char             *p, c;
+    static u_char       name[] = "xindex=";
+
+    name[0] = (u_char) type;
+
+    for ( ;; ) {
+        p = (u_char *) ngx_strstr(args, name);
+        if (p == NULL) {
+            return 0;
+        }
+
+        if (p != args) {
+            c = *(p - 1);
+            if (c != '?' && c != '&') {
+                args = p + 1;
+                continue;
+            }
+        }
+
+        return atoi((char *) p + (sizeof(name) - 1));
+    }
+}
+
+
+static ngx_int_t
 ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 {
     ngx_rtmp_play_main_conf_t      *pmcf;
@@ -486,6 +513,9 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     }
 
     ngx_memzero(ctx, sizeof(*ctx));
+
+    ctx->aindex = ngx_rtmp_play_parse_index('a', v->args);
+    ctx->vindex = ngx_rtmp_play_parse_index('v', v->args);
 
     ctx->file.log = s->connection->log;
 
