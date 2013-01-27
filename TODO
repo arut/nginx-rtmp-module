@@ -1,8 +1,3 @@
-- multiple tracks in vod/mp4
-
-- HLS problem on publish restart
-
-
 - improve session epoch variable
 
 - exec_init
