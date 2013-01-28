@@ -12,6 +12,7 @@
 
 static ngx_int_t ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s,
        ngx_rtmp_connect_t *v);
+static ngx_int_t ngx_rtmp_cmd_disconnect(ngx_rtmp_session_t *s);
 static ngx_int_t ngx_rtmp_cmd_create_stream(ngx_rtmp_session_t *s,
        ngx_rtmp_create_stream_t *v);
 static ngx_int_t ngx_rtmp_cmd_close_stream(ngx_rtmp_session_t *s,
@@ -41,6 +42,7 @@ static ngx_int_t ngx_rtmp_cmd_set_buflen(ngx_rtmp_session_t *s,
 
 
 ngx_rtmp_connect_pt         ngx_rtmp_connect = ngx_rtmp_cmd_connect;
+ngx_rtmp_disconnect_pt      ngx_rtmp_disconnect = ngx_rtmp_cmd_disconnect;
 ngx_rtmp_create_stream_pt   ngx_rtmp_create_stream = ngx_rtmp_cmd_create_stream;
 ngx_rtmp_close_stream_pt    ngx_rtmp_close_stream = ngx_rtmp_cmd_close_stream;
 ngx_rtmp_delete_stream_pt   ngx_rtmp_delete_stream = ngx_rtmp_cmd_delete_stream;
@@ -86,6 +88,22 @@ ngx_module_t  ngx_rtmp_cmd_module = {
     NULL,                                   /* exit master */
     NGX_MODULE_V1_PADDING
 };
+
+
+static void
+ngx_rtmp_cmd_fill_args(u_char name[NGX_RTMP_MAX_NAME], 
+        u_char args[NGX_RTMP_MAX_ARGS])
+{
+    u_char      *p;
+
+    p = (u_char *)ngx_strchr(name, '?');
+    if (p == NULL) {
+        return;
+    }
+
+    *p++ = 0;
+    ngx_cpystrn(args, p, NGX_RTMP_MAX_ARGS);
+}
 
 
 static ngx_int_t
@@ -153,6 +171,16 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (len && v.app[len - 1] == '/') {
         v.app[len - 1] = 0;
     }
+
+    ngx_rtmp_cmd_fill_args(v.app, v.args);
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "connect: app='%s' args='%s' flashver='%s' swf_url='%s' "
+            "tc_url='%s' page_url='%s' acodecs=%uD vcodecs=%uD "
+            "object_encoding=%ui", 
+            v.app, v.args, v.flashver, v.swf_url, v.tc_url, v.page_url,
+            (uint32_t)v.acodecs, (uint32_t)v.vcodecs,
+            (ngx_int_t)v.object_encoding);
 
     return ngx_rtmp_connect(s, &v);
 }
@@ -228,14 +256,6 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
-    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "connect: app='%s' flashver='%s' swf_url='%s' "
-            "tc_url='%s' page_url='%s' acodecs=%uD vcodecs=%uD "
-            "object_encoding=%ui", 
-            v->app, v->flashver, v->swf_url, v->tc_url, v->page_url,
-            (uint32_t)v->acodecs, (uint32_t)v->vcodecs,
-            (ngx_int_t)v->object_encoding);
-
     trans = v->trans;
 
     /* fill session parameters */
@@ -252,6 +272,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     ngx_memcpy(s->name.data, v->name, s->name.len)
 
     NGX_RTMP_SET_STRPAR(app);
+    NGX_RTMP_SET_STRPAR(args);
     NGX_RTMP_SET_STRPAR(flashver);
     NGX_RTMP_SET_STRPAR(swf_url);
     NGX_RTMP_SET_STRPAR(tc_url);
@@ -439,22 +460,6 @@ ngx_rtmp_cmd_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 }
 
 
-static void
-ngx_rtmp_cmd_fill_args(u_char name[NGX_RTMP_MAX_NAME], 
-        u_char args[NGX_RTMP_MAX_ARGS])
-{
-    u_char      *p;
-
-    p = (u_char *)ngx_strchr(name, '?');
-    if (p == NULL) {
-        return;
-    }
-
-    *p++ = 0;
-    ngx_cpystrn(args, p, NGX_RTMP_MAX_ARGS);
-}
-
-
 static ngx_int_t
 ngx_rtmp_cmd_publish_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
@@ -616,11 +621,18 @@ ngx_rtmp_cmd_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
 
 
 static ngx_int_t
-ngx_rtmp_cmd_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+ngx_rtmp_cmd_disconnect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                         ngx_chain_t *in)
 {
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "disconnect");
 
+    return ngx_rtmp_disconnect(s);
+}
+
+
+static ngx_int_t
+ngx_rtmp_cmd_disconnect(ngx_rtmp_session_t *s)
+{
     return ngx_rtmp_delete_stream(s, NULL);
 }
 
@@ -737,7 +749,7 @@ ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf)
         return NGX_ERROR;
     }
 
-    *h = ngx_rtmp_cmd_disconnect;
+    *h = ngx_rtmp_cmd_disconnect_init;
 
     /* register AMF callbacks */
 

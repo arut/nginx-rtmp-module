@@ -13,7 +13,6 @@
 #include "ngx_rtmp.h"
 
 
-#define NGX_RTMP_MAX_APP            128
 #define NGX_RTMP_MAX_NAME           256
 #define NGX_RTMP_MAX_URL            256
 #define NGX_RTMP_MAX_ARGS           NGX_RTMP_MAX_NAME
@@ -23,7 +22,8 @@
 
 typedef struct {
     double                          trans;
-    u_char                          app[NGX_RTMP_MAX_APP];
+    u_char                          app[NGX_RTMP_MAX_NAME];
+    u_char                          args[NGX_RTMP_MAX_ARGS];
     u_char                          flashver[32];
     u_char                          swf_url[NGX_RTMP_MAX_URL];
     u_char                          tc_url[NGX_RTMP_MAX_URL];
@@ -98,6 +98,7 @@ typedef struct {
 
 typedef ngx_int_t (*ngx_rtmp_connect_pt)(ngx_rtmp_session_t *s, 
         ngx_rtmp_connect_t *v);
+typedef ngx_int_t (*ngx_rtmp_disconnect_pt)(ngx_rtmp_session_t *s);
 typedef ngx_int_t (*ngx_rtmp_create_stream_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_create_stream_t *v);
 typedef ngx_int_t (*ngx_rtmp_close_stream_pt)(ngx_rtmp_session_t *s,
@@ -126,6 +127,7 @@ typedef ngx_int_t (*ngx_rtmp_set_buflen_pt)(ngx_rtmp_session_t *s,
 
 
 extern ngx_rtmp_connect_pt          ngx_rtmp_connect;
+extern ngx_rtmp_disconnect_pt       ngx_rtmp_disconnect;
 extern ngx_rtmp_create_stream_pt    ngx_rtmp_create_stream;
 extern ngx_rtmp_close_stream_pt     ngx_rtmp_close_stream;
 extern ngx_rtmp_delete_stream_pt    ngx_rtmp_delete_stream;
