@@ -484,6 +484,10 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
         case 0:
             /* child */
 
+#if (NGX_LINUX)
+            prctl(PR_GET_PDEATHSIG, SIGKILL, 0, 0, 0);
+#endif
+
             /* close all descriptors but pipe write end */
             maxfd = sysconf(_SC_OPEN_MAX);
             for (fd = 0; fd < maxfd; ++fd) {
