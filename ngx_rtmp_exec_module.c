@@ -16,16 +16,16 @@ static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_close_stream_pt         next_close_stream;
 
 
-static ngx_int_t ngx_rtmp_exec_init_process(ngx_cycle_t *cycle);
+static ngx_int_t ngx_rtmp_exec_static_process(ngx_cycle_t *cycle);
 static ngx_int_t ngx_rtmp_exec_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_exec_create_main_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_exec_init_main_conf(ngx_conf_t *cf, void *conf);
+static char * ngx_rtmp_exec_static_main_conf(ngx_conf_t *cf, void *conf);
 static void * ngx_rtmp_exec_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, 
        void *parent, void *child);
 static char * ngx_rtmp_exec_exec(ngx_conf_t *cf, ngx_command_t *cmd, 
        void *conf);
-static char * ngx_rtmp_exec_exec_init(ngx_conf_t *cf, ngx_command_t *cmd, 
+static char * ngx_rtmp_exec_exec_static(ngx_conf_t *cf, ngx_command_t *cmd, 
        void *conf);
 
 
@@ -89,9 +89,9 @@ static ngx_command_t  ngx_rtmp_exec_commands[] = {
       0,
       NULL },
 
-    { ngx_string("exec_init"),
+    { ngx_string("exec_static"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_1MORE,
-      ngx_rtmp_exec_exec_init,
+      ngx_rtmp_exec_exec_static,
       NGX_RTMP_MAIN_CONF_OFFSET,
       0,
       NULL },
@@ -125,7 +125,7 @@ static ngx_rtmp_module_t  ngx_rtmp_exec_module_ctx = {
     NULL,                                   /* preconfiguration */
     ngx_rtmp_exec_postconfiguration,        /* postconfiguration */
     ngx_rtmp_exec_create_main_conf,         /* create main configuration */
-    ngx_rtmp_exec_init_main_conf,           /* init main configuration */
+    ngx_rtmp_exec_static_main_conf,           /* init main configuration */
     NULL,                                   /* create server configuration */
     NULL,                                   /* merge server configuration */
     ngx_rtmp_exec_create_app_conf,          /* create app configuration */
@@ -140,7 +140,7 @@ ngx_module_t  ngx_rtmp_exec_module = {
     NGX_RTMP_MODULE,                        /* module type */
     NULL,                                   /* init master */
     NULL,                                   /* init module */
-    ngx_rtmp_exec_init_process,             /* init process */
+    ngx_rtmp_exec_static_process,             /* init process */
     NULL,                                   /* init thread */
     NULL,                                   /* exit thread */
     NULL,                                   /* exit process */
@@ -206,7 +206,7 @@ ngx_rtmp_exec_create_main_conf(ngx_conf_t *cf)
 
 
 static char *
-ngx_rtmp_exec_init_main_conf(ngx_conf_t *cf, void *conf)
+ngx_rtmp_exec_static_main_conf(ngx_conf_t *cf, void *conf)
 {
     ngx_rtmp_exec_main_conf_t  *emcf = conf;
     ngx_rtmp_exec_conf_t       *ec;
@@ -291,7 +291,7 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
 static ngx_int_t
-ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
+ngx_rtmp_exec_static_process(ngx_cycle_t *cycle)
 {
     ngx_rtmp_core_main_conf_t  *cmcf = ngx_rtmp_core_main_conf;
     ngx_rtmp_core_srv_conf_t  **cscf;
@@ -317,7 +317,7 @@ ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
     /* When worker is restarted, child process (ffmpeg) will
      * not be terminated if it's connected to another 
      * (still alive) worker. That leads to starting
-     * another instance of exec_init process.
+     * another instance of exec_static process.
      * We need to kill previously started processes.
      */
 /*
@@ -696,7 +696,7 @@ ngx_rtmp_exec_exec(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static char *
-ngx_rtmp_exec_exec_init(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_rtmp_exec_exec_static(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_rtmp_exec_main_conf_t  *emcf = conf;
 
