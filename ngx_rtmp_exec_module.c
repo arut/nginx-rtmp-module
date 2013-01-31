@@ -477,7 +477,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             /* child */
 
 #if (NGX_LINUX)
-            prctl(PR_GET_PDEATHSIG, SIGKILL, 0, 0, 0);
+            prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
 #endif
 
             /* close all descriptors but pipe write end */
