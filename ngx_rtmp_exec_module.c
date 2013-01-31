@@ -16,10 +16,10 @@ static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_close_stream_pt         next_close_stream;
 
 
-static ngx_int_t ngx_rtmp_exec_static_process(ngx_cycle_t *cycle);
+static ngx_int_t ngx_rtmp_exec_init_process(ngx_cycle_t *cycle);
 static ngx_int_t ngx_rtmp_exec_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_exec_create_main_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_exec_static_main_conf(ngx_conf_t *cf, void *conf);
+static char * ngx_rtmp_exec_init_main_conf(ngx_conf_t *cf, void *conf);
 static void * ngx_rtmp_exec_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, 
        void *parent, void *child);
@@ -27,6 +27,7 @@ static char * ngx_rtmp_exec_exec(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 static char * ngx_rtmp_exec_exec_static(ngx_conf_t *cf, ngx_command_t *cmd, 
        void *conf);
+static void ngx_rtmp_exec_respawn(ngx_event_t *ev);
 
 
 #define NGX_RTMP_EXEC_RESPAWN           0x01
@@ -125,7 +126,7 @@ static ngx_rtmp_module_t  ngx_rtmp_exec_module_ctx = {
     NULL,                                   /* preconfiguration */
     ngx_rtmp_exec_postconfiguration,        /* postconfiguration */
     ngx_rtmp_exec_create_main_conf,         /* create main configuration */
-    ngx_rtmp_exec_static_main_conf,           /* init main configuration */
+    ngx_rtmp_exec_init_main_conf,           /* init main configuration */
     NULL,                                   /* create server configuration */
     NULL,                                   /* merge server configuration */
     ngx_rtmp_exec_create_app_conf,          /* create app configuration */
@@ -140,7 +141,7 @@ ngx_module_t  ngx_rtmp_exec_module = {
     NGX_RTMP_MODULE,                        /* module type */
     NULL,                                   /* init master */
     NULL,                                   /* init module */
-    ngx_rtmp_exec_static_process,             /* init process */
+    ngx_rtmp_exec_init_process,             /* init process */
     NULL,                                   /* init thread */
     NULL,                                   /* exit thread */
     NULL,                                   /* exit process */
@@ -206,7 +207,7 @@ ngx_rtmp_exec_create_main_conf(ngx_conf_t *cf)
 
 
 static char *
-ngx_rtmp_exec_static_main_conf(ngx_conf_t *cf, void *conf)
+ngx_rtmp_exec_init_main_conf(ngx_conf_t *cf, void *conf)
 {
     ngx_rtmp_exec_main_conf_t  *emcf = conf;
     ngx_rtmp_exec_conf_t       *ec;
@@ -291,7 +292,7 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
 static ngx_int_t
-ngx_rtmp_exec_static_process(ngx_cycle_t *cycle)
+ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
 {
     ngx_rtmp_core_main_conf_t  *cmcf = ngx_rtmp_core_main_conf;
     ngx_rtmp_core_srv_conf_t  **cscf;
@@ -299,7 +300,6 @@ ngx_rtmp_exec_static_process(ngx_cycle_t *cycle)
     ngx_rtmp_exec_main_conf_t  *emcf;
     ngx_rtmp_exec_t            *e;
     ngx_uint_t                  n;
- /*   ngx_pid_t                  *pid;*/
 
     if (cmcf->servers.nelts == 0) {
         return NGX_ERROR;
@@ -314,31 +314,23 @@ ngx_rtmp_exec_static_process(ngx_cycle_t *cycle)
     cctx = (*cscf)->ctx;
     emcf = cctx->main_conf[ngx_rtmp_exec_module.ctx_index];
 
-    /* When worker is restarted, child process (ffmpeg) will
+    /* FreeBSD note:
+     * When worker is restarted, child process (ffmpeg) will
      * not be terminated if it's connected to another 
      * (still alive) worker. That leads to starting
      * another instance of exec_static process.
-     * We need to kill previously started processes.
-     */
-/*
-    pid = emcf->pids;
-    for (n = 0; n < emcf->execs.nelts; ++n, ++pid) {
-        if (*pid == NGX_INVALID_PID) {
-            continue;
-        }
-
-        kill(*pid, SIGKILL);
-        *pid = NGX_INVALID_PID;
-    }
-*/
-    /* TODO: kill all processes started by the previous
-     * instance of this worker. Need shared object with
-     * all pids.
+     * Need to kill previously started processes.
+     *
+     * On Linux "prctl" syscall is used to kill child with 
+     * SIGTERM when nginx worker is terminated.
      */
 
     e = emcf->execs.elts;
     for (n = 0; n < emcf->execs.nelts; ++n, ++e) {
-        ngx_rtmp_exec_run(e);
+        e->respawn_evt.data = e;
+        e->respawn_evt.log = e->log;
+        e->respawn_evt.handler = ngx_rtmp_exec_respawn;
+        ngx_post_event((&e->respawn_evt), &ngx_posted_events);
     }
 
     return NGX_OK;
@@ -633,6 +625,7 @@ ngx_rtmp_exec_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
         ec = eacf->confs.elts;
         for (n = 0; n < eacf->confs.nelts; ++n, ++e, ++ec) {
+            ngx_memzero(e, sizeof(*e));
             e->conf = ec;
             e->log = s->connection->log;
             e->session = s;
