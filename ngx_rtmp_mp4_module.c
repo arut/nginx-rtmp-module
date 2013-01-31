@@ -2199,6 +2199,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
     uint32_t                    hdr[2];
     ssize_t                     n;
     size_t                      offset, page_offset, size;
+    uint64_t                    extended_size;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
 
@@ -2231,6 +2232,20 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
         }
 
         size = ngx_rtmp_r32(hdr[0]);
+
+        if (size == 1) {
+            n = ngx_read_file(f, (u_char *) &extended_size,
+                              sizeof(extended_size), offset + sizeof(hdr));
+
+            if (n != sizeof(extended_size)) {
+                ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                              "mp4: error reading file at offset=%uz "
+                              "while searching for moov box", offset + 8);
+                return NGX_ERROR;
+            }
+
+            size = ngx_rtmp_r64(extended_size);
+        }
 
         if (hdr[1] == ngx_rtmp_mp4_make_tag('m','o','o','v')) {
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
