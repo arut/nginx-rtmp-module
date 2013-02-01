@@ -38,7 +38,6 @@ struct ngx_rtmp_relay_ctx_s {
     ngx_rtmp_relay_ctx_t           *publish;
     ngx_rtmp_relay_ctx_t           *play;
     ngx_rtmp_relay_ctx_t           *next;
-    unsigned                        relay:1;
 
     ngx_str_t                       app;
     ngx_str_t                       tc_url;
@@ -51,6 +50,7 @@ struct ngx_rtmp_relay_ctx_s {
     ngx_int_t                       stop;
 
     ngx_event_t                     push_evt;
+    ngx_event_t                    *static_evt;
     void                           *tag;
     void                           *data;
 };
