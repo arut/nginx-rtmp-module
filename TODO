@@ -1,6 +1,8 @@
-- improve session epoch variable
+- HLS monotonical dts
 
-- exec_init
+- total client counter
+
+- improve session epoch variable
 
 - fix auto-pushing to cache manager
 
@@ -11,5 +13,3 @@
 - multiple streams per connection
 
 - VOD HLS
-
-- sync exec
