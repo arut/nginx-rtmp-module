@@ -9,7 +9,8 @@
 
 
 static ngx_int_t ngx_rtmp_mp4_postconfiguration(ngx_conf_t *cf);
-static ngx_int_t ngx_rtmp_mp4_init(ngx_rtmp_session_t *s,  ngx_file_t *f);
+static ngx_int_t ngx_rtmp_mp4_init(ngx_rtmp_session_t *s,  ngx_file_t *f,
+       ngx_int_t aindex, ngx_int_t vindex);
 static ngx_int_t ngx_rtmp_mp4_done(ngx_rtmp_session_t *s,  ngx_file_t *f);
 static ngx_int_t ngx_rtmp_mp4_start(ngx_rtmp_session_t *s, ngx_file_t *f);
 static ngx_int_t ngx_rtmp_mp4_seek(ngx_rtmp_session_t *s,  ngx_file_t *f,
@@ -172,6 +173,9 @@ typedef struct {
     ngx_uint_t                          nchannels;
     ngx_uint_t                          sample_size;
     ngx_uint_t                          sample_rate;
+
+    ngx_int_t                           atracks, vtracks;
+    ngx_int_t                           aindex, vindex;
 
     uint32_t                            start_timestamp, epoch;
 } ngx_rtmp_mp4_ctx_t;
@@ -368,6 +372,26 @@ ngx_rtmp_mp4_parse_trak(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
     {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "mp4: adding track %ui", ctx->ntracks);
+
+        if (ctx->track->type == NGX_RTMP_MSG_AUDIO) {
+            if (ctx->atracks++ != ctx->aindex) {
+                ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                               "mp4: skipping audio track %ui!=%ui",
+                               ctx->atracks - 1, ctx->aindex);
+                ctx->track = NULL;
+                return NGX_OK;
+            }
+
+        } else {
+            if (ctx->vtracks++ != ctx->vindex) {
+                ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                               "mp4: skipping video track %i!=%i",
+                               ctx->vtracks - 1, ctx->vindex);
+                ctx->track = NULL;
+                return NGX_OK;
+            }
+        }
+
         ++ctx->ntracks;
 
     } else {
@@ -2168,12 +2192,14 @@ next:
 
 
 static ngx_int_t
-ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f)
+ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
+                  ngx_int_t vindex)
 {
     ngx_rtmp_mp4_ctx_t         *ctx;
     uint32_t                    hdr[2];
     ssize_t                     n;
     size_t                      offset, page_offset, size;
+    uint64_t                    extended_size;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
 
@@ -2189,6 +2215,9 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f)
 
     ngx_memzero(ctx, sizeof(*ctx));
 
+    ctx->aindex = aindex;
+    ctx->vindex = vindex;
+
     offset = 0;
     size   = 0;
 
@@ -2203,6 +2232,20 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f)
         }
 
         size = ngx_rtmp_r32(hdr[0]);
+
+        if (size == 1) {
+            n = ngx_read_file(f, (u_char *) &extended_size,
+                              sizeof(extended_size), offset + sizeof(hdr));
+
+            if (n != sizeof(extended_size)) {
+                ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                              "mp4: error reading file at offset=%uz "
+                              "while searching for moov box", offset + 8);
+                return NGX_ERROR;
+            }
+
+            size = ngx_rtmp_r64(extended_size);
+        }
 
         if (hdr[1] == ngx_rtmp_mp4_make_tag('m','o','o','v')) {
             ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,

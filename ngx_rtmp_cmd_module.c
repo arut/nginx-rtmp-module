@@ -10,21 +10,51 @@
 #define NGX_RTMP_CAPABILITIES       31
 
 
-ngx_rtmp_connect_pt          ngx_rtmp_connect;
-ngx_rtmp_create_stream_pt    ngx_rtmp_create_stream;
-ngx_rtmp_close_stream_pt     ngx_rtmp_close_stream;
-ngx_rtmp_delete_stream_pt    ngx_rtmp_delete_stream;
-ngx_rtmp_publish_pt          ngx_rtmp_publish;
-ngx_rtmp_play_pt             ngx_rtmp_play;
-ngx_rtmp_seek_pt             ngx_rtmp_seek;
-ngx_rtmp_pause_pt            ngx_rtmp_pause;
+static ngx_int_t ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s,
+       ngx_rtmp_connect_t *v);
+static ngx_int_t ngx_rtmp_cmd_create_stream(ngx_rtmp_session_t *s,
+       ngx_rtmp_create_stream_t *v);
+static ngx_int_t ngx_rtmp_cmd_close_stream(ngx_rtmp_session_t *s,
+       ngx_rtmp_close_stream_t *v);
+static ngx_int_t ngx_rtmp_cmd_delete_stream(ngx_rtmp_session_t *s,
+       ngx_rtmp_delete_stream_t *v);
+static ngx_int_t ngx_rtmp_cmd_publish(ngx_rtmp_session_t *s,
+       ngx_rtmp_publish_t *v);
+static ngx_int_t ngx_rtmp_cmd_play(ngx_rtmp_session_t *s,
+       ngx_rtmp_play_t *v);
+static ngx_int_t ngx_rtmp_cmd_seek(ngx_rtmp_session_t *s,
+       ngx_rtmp_seek_t *v);
+static ngx_int_t ngx_rtmp_cmd_pause(ngx_rtmp_session_t *s,
+       ngx_rtmp_pause_t *v);
 
 
-ngx_rtmp_stream_begin_pt     ngx_rtmp_stream_begin;
-ngx_rtmp_stream_eof_pt       ngx_rtmp_stream_eof;
-ngx_rtmp_stream_dry_pt       ngx_rtmp_stream_dry;
-ngx_rtmp_recorded_pt         ngx_rtmp_recorded;
-ngx_rtmp_set_buflen_pt       ngx_rtmp_set_buflen;
+static ngx_int_t ngx_rtmp_cmd_stream_begin(ngx_rtmp_session_t *s,
+       ngx_rtmp_stream_begin_t *v);
+static ngx_int_t ngx_rtmp_cmd_stream_eof(ngx_rtmp_session_t *s,
+       ngx_rtmp_stream_eof_t *v);
+static ngx_int_t ngx_rtmp_cmd_stream_dry(ngx_rtmp_session_t *s,
+       ngx_rtmp_stream_dry_t *v);
+static ngx_int_t ngx_rtmp_cmd_recorded(ngx_rtmp_session_t *s,
+       ngx_rtmp_recorded_t *v);
+static ngx_int_t ngx_rtmp_cmd_set_buflen(ngx_rtmp_session_t *s,
+       ngx_rtmp_set_buflen_t *v);
+
+
+ngx_rtmp_connect_pt         ngx_rtmp_connect = ngx_rtmp_cmd_connect;
+ngx_rtmp_create_stream_pt   ngx_rtmp_create_stream = ngx_rtmp_cmd_create_stream;
+ngx_rtmp_close_stream_pt    ngx_rtmp_close_stream = ngx_rtmp_cmd_close_stream;
+ngx_rtmp_delete_stream_pt   ngx_rtmp_delete_stream = ngx_rtmp_cmd_delete_stream;
+ngx_rtmp_publish_pt         ngx_rtmp_publish = ngx_rtmp_cmd_publish;
+ngx_rtmp_play_pt            ngx_rtmp_play = ngx_rtmp_cmd_play;
+ngx_rtmp_seek_pt            ngx_rtmp_seek = ngx_rtmp_cmd_seek;
+ngx_rtmp_pause_pt           ngx_rtmp_pause = ngx_rtmp_cmd_pause;
+
+
+ngx_rtmp_stream_begin_pt    ngx_rtmp_stream_begin = ngx_rtmp_cmd_stream_begin;
+ngx_rtmp_stream_eof_pt      ngx_rtmp_stream_eof = ngx_rtmp_cmd_stream_eof;
+ngx_rtmp_stream_dry_pt      ngx_rtmp_stream_dry = ngx_rtmp_cmd_stream_dry;
+ngx_rtmp_recorded_pt        ngx_rtmp_recorded = ngx_rtmp_cmd_recorded;
+ngx_rtmp_set_buflen_pt      ngx_rtmp_set_buflen = ngx_rtmp_cmd_set_buflen;
 
 
 static ngx_int_t ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf);
@@ -134,8 +164,8 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_core_app_conf_t  **cacfp;
     ngx_uint_t                  n;
-    size_t                      len;
     ngx_rtmp_header_t           h;
+    u_char                     *p;
 
     static double               trans;
     static double               capabilities = NGX_RTMP_CAPABILITIES;
@@ -229,16 +259,19 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
 #undef NGX_RTMP_SET_STRPAR
 
+    p = ngx_strlchr(s->app.data, s->app.data + s->app.len, '?');
+    if (p) {
+        s->app.len = (p - s->app.data);
+    }
+
     s->acodecs = v->acodecs;
     s->vcodecs = v->vcodecs;
 
     /* find application & set app_conf */
-    len = ngx_strlen(v->app);
-
     cacfp = cscf->applications.elts;
     for(n = 0; n < cscf->applications.nelts; ++n, ++cacfp) {
-        if ((*cacfp)->name.len == len
-                && !ngx_strncmp((*cacfp)->name.data, v->app, len))
+        if ((*cacfp)->name.len == s->app.len &&
+            ngx_strncmp((*cacfp)->name.data, s->app.data, s->app.len) == 0)
         {
             /* found app! */
             s->app_conf = (*cacfp)->app_conf;
@@ -248,7 +281,7 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
 
     if (s->app_conf == NULL) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
-                      "connect: application not found: '%s'", v->app);
+                      "connect: application not found: '%V'", &s->app);
         return NGX_ERROR;
     }
 
@@ -720,23 +753,6 @@ ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf)
     for(n = 0; n < ncalls; ++n, ++ch, ++bh) {
         *ch = *bh;
     }
-
-    /* set initial handlers */
-
-    ngx_rtmp_connect = ngx_rtmp_cmd_connect;
-    ngx_rtmp_create_stream = ngx_rtmp_cmd_create_stream;
-    ngx_rtmp_close_stream  = ngx_rtmp_cmd_close_stream;
-    ngx_rtmp_delete_stream = ngx_rtmp_cmd_delete_stream;
-    ngx_rtmp_publish = ngx_rtmp_cmd_publish;
-    ngx_rtmp_play = ngx_rtmp_cmd_play;
-    ngx_rtmp_seek = ngx_rtmp_cmd_seek;
-    ngx_rtmp_pause = ngx_rtmp_cmd_pause;
-
-    ngx_rtmp_stream_begin = ngx_rtmp_cmd_stream_begin;
-    ngx_rtmp_stream_eof = ngx_rtmp_cmd_stream_eof;
-    ngx_rtmp_stream_dry = ngx_rtmp_cmd_stream_dry;
-    ngx_rtmp_recorded = ngx_rtmp_cmd_recorded;
-    ngx_rtmp_set_buflen = ngx_rtmp_cmd_set_buflen;
 
     return NGX_OK;
 }

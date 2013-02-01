@@ -214,6 +214,7 @@ typedef struct {
     /* auto-pushed? */
     unsigned                auto_pushed:1;
     unsigned                relay:1;
+    unsigned                static_relay:1;
 
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */
@@ -232,6 +233,7 @@ typedef struct {
 
     /* circular buffer of RTMP message pointers */
     ngx_msec_t              timeout;
+    uint32_t                out_bytes;
     size_t                  out_pos, out_last;
     ngx_chain_t            *out_chain;
     u_char                 *out_bpos;
@@ -309,7 +311,7 @@ typedef struct {
 typedef struct {
     ngx_str_t              *client;
     ngx_rtmp_session_t     *session;
-} ngx_rtmp_log_ctx_t;
+} ngx_rtmp_error_log_ctx_t;
 
 
 typedef struct {

@@ -179,7 +179,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->wait_key, prev->wait_key, 0);
     ngx_conf_merge_value(conf->wait_video, prev->wait_video, 0);
     ngx_conf_merge_value(conf->publish_notify, prev->publish_notify, 0);
-    ngx_conf_merge_value(conf->play_restart, prev->play_restart, 1);
+    ngx_conf_merge_value(conf->play_restart, prev->play_restart, 0);
 
     conf->pool = ngx_create_pool(4096, &cf->cycle->new_log);
     if (conf->pool == NULL) {

@@ -133,7 +133,7 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
 {
     ngx_rtmp_session_t             *s;
     ngx_rtmp_core_srv_conf_t       *cscf;
-    ngx_rtmp_log_ctx_t             *ctx;
+    ngx_rtmp_error_log_ctx_t       *ctx;
 
     s = ngx_pcalloc(c->pool, sizeof(ngx_rtmp_session_t) + 
             sizeof(ngx_chain_t *) * ((ngx_rtmp_core_srv_conf_t *)
@@ -152,7 +152,7 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
     c->data = s;
     s->connection = c;
 
-    ctx = ngx_palloc(c->pool, sizeof(ngx_rtmp_log_ctx_t));
+    ctx = ngx_palloc(c->pool, sizeof(ngx_rtmp_error_log_ctx_t));
     if (ctx == NULL) {
         ngx_rtmp_close_connection(c);
         return NULL;
@@ -202,9 +202,9 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
 static u_char *
 ngx_rtmp_log_error(ngx_log_t *log, u_char *buf, size_t len)
 {
-    u_char              *p;
-    ngx_rtmp_session_t  *s;
-    ngx_rtmp_log_ctx_t  *ctx;
+    u_char                     *p;
+    ngx_rtmp_session_t         *s;
+    ngx_rtmp_error_log_ctx_t   *ctx;
 
     if (log->action) {
         p = ngx_snprintf(buf, len, " while %s", log->action);
@@ -238,6 +238,10 @@ ngx_rtmp_close_connection(ngx_connection_t *c)
     ngx_pool_t                         *pool;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, "close connection");
+
+#if (NGX_STAT_STUB)
+    (void) ngx_atomic_fetch_add(ngx_stat_active, -1);
+#endif
 
     pool = c->pool;
     ngx_close_connection(c);

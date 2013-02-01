@@ -43,7 +43,13 @@ ngx_rtmp_hls_av_log_callback(void* avcl, int level, const char* fmt,
         }
     }
 
-    ngx_log_error_core(NGX_LOG_ERR, ngx_rtmp_hls_log, 0, "hls: av: %s", buf);
+    if (level <= AV_LOG_ERROR) {
+        ngx_log_error_core(NGX_LOG_ERR, ngx_rtmp_hls_log, 0, "hls: av: %s",
+                           buf);
+        return;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_rtmp_hls_log, 0, "hls: av: %s", buf);
 }
 
 
@@ -88,6 +94,7 @@ typedef struct {
     ngx_msec_t                          sync;
     ngx_msec_t                          playlen;
     size_t                              nfrags;
+    ngx_flag_t                          continuous;
     ngx_rtmp_hls_ctx_t                **ctx;
     ngx_uint_t                          nbuckets;
     ngx_str_t                           path;
@@ -138,6 +145,12 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       offsetof(ngx_rtmp_hls_app_conf_t, sync),
       NULL },
 
+    { ngx_string("hls_continuous"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, continuous),
+      NULL },
 
     ngx_null_command
 };
@@ -418,6 +431,7 @@ retry:
     p = ngx_snprintf(buffer, sizeof(buffer), 
             "#EXTM3U\r\n"
             "#EXT-X-TARGETDURATION:%i\r\n"
+            "#EXT-X-ALLOW-CACHE:NO\r\n"
             "#EXT-X-MEDIA-SEQUENCE:%i\r\n\r\n",
             /*TODO: float*/(ngx_int_t)(hacf->fraglen / 1000), ffrag);
     n = write(fd, buffer, p - buffer);
@@ -796,6 +810,71 @@ ngx_rtmp_hls_restart(ngx_rtmp_session_t *s)
 }
 
 
+static void
+ngx_rtmp_hls_restore_frag(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_hls_ctx_t             *ctx;
+    ngx_file_t                      file;
+    ngx_file_info_t                 fi;
+    ssize_t                         ret;
+    u_char                         *p, *last;
+    u_char                          buffer[sizeof("-.ts\r\n") +
+                                           NGX_OFF_T_LEN];
+
+    /* try to restore frag from previously stored playlist */
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    ngx_memzero(&file, sizeof(file));
+
+    file.log = s->connection->log;
+
+    file.fd = ngx_open_file(ctx->playlist.data, NGX_FILE_RDONLY, NGX_FILE_OPEN,
+                            0);
+    if (file.fd == NGX_INVALID_FILE) {
+        return;
+    }
+
+    if (ngx_fd_info(file.fd, &fi)) {
+        goto done;
+    }
+
+    ret = ngx_read_file(&file, buffer, sizeof(buffer),
+                        fi.st_size > (off_t) sizeof(buffer) ?
+                        fi.st_size - sizeof(buffer) : 0);
+    if (ret <= 0) {
+        goto done;
+    }
+
+    /* last line example:
+     * mystream-14.ts\r\n */
+
+    if (ret < (ssize_t) sizeof(".ts\r\n")) {
+        goto done;
+    }
+
+    ret -= (sizeof(".ts\r\n") - 1);
+
+    last = buffer + ret;
+    p = last;
+    while (p > buffer && *(p - 1) != '-') {
+        --p;
+    }
+
+    if (p == buffer) {
+        goto done;
+    }
+
+    ctx->frag = ngx_atoi(p, (size_t) (last - p)) + 1;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: restored frag=%i", ctx->frag);
+
+done:
+    ngx_close_file(file.fd);
+}
+
+
 static ngx_int_t
 ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
@@ -865,6 +944,10 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "hls: playlist='%V' playlist_bak='%V' stream_pattern='%V'",
             &ctx->playlist, &ctx->playlist_bak, &ctx->stream);
+
+    if (hacf->continuous) {
+        ngx_rtmp_hls_restore_frag(s);
+    }
 
     /* schedule restart event */
     ctx->publishing = 1;
@@ -1164,6 +1247,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->muxdelay = NGX_CONF_UNSET;
     conf->sync = NGX_CONF_UNSET;
     conf->playlen = NGX_CONF_UNSET;
+    conf->continuous = NGX_CONF_UNSET;
     conf->nbuckets = 1024;
 
     return conf;
@@ -1179,9 +1263,10 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->hls, prev->hls, 0);
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
     ngx_conf_merge_msec_value(conf->muxdelay, prev->muxdelay, 700);
-    ngx_conf_merge_msec_value(conf->sync, prev->sync, 0);
+    ngx_conf_merge_msec_value(conf->sync, prev->sync, 300);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
     ngx_conf_merge_str_value(conf->path, prev->path, "");
+    ngx_conf_merge_value(conf->continuous, prev->continuous, 0);
     conf->ctx = ngx_pcalloc(cf->pool, 
             sizeof(ngx_rtmp_hls_ctx_t *) * conf->nbuckets);
     if (conf->ctx == NULL) {
