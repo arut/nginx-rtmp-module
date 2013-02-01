@@ -32,6 +32,9 @@ static char * ngx_rtmp_merge_applications(ngx_conf_t *cf,
 ngx_uint_t  ngx_rtmp_max_module;
 
 
+ngx_thread_volatile ngx_event_t *ngx_rtmp_init_process_events;
+
+
 static ngx_command_t  ngx_rtmp_commands[] = {
 
     { ngx_string("rtmp"),
