@@ -13,6 +13,9 @@ static void ngx_rtmp_ping(ngx_event_t *rev);
 static ngx_int_t ngx_rtmp_finalize_set_chunk_size(ngx_rtmp_session_t *s);
 
 
+ngx_uint_t                  ngx_rtmp_naccepted;
+
+
 ngx_rtmp_bandwidth_t        ngx_rtmp_bw_out;
 ngx_rtmp_bandwidth_t        ngx_rtmp_bw_in;
 

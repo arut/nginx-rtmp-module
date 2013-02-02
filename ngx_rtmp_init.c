@@ -26,6 +26,7 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
     ngx_rtmp_in6_addr_t   *addr6;
 #endif
 
+    ++ngx_rtmp_naccepted;
 
     /* find the server configuration for the address:port */
 

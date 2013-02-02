@@ -578,6 +578,11 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
                 "%T", ngx_cached_time->sec - start_time) - tbuf);
     NGX_RTMP_STAT_L("</uptime>\r\n");
 
+    NGX_RTMP_STAT_L("<naccepted>");
+    NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                  "%ui", ngx_rtmp_naccepted) - nbuf);
+    NGX_RTMP_STAT_L("</naccepted>\r\n");
+
     ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_in, &ngx_rtmp_bw_out);
 
     cscf = cmcf->servers.elts;

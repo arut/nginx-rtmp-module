@@ -36,7 +36,8 @@
             <th>Time</th>
         </tr>
         <tr>
-            <td colspan="2"/>
+            <td>@<xsl:value-of select="naccepted"/></td>
+            <td/>
             <td><xsl:value-of select="in"/></td>
             <td><xsl:value-of select="out"/></td>
             <td><xsl:value-of select="round(bwin div 1024)"/></td>
