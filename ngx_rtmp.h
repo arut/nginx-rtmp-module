@@ -570,6 +570,9 @@ ngx_rtmp_is_codec_header(ngx_chain_t *in)
 }
 
 
+extern ngx_thread_volatile ngx_event_t     *ngx_rtmp_init_process_events;
+
+
 extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_out;
 extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_in;
 
