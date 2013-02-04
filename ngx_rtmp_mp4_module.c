@@ -2198,7 +2198,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
     ngx_rtmp_mp4_ctx_t         *ctx;
     uint32_t                    hdr[2];
     ssize_t                     n;
-    size_t                      offset, page_offset, size;
+    size_t                      offset, page_offset, size, shift;
     uint64_t                    extended_size;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
@@ -2232,6 +2232,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
         }
 
         size = ngx_rtmp_r32(hdr[0]);
+        shift = sizeof(hdr);
 
         if (size == 1) {
             n = ngx_read_file(f, (u_char *) &extended_size,
@@ -2245,6 +2246,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
             }
 
             size = ngx_rtmp_r64(extended_size);
+            shift += sizeof(extended_size);
         }
 
         if (hdr[1] == ngx_rtmp_mp4_make_tag('m','o','o','v')) {
@@ -2259,12 +2261,12 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
         offset += size;
     }
 
-    if (size < 8) {
+    if (size < shift) {
         return NGX_ERROR;
     }
 
-    size   -= 8;
-    offset += 8;
+    size   -= shift;
+    offset += shift;
 
     page_offset = offset & (ngx_pagesize - 1);
     ctx->mmaped_size = page_offset + size;
