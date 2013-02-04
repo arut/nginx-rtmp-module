@@ -188,6 +188,7 @@ typedef struct {
 
     /* connection parameters */
     ngx_str_t               app;
+    ngx_str_t               args;
     ngx_str_t               flashver;
     ngx_str_t               swf_url;
     ngx_str_t               tc_url;
