@@ -11,7 +11,10 @@
 #include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_record_module.h"
 
+#include "ngx_rtmp_live_module.h"
+#include "ngx_rtmp_codec_module.h"
 
+static ngx_rtmp_meta_pt                    		next_meta;
 static ngx_rtmp_connect_pt                      next_connect;
 static ngx_rtmp_disconnect_pt                   next_disconnect;
 static ngx_rtmp_publish_pt                      next_publish;
@@ -53,6 +56,7 @@ enum {
     NGX_RTMP_NOTIFY_DONE,
     NGX_RTMP_NOTIFY_RECORD_DONE,
     NGX_RTMP_NOTIFY_UPDATE,
+	NGX_RTMP_NOTIFY_META,
     NGX_RTMP_NOTIFY_APP_MAX
 };
 
@@ -101,7 +105,7 @@ static ngx_command_t  ngx_rtmp_notify_commands[] = {
       NGX_RTMP_SRV_CONF_OFFSET,
       0,
       NULL },
-
+		  
     { ngx_string("on_disconnect"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_rtmp_notify_on_srv_event,
@@ -115,6 +119,13 @@ static ngx_command_t  ngx_rtmp_notify_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       0,
       NULL },
+			  
+	{ ngx_string("on_meta"),
+	  NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+	  ngx_rtmp_notify_on_app_event,
+	  NGX_RTMP_APP_CONF_OFFSET,
+	  0,
+	  NULL },			  
 
     { ngx_string("on_play"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
@@ -1325,13 +1336,15 @@ ngx_rtmp_notify_on_app_event(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     n = 0;
 
     switch (name->len) {
-        case sizeof("on_done") - 1: /* and on_play */
-            if (name->data[3] == 'd') {
-                n = NGX_RTMP_NOTIFY_DONE;
-            } else {
-                n = NGX_RTMP_NOTIFY_PLAY;
-            }
-            break;
+        case sizeof("on_done") - 1: /* and on_play, on_meta */
+	        if (name->data[3] == 'd') {
+	            n = NGX_RTMP_NOTIFY_DONE;
+	        } else if(name->data[3] == 'm') {
+				n = NGX_RTMP_NOTIFY_META;
+			} else {
+	            n = NGX_RTMP_NOTIFY_PLAY;
+	        }
+        break;
 
         case sizeof("on_update") - 1:
             n = NGX_RTMP_NOTIFY_UPDATE;
@@ -1391,6 +1404,127 @@ ngx_rtmp_notify_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
+static ngx_int_t 
+ngx_rtmp_notify_meta_handle(ngx_rtmp_session_t *s, 
+        void *arg, ngx_chain_t *in)
+{
+    if (ngx_rtmp_notify_parse_http_retcode(s, in) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+	return NGX_OK;
+}
+
+
+static ngx_chain_t *
+ngx_rtmp_notify_meta_create(ngx_rtmp_session_t *s, void *arg, 
+        ngx_pool_t *pool)
+{
+    ngx_rtmp_live_stream_t         *v = arg;
+	ngx_rtmp_codec_ctx_t			*ctx;
+
+    ngx_chain_t                    *pl;
+    ngx_buf_t                      *b;
+    size_t                          name_len;
+
+    pl = ngx_alloc_chain_link(pool);
+    if (pl == NULL) {
+        return NULL;
+    }
+
+	ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+	if(ctx == NULL) {
+		return NULL;
+	}
+
+    name_len = ngx_strlen(v->name);
+
+    b = ngx_create_temp_buf(pool,
+                            sizeof("&call=on_meta") + 
+                            sizeof("&name=") + name_len * 3 +
+                            sizeof("&width=&height=&duration=&frame_rate=&video=&audio=") +
+                            NGX_OFF_T_LEN * 6 + 1);
+
+    if (b == NULL) {
+        return NULL;
+    }
+
+    pl->buf = b;
+    pl->next = NULL;
+
+    b->last = ngx_cpymem(b->last, (u_char*) "&call=meta", 
+                         sizeof("&call=meta") - 1);
+
+    b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);
+    b->last = (u_char*) ngx_escape_uri(b->last, v->name, name_len,
+                                       NGX_ESCAPE_ARGS);
+
+
+
+    b->last = ngx_snprintf(b->last, b->end - b->last,
+                           "&width=%ui&height=%ui&duration=%ui&frame_rate=%ui&video=%ui&audio=%ui",
+                           ctx->width,ctx->height,ctx->duration,ctx->frame_rate,ctx->video_codec_id,ctx->audio_codec_id);
+
+    return ngx_rtmp_notify_create_request(s, pool, NGX_RTMP_NOTIFY_PLAY, pl);
+}
+
+static ngx_int_t ngx_rtmp_notify_meta(ngx_rtmp_session_t *s, ngx_rtmp_live_stream_t *v)
+{
+    ngx_rtmp_notify_app_conf_t     *nacf;
+    ngx_rtmp_netcall_init_t         ci;
+    ngx_url_t                      *url;
+
+    if (s->auto_pushed) {
+        goto next;
+    }
+
+	if(s->relay) {
+		goto next;
+	}
+
+    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
+    if (nacf == NULL) {
+		return NGX_ERROR;
+    }
+
+    url = nacf->url[NGX_RTMP_NOTIFY_META];
+    if (url == NULL) {
+		return NGX_OK;
+    }
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: meta '%V'", &url->url);
+
+    ngx_memzero(&ci, sizeof(ci));
+
+    ci.url = url;
+    ci.create = ngx_rtmp_notify_meta_create;
+    ci.handle = ngx_rtmp_notify_meta_handle;
+    ci.arg = v;
+    ci.argsize = sizeof(*v);
+
+    return ngx_rtmp_netcall_create(s, &ci);
+
+next:
+return NGX_OK;
+}
+
+
+static ngx_int_t ngx_rtmp_notfiy_meta(ngx_rtmp_session_t *s)
+{
+	ngx_rtmp_live_ctx_t				*live;
+	ngx_rtmp_codec_ctx_t			*ctx;
+
+	live = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+	ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+
+	if(live != NULL && ctx != NULL) {
+		ngx_rtmp_notify_meta(s,live->stream);
+	}
+
+	return next_meta(s);
+}
+
 
 static ngx_int_t
 ngx_rtmp_notify_postconfiguration(ngx_conf_t *cf)
@@ -1406,6 +1540,9 @@ ngx_rtmp_notify_postconfiguration(ngx_conf_t *cf)
 
     next_play = ngx_rtmp_play;
     ngx_rtmp_play = ngx_rtmp_notify_play;
+	
+	next_meta = ngx_rtmp_meta;
+	ngx_rtmp_meta = ngx_rtmp_notfiy_meta;	
 
     next_close_stream = ngx_rtmp_close_stream;
     ngx_rtmp_close_stream = ngx_rtmp_notify_close_stream;

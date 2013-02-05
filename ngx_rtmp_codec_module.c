@@ -7,6 +7,7 @@
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"
 
+ngx_rtmp_meta_pt              ngx_rtmp_meta;
 
 static ngx_int_t ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf);
 
@@ -555,7 +556,15 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_rtmp_codec_update_meta(s);
 
-    return NGX_OK;
+    return ngx_rtmp_meta
+         ? ngx_rtmp_meta(s)
+         : NGX_OK;
+}
+
+static ngx_int_t
+ngx_rtmp_codec_meta(ngx_rtmp_session_t *s)
+{	
+	return NGX_OK;
 }
 
 
@@ -592,6 +601,7 @@ ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf)
     ngx_str_set(&ch->name, "onMetaData");
     ch->handler = ngx_rtmp_codec_meta_data;
 
+	ngx_rtmp_meta = ngx_rtmp_codec_meta;
 
     return NGX_OK;
 }
