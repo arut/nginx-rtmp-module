@@ -105,6 +105,7 @@ typedef ngx_int_t (*ngx_rtmp_close_stream_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_close_stream_t *v);
 typedef ngx_int_t (*ngx_rtmp_delete_stream_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_delete_stream_t *v);
+typedef ngx_int_t (*ngx_rtmp_meta_pt)(ngx_rtmp_session_t *s);
 typedef ngx_int_t (*ngx_rtmp_publish_pt)(ngx_rtmp_session_t *s, 
         ngx_rtmp_publish_t *v);
 typedef ngx_int_t (*ngx_rtmp_play_pt)(ngx_rtmp_session_t *s, 
@@ -131,6 +132,7 @@ extern ngx_rtmp_disconnect_pt       ngx_rtmp_disconnect;
 extern ngx_rtmp_create_stream_pt    ngx_rtmp_create_stream;
 extern ngx_rtmp_close_stream_pt     ngx_rtmp_close_stream;
 extern ngx_rtmp_delete_stream_pt    ngx_rtmp_delete_stream;
+extern ngx_rtmp_meta_pt             ngx_rtmp_meta;
 extern ngx_rtmp_publish_pt          ngx_rtmp_publish;
 extern ngx_rtmp_play_pt             ngx_rtmp_play;
 extern ngx_rtmp_seek_pt             ngx_rtmp_seek;

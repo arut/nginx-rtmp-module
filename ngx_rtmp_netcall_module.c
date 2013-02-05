@@ -498,6 +498,8 @@ ngx_rtmp_netcall_http_format_request(ngx_int_t method, ngx_str_t *host,
 {
     ngx_chain_t                    *al, *bl, *ret;
     ngx_buf_t                      *b;
+	ngx_int_t       				n;
+	u_char          				c, x;
     size_t                          content_length;
     static const char              *methods[2] = { "GET", "POST" };
     static const char               rq_tmpl[] = " HTTP/1.0\r\n"
@@ -533,11 +535,23 @@ ngx_rtmp_netcall_http_format_request(ngx_int_t method, ngx_str_t *host,
 
     ret = al;
 
-    if (args) {
-        *b->last++ = '?';
-        al->next = args;
-        for (al = args; al->next; al = al->next);
-    }
+	/*
+		if we have ? in our uri we have to put an &
+		at the end if not we have to put an ? at the end
+	*/
+	x = '?';
+	for(n=0;n < (ngx_int_t)ngx_strlen(uri->data);n++) {
+		c = uri->data[n];
+		if(c == '?') {
+			x = '&';
+		}
+	}
+
+	if (args) {
+	    *b->last++ = x;
+	    al->next = args;
+	    for (al = args; al->next; al = al->next);
+	}
 
     /* create second buffer */
 
