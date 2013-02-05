@@ -306,8 +306,8 @@ ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
     ngx_rtmp_exec_t            *e;
     ngx_uint_t                  n;
 
-    if (cmcf->servers.nelts == 0) {
-        return NGX_ERROR;
+    if (cmcf == NULL || cmcf->servers.nelts == 0) {
+        return NGX_OK;
     }
 
     /* execs are always started by the first worker */

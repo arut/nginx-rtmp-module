@@ -1561,7 +1561,7 @@ ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
     ngx_rtmp_listen_t          *lst;
     ngx_event_t               **pevent, *event;
 
-    if (cmcf->listen.nelts == 0) {
+    if (cmcf == NULL || cmcf->listen.nelts == 0) {
         return NGX_OK;
     }
 
