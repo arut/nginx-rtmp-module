@@ -306,6 +306,10 @@ ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
     ngx_rtmp_exec_t            *e;
     ngx_uint_t                  n;
 
+	if(cmcf == NULL) {
+		return NGX_OK;
+	}
+
     if (cmcf->servers.nelts == 0) {
         return NGX_ERROR;
     }
