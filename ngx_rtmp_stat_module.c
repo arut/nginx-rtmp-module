@@ -15,7 +15,6 @@ static ngx_int_t ngx_rtmp_stat_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_stat_create_loc_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_stat_merge_loc_conf(ngx_conf_t *cf, 
         void *parent, void *child);
-static ngx_int_t ngx_rtmp_stat_init_process(ngx_cycle_t *cycle);
 
 
 static time_t                       start_time;
@@ -88,28 +87,13 @@ ngx_module_t  ngx_rtmp_stat_module = {
 	NGX_HTTP_MODULE,                    /* module type */
 	NULL,                               /* init master */
 	NULL,                               /* init module */
-	ngx_rtmp_stat_init_process,         /* init process */
+	NULL,                               /* init process */
 	NULL,                               /* init thread */
 	NULL,                               /* exit thread */
 	NULL,                               /* exit process */
 	NULL,                               /* exit master */
 	NGX_MODULE_V1_PADDING
 };
-
-
-static ngx_int_t
-ngx_rtmp_stat_init_process(ngx_cycle_t *cycle)
-{
-    /* Run posted events;
-     * HTTP module's init_process is called after event module's
-     * init_process. That makes is possible to use event-related
-     * calls. RTMP modules are core modules with early
-     * initializers */
-
-    ngx_event_process_posted(cycle, &ngx_rtmp_init_process_events);
-
-    return NGX_OK;
-}
 
 
 #define NGX_RTMP_STAT_BUFSIZE           256
