@@ -143,12 +143,19 @@ rtmp_auto_push directive.
                 #
                 # Multiple exec lines can be specified.
 
-                exec /usr/bin/ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name};
+                exec ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name};
             }
 
             application small {
                 live on;
                 # Video with reduced resolution comes here from ffmpeg
+            }
+
+            application webcam {
+                live on;
+
+                # Stream from local webcam
+                exec_static ffmpeg -f video4linux2 -i /dev/video0 -c:v libx264 -an -f flv rtmp://localhost:1935/webcam/mystream;
             }
 
             application mypush {
@@ -167,6 +174,13 @@ rtmp_auto_push directive.
                 # Pull all streams from remote machine
                 # and play locally
                 pull rtmp://rtmp3.example.com pageUrl=www.example.com/index.html;
+            }
+            
+            application mystaticpull {
+                live on;
+
+                # Static pull is started at nginx start
+                pull rtmp://rtmp4.example.com pageUrl=www.example.com/index.html name=mystream static;
             }
 
             # video on demand
@@ -275,7 +289,11 @@ rtmp_auto_push directive.
 
             location /hls {
                 # Serve HLS fragments
+                types {
+                    application/vnd.apple.mpegurl m3u8;
+                }
                 alias /tmp/app;
+                expires -1;
             }
 
         }
