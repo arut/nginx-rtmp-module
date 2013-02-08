@@ -1039,11 +1039,11 @@ ngx_rtmp_relay_send_play(ngx_rtmp_session_t *s)
     }
 
     if (ctx->live) {
-        start = -1;
-        duration = -1;
+        start = -1000;
+        duration = -1000;
     } else {
-        start    = (ctx->start ? ctx->start : -2);
-        duration = (ctx->stop  ? ctx->stop - ctx->start : -1);
+        start    = (ctx->start ? ctx->start : -2000);
+        duration = (ctx->stop  ? ctx->stop - ctx->start : -1000);
     }
 
     ngx_memzero(&h, sizeof(h));
