@@ -377,9 +377,8 @@ ngx_rtmp_live_start(ngx_rtmp_session_t *s)
     if (lacf->play_restart) {
         status[nstatus++] = ngx_rtmp_create_status(s, "NetStream.Play.Start",
                                                    "status", "Start live");
+        status[nstatus++] = ngx_rtmp_create_sample_access(s);
     }
-
-    status[nstatus++] = ngx_rtmp_create_sample_access(s);
 
     if (lacf->publish_notify) {
         status[nstatus++] = ngx_rtmp_create_status(s,
@@ -541,8 +540,8 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
         s->out_buffer = 1;
     }
 
-    ctx->cs[0].csid = NGX_RTMP_CSID_AUDIO;
-    ctx->cs[1].csid = NGX_RTMP_CSID_VIDEO;
+    ctx->cs[0].csid = NGX_RTMP_CSID_VIDEO;
+    ctx->cs[1].csid = NGX_RTMP_CSID_AUDIO;
 
     if (!ctx->publishing && ctx->stream->active) {
         ngx_rtmp_live_start(s);
@@ -1043,6 +1042,7 @@ ngx_rtmp_live_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     if (!ctx->silent && !lacf->play_restart) {
         ngx_rtmp_send_status(s, "NetStream.Play.Start",
                              "status", "Start live");
+        ngx_rtmp_send_sample_access(s);
     }
 
 next:
