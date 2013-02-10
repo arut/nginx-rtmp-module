@@ -674,7 +674,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_session_t             *ss;
     ngx_rtmp_header_t               ch, lh, clh;
-    ngx_int_t                       rc, mandatory;
+    ngx_int_t                       rc, mandatory, dummy_audio;
     ngx_uint_t                      prio;
     ngx_uint_t                      peers;
     ngx_uint_t                      meta_version;
@@ -870,11 +870,15 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 continue;
             }
 
+            dummy_audio = 0;
             if (lacf->wait_video && h->type == NGX_RTMP_MSG_VIDEO &&
-                aapkt == NULL)
+                !pctx->cs[1].active)
             {
-                aapkt = ngx_rtmp_alloc_shared_buf(cscf);
-                ngx_rtmp_prepare_message(s, &clh, NULL, aapkt);
+                dummy_audio = 1;
+                if (aapkt == NULL) {
+                    aapkt = ngx_rtmp_alloc_shared_buf(cscf);
+                    ngx_rtmp_prepare_message(s, &clh, NULL, aapkt);
+                }
             }
 
             if (header || coheader) {
@@ -908,7 +912,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                         continue;
                     }
 
-                } else if (aapkt) {
+                } else if (dummy_audio) {
                     ngx_rtmp_send_message(ss, aapkt, 0);
                 }
 
@@ -938,7 +942,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                 ++peers;
 
-                if (aapkt) {
+                if (dummy_audio) {
                     ngx_rtmp_send_message(ss, aapkt, 0);
                 }
 
