@@ -871,7 +871,9 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 continue;
             }
 
-            if (h->type == NGX_RTMP_MSG_VIDEO && aapkt == NULL) {
+            if (lacf->wait_video && h->type == NGX_RTMP_MSG_VIDEO &&
+                aapkt == NULL)
+            {
                 aapkt = ngx_rtmp_alloc_shared_buf(cscf);
                 ngx_rtmp_prepare_message(s, &clh, NULL, aapkt);
             }
