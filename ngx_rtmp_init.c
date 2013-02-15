@@ -118,14 +118,16 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
                   c->number, &c->addr_text);
 
     s = ngx_rtmp_init_session(c, addr_conf);
+    if (s == NULL) {
+        return;
+    }
 
     /* only auto-pushed connections are
      * done through unix socket */
+
     s->auto_pushed = unix_socket;
 
-    if (s) {
-        ngx_rtmp_handshake(s);
-    }
+    ngx_rtmp_handshake(s);
 }
 
 
@@ -264,27 +266,25 @@ ngx_rtmp_close_session_handler(ngx_event_t *e)
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, c->log, 0, "close session");
 
-    if (s) {
-        ngx_rtmp_fire_event(s, NGX_RTMP_DISCONNECT, NULL, NULL);
+    ngx_rtmp_fire_event(s, NGX_RTMP_DISCONNECT, NULL, NULL);
 
-        if (s->ping_evt.timer_set) {
-            ngx_del_timer(&s->ping_evt);
-        }
+    if (s->ping_evt.timer_set) {
+        ngx_del_timer(&s->ping_evt);
+    }
 
-        if (s->in_old_pool) {
-            ngx_destroy_pool(s->in_old_pool);
-        }
+    if (s->in_old_pool) {
+        ngx_destroy_pool(s->in_old_pool);
+    }
 
-        if (s->in_pool) {
-            ngx_destroy_pool(s->in_pool);
-        }
+    if (s->in_pool) {
+        ngx_destroy_pool(s->in_pool);
+    }
 
-        ngx_rtmp_free_handshake_buffers(s);
+    ngx_rtmp_free_handshake_buffers(s);
 
-        while (s->out_pos != s->out_last) {
-            ngx_rtmp_free_shared_chain(cscf, s->out[s->out_pos++]);
-            s->out_pos %= s->out_queue;
-        }
+    while (s->out_pos != s->out_last) {
+        ngx_rtmp_free_shared_chain(cscf, s->out[s->out_pos++]);
+        s->out_pos %= s->out_queue;
     }
 
     ngx_rtmp_close_connection(c);

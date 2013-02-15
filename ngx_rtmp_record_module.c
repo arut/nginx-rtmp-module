@@ -1026,7 +1026,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
         }
 
         if (ngx_rtmp_get_video_frame_type(in) == NGX_RTMP_VIDEO_KEY_FRAME &&
-            (codec_ctx->video_codec_id != NGX_RTMP_VIDEO_H264 ||
+            ((codec_ctx && codec_ctx->video_codec_id != NGX_RTMP_VIDEO_H264) ||
              !ngx_rtmp_is_codec_header(in)))
         {
             rctx->video_key_sent = 1;

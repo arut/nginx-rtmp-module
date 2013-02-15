@@ -453,7 +453,7 @@ ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cscf = pctx->srv_conf[ngx_rtmp_core_module.ctx_index];
 
     cacfp = ngx_array_push(&cscf->applications);
-    if (cacf == NULL) {
+    if (cacfp == NULL) {
         return NGX_CONF_ERROR;
     }
 
