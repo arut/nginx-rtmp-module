@@ -44,15 +44,25 @@ typedef struct {
     ngx_event_t             send_evt;
     unsigned                playing:1;
     ngx_uint_t              ncrs;
-    ngx_str_t               name;
+    ngx_uint_t              nbody;
+    size_t                  pfx_size;
+    ngx_str_t               sfx;
+    ngx_uint_t              file_id;
     ngx_int_t               aindex, vindex;
+    ngx_uint_t              nentry;
 } ngx_rtmp_play_ctx_t;
 
 
 typedef struct {
-    ngx_str_t               root;
-    ngx_str_t               temp_path;
+    ngx_str_t              *root;
     ngx_url_t              *url;
+} ngx_rtmp_play_entry_t;
+
+
+typedef struct {
+    ngx_str_t               temp_path;
+    ngx_str_t               local_path;
+    ngx_array_t             entries; /* ngx_rtmp_play_entry_t * */
 } ngx_rtmp_play_app_conf_t;
 
 
