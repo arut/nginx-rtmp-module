@@ -10,6 +10,7 @@
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_play_pt             next_play;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
+static ngx_rtmp_close_stream_pt     next_close_stream;
 
 
 static ngx_int_t ngx_rtmp_relay_init_process(ngx_cycle_t *cycle);
@@ -48,6 +49,7 @@ typedef struct {
     ngx_log_t                  *log;
     ngx_uint_t                  nbuckets;
     ngx_msec_t                  buflen;
+    ngx_flag_t                  session_relay;
     ngx_msec_t                  push_reconnect;
     ngx_msec_t                  pull_reconnect;
     ngx_rtmp_relay_ctx_t        **ctx;
@@ -108,6 +110,13 @@ static ngx_command_t  ngx_rtmp_relay_commands[] = {
       ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_relay_app_conf_t, pull_reconnect),
+      NULL },
+
+    { ngx_string("session_relay"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_relay_app_conf_t, session_relay),
       NULL },
 
 
@@ -176,6 +185,7 @@ ngx_rtmp_relay_create_app_conf(ngx_conf_t *cf)
     racf->nbuckets = 1024;
     racf->log = &cf->cycle->new_log;
     racf->buflen = NGX_CONF_UNSET;
+    racf->session_relay = NGX_CONF_UNSET;
     racf->push_reconnect = NGX_CONF_UNSET;
     racf->pull_reconnect = NGX_CONF_UNSET;
 
@@ -192,6 +202,7 @@ ngx_rtmp_relay_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     conf->ctx = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_relay_ctx_t *) 
             * conf->nbuckets);
 
+    ngx_conf_merge_value(conf->session_relay, prev->session_relay, 0);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 5000);
     ngx_conf_merge_msec_value(conf->push_reconnect, prev->push_reconnect, 
             3000);
@@ -1293,8 +1304,8 @@ ngx_rtmp_relay_handshake_done(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 }
 
 
-static ngx_int_t
-ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
+static void
+ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_relay_app_conf_t          *racf;
     ngx_rtmp_relay_ctx_t               *ctx, **cctx;
@@ -1304,16 +1315,16 @@ ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx == NULL) {
-        goto next;
+        return;
     }
 
     if (s->static_relay) {
         ngx_add_timer(ctx->static_evt, racf->pull_reconnect);
-        goto next;
+        return;
     }
 
     if (ctx->publish == NULL) {
-        goto next;
+        return;
     }
 
     /* play end disconnect? */
@@ -1340,7 +1351,7 @@ ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
         {
             ngx_uint_t  n = 0;
             for (cctx = &ctx->publish->play; *cctx; cctx = &(*cctx)->next, ++n);
-            ngx_log_debug3(NGX_LOG_DEBUG_RTMP, ctx->session->connection->log, 0, 
+            ngx_log_debug3(NGX_LOG_DEBUG_RTMP, ctx->session->connection->log, 0,
                 "relay: play left after disconnect app='%V' name='%V': %ui",
                 &ctx->app, &ctx->name, n);
         }
@@ -1356,7 +1367,7 @@ ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
 
         ctx->publish = NULL;
 
-        goto next;
+        return;
     }
 
     /* publish end disconnect */
@@ -1383,8 +1394,28 @@ ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
     if (*cctx) {
         *cctx = ctx->next;
     }
+}
 
-next:
+
+static ngx_int_t
+ngx_rtmp_relay_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
+{
+    ngx_rtmp_relay_app_conf_t  *racf;
+
+    racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_relay_module);
+    if (racf && racf->session_relay) {
+        ngx_rtmp_relay_close(s);
+    }
+
+    return next_close_stream(s, v);
+}
+
+
+static ngx_int_t
+ngx_rtmp_relay_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
+{
+    ngx_rtmp_relay_close(s);
+
     return next_delete_stream(s, v);
 }
 
@@ -1623,6 +1654,9 @@ ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf)
 
     next_delete_stream = ngx_rtmp_delete_stream;
     ngx_rtmp_delete_stream = ngx_rtmp_relay_delete_stream;
+
+    next_close_stream = ngx_rtmp_close_stream;
+    ngx_rtmp_close_stream = ngx_rtmp_relay_close_stream;
 
 
     ch = ngx_array_push(&cmcf->amf);
