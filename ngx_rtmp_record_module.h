@@ -40,10 +40,11 @@ typedef struct {
     ngx_rtmp_record_app_conf_t         *conf;
     ngx_file_t                          file;
     ngx_uint_t                          nframes;
-    uint32_t                            epoch;
+    uint32_t                            epoch, time_shift;
     ngx_time_t                          last;
     time_t                              timestamp;
     unsigned                            failed:1;
+    unsigned                            initialized:1;
     unsigned                            aac_header_sent:1;
     unsigned                            avc_header_sent:1;
     unsigned                            video_key_sent:1;
