@@ -136,6 +136,7 @@ ngx_rtmp_limit_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     n = --*nconn;
     ngx_shmtx_unlock(&shpool->mutex);
 
+    (void) n;
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "limit: dec conection counter: %uD", n);
 
