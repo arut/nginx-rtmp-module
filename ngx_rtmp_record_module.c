@@ -89,6 +89,14 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       offsetof(ngx_rtmp_record_app_conf_t, unique),
       NULL },
 
+    { ngx_string("record_append"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, append),
+      NULL },
+
     { ngx_string("record_lock"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
                          NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
@@ -184,6 +192,7 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     racf->max_frames = NGX_CONF_UNSET;
     racf->interval   = NGX_CONF_UNSET;
     racf->unique     = NGX_CONF_UNSET;
+    racf->append     = NGX_CONF_UNSET;
     racf->lock_file  = NGX_CONF_UNSET;
     racf->notify     = NGX_CONF_UNSET;
     racf->url        = NGX_CONF_UNSET_PTR;
@@ -208,6 +217,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
     ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
     ngx_conf_merge_value(conf->unique, prev->unique, 0);
+    ngx_conf_merge_value(conf->append, prev->append, 0);
     ngx_conf_merge_value(conf->lock_file, prev->lock_file, 0);
     ngx_conf_merge_value(conf->notify, prev->notify, 0);
     ngx_conf_merge_msec_value(conf->interval, prev->interval, 
@@ -421,6 +431,10 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     ngx_rtmp_record_app_conf_t *rracf;
     ngx_err_t                   err;
     ngx_str_t                   path;
+    ngx_int_t                   mode, create_mode;
+    u_char                      buf[8], *p;
+    off_t                       file_size;
+    uint32_t                    tag_size, mlen, timestamp;
 
     rracf = rctx->conf;
 
@@ -438,11 +452,15 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
 
     ngx_rtmp_record_make_path(s, rctx, &path);
 
+    mode = rracf->append ? NGX_FILE_RDWR : NGX_FILE_WRONLY;
+    create_mode = rracf->append ? NGX_FILE_CREATE_OR_OPEN : NGX_FILE_TRUNCATE;
+
     ngx_memzero(&rctx->file, sizeof(rctx->file));
     rctx->file.offset = 0;
     rctx->file.log = s->connection->log;
-    rctx->file.fd = ngx_open_file(path.data, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE,
+    rctx->file.fd = ngx_open_file(path.data, mode, create_mode,
                                   NGX_FILE_DEFAULT_ACCESS);
+    ngx_str_set(&rctx->file.name, "recorded");
 
     if (rctx->file.fd == NGX_INVALID_FILE) {
         err = ngx_errno;
@@ -472,6 +490,74 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     if (rracf->notify) {
         ngx_rtmp_send_status(s, "NetStream.Record.Start", "status",
                              rracf->id.data ? (char *) rracf->id.data : "");
+    }
+
+    if (rracf->append) {
+
+        file_size = 0;
+        timestamp = 0;
+
+        file_size = lseek(rctx->file.fd, 0, SEEK_END);
+        if (file_size == (off_t) -1) {
+            ngx_log_error(NGX_LOG_CRIT, s->connection->log, ngx_errno,
+                          "record: %V seek failed", &rracf->id);
+            goto done;
+        }
+
+        if (file_size < 4) {
+            goto done;
+        }
+
+        if (ngx_read_file(&rctx->file, buf, 4, file_size - 4) != 4) {
+            ngx_log_error(NGX_LOG_CRIT, s->connection->log, ngx_errno,
+                          "record: %V tag size read failed", &rracf->id);
+            goto done;
+        }
+
+        p = (u_char *) &tag_size;
+        p[0] = buf[3];
+        p[1] = buf[2];
+        p[2] = buf[1];
+        p[3] = buf[0];
+
+        if (tag_size == 0 || tag_size + 4 > file_size) {
+            file_size = 0;
+            goto done;
+        }
+
+        if (ngx_read_file(&rctx->file, buf, 8, file_size - tag_size - 4) != 8)
+        {
+            ngx_log_error(NGX_LOG_CRIT, s->connection->log, ngx_errno,
+                          "record: %V tag read failed", &rracf->id);
+            goto done;
+        }
+
+        p = (u_char *) &mlen;
+        p[0] = buf[3];
+        p[1] = buf[2];
+        p[2] = buf[1];
+        p[3] = 0;
+
+        if (tag_size != mlen + 11) {
+            ngx_log_error(NGX_LOG_CRIT, s->connection->log, ngx_errno,
+                          "record: %V tag size mismatch: "
+                          "tag_size=%uD, mlen=%uD", &rracf->id, tag_size, mlen);
+            goto done;
+        }
+
+        p = (u_char *) &timestamp;
+        p[3] = buf[7];
+        p[0] = buf[6];
+        p[1] = buf[5];
+        p[2] = buf[4];
+
+done:
+        rctx->file.offset = file_size;
+        rctx->time_shift = timestamp;
+
+        ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "record: append offset=%O, time=%uD, tag_size=%uD",
+                       file_size, timestamp, tag_size);
     }
 
     return NGX_OK;
@@ -947,27 +1033,17 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
         return NGX_OK;
     }
 
-    if (rctx->file.offset == 0) {
-        rctx->epoch = h->timestamp;
+    if (!rctx->initialized) {
 
-        if (ngx_rtmp_record_write_header(&rctx->file) != NGX_OK) {
+        rctx->initialized = 1;
+        rctx->epoch = h->timestamp + rctx->time_shift;
+
+        if (rctx->file.offset == 0 &&
+            ngx_rtmp_record_write_header(&rctx->file) != NGX_OK)
+        {
             ngx_rtmp_record_node_close(s, rctx);
             return NGX_OK;
         }
-#if 0
-            /* metadata */
-            if (codec_ctx->meta) {
-                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
-                        "record: writing metadata");
-                ch.type = NGX_RTMP_MSG_AMF_META;
-                ch.mlen = ngx_rtmp_record_get_chain_mlen(codec_ctx->meta);
-                if (ngx_rtmp_record_write_frame(s, &ch, codec_ctx->meta)
-                        != NGX_OK) 
-                {
-                    return NGX_OK;
-                }
-            }
-#endif
     }
 
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
