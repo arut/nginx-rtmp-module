@@ -1403,7 +1403,7 @@ ngx_rtmp_relay_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     ngx_rtmp_relay_app_conf_t  *racf;
 
     racf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_relay_module);
-    if (racf && racf->session_relay) {
+    if (racf && !racf->session_relay) {
         ngx_rtmp_relay_close(s);
     }
 
