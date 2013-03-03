@@ -921,6 +921,18 @@ ngx_rtmp_play_remote_sink(ngx_rtmp_session_t *s, ngx_chain_t *in)
         b = in->buf;
 
         for (; b->pos != b->last && ctx->ncrs != 2; ++b->pos) {
+            if (ctx->response_code_received == 4 && *b->pos == 32) {
+                ctx->response_code_received = 0;
+            }else if (ctx->response_code_received < 3 && *b->pos >= '0' && *b->pos <= '9') {
+                ctx->response_code *= 10;
+                ctx->response_code += *b->pos - '0';
+                if (ctx->response_code_received == 2) {
+                    if( ctx->response_code != 200 ){
+                        return NGX_ERROR;
+                    }
+                }
+                ctx->response_code_received++;
+            }
             switch (*b->pos) {
                 case '\n':
                     ++ctx->ncrs;
@@ -992,6 +1004,7 @@ ngx_rtmp_play_open_remote(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
     ctx->ncrs = 0;
+    ctx->response_code_received = 4;
     ctx->nbody = 0;
 
     for ( ;; ) {

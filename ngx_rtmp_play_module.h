@@ -43,7 +43,9 @@ typedef struct {
     ngx_rtmp_play_fmt_t    *fmt;
     ngx_event_t             send_evt;
     unsigned                playing:1;
+    unsigned                response_code_received:3;
     ngx_uint_t              ncrs;
+    ngx_uint_t              response_code;
     ngx_uint_t              nbody;
     size_t                  pfx_size;
     ngx_str_t               sfx;
