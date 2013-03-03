@@ -929,6 +929,13 @@ ngx_rtmp_play_remote_sink(ngx_rtmp_session_t *s, ngx_chain_t *in)
                 default:
                     ctx->ncrs = 0;
             }
+            /* 10th header byte is HTTP response header */
+            if (++ctx->nheader == 10 && *b->pos != (u_char) '2') {
+                ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
+                              "play: remote HTTP response code: %cxx",
+                              *b->pos);
+                return NGX_ERROR;
+            }
         }
 
         if (b->pos == b->last) {
@@ -992,6 +999,7 @@ ngx_rtmp_play_open_remote(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
     ctx->ncrs = 0;
+    ctx->nheader = 0;
     ctx->nbody = 0;
 
     for ( ;; ) {

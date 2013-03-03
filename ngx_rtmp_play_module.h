@@ -44,6 +44,7 @@ typedef struct {
     ngx_event_t             send_evt;
     unsigned                playing:1;
     ngx_uint_t              ncrs;
+    ngx_uint_t              nheader;
     ngx_uint_t              nbody;
     size_t                  pfx_size;
     ngx_str_t               sfx;
