@@ -206,8 +206,8 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
 
             if (packet[3] & 0x20) {
                 packet[4] += stuff_size;
-                ngx_memset(p, 0xff, stuff_size);
-                p += stuff_size;
+                p = ngx_movemem(&packet[6] + stuff_size, &packet[6], p - &packet[4]);
+                ngx_memset(&packet[6], 0xff, stuff_size);
 
             } else {
                 packet[3] |= 0x20;
@@ -215,11 +215,11 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
                     p = ngx_movemem(&packet[5], &packet[4], p - &packet[4]);
                     packet[4] = 0;
                 } else {
-                    p = ngx_movemem(&packet[6], &packet[4], p - &packet[4]);
+                    p = ngx_movemem(&packet[4] + stuff_size, &packet[4],
+                                    p - &packet[4]);
                     packet[4] = stuff_size - 1;
                     packet[5] = 0;
-                    ngx_memset(p, 0xff, stuff_size - 2);
-                    p += (stuff_size - 2);
+                    ngx_memset(&packet[6], 0xff, stuff_size - 2);
                 }
             }
 
