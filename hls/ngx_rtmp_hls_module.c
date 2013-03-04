@@ -150,27 +150,24 @@ ngx_module_t  ngx_rtmp_hls_module = {
 };
 
 
-static size_t
-ngx_rtmp_hls_chain2buffer(u_char *buffer, size_t size, ngx_chain_t *in, 
-    size_t skip)
+static void
+ngx_rtmp_hls_chain2buffer(ngx_buf_t *out, ngx_chain_t *in, size_t skip)
 {
-    ngx_buf_t                       out;
-
-    out.pos  = buffer;
-    out.last = buffer + size;
+    size_t  size;
 
     for (; in; in = in->next) {
+        
         size = in->buf->last - in->buf->pos;
         if (size < skip) {
             skip -= size;
             continue;
         }
-        out.pos = ngx_cpymem(out.pos, in->buf->pos + skip, ngx_min(
-                    size - skip, (size_t)(out.last - out.pos)));
+
+        out->last = ngx_cpymem(out->last, in->buf->pos + skip,
+                              ngx_min(size - skip,
+                                      (size_t) (out->end - out->last)));
         skip = 0;
     }
-
-    return out.pos - buffer;
 }
 
 
@@ -695,6 +692,58 @@ next:
 
 
 static ngx_int_t
+ngx_rtmp_hls_parse_aac_header(ngx_rtmp_session_t *s, ngx_uint_t *objtype,
+    ngx_uint_t *srindex, ngx_uint_t *chconf)
+{
+    ngx_rtmp_codec_ctx_t   *codec_ctx;
+    ngx_chain_t            *cl;
+    u_char                 *p, b0, b1;
+
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+
+    cl = codec_ctx->aac_header;
+
+    p = cl->buf->pos;
+
+    if (ngx_rtmp_hls_copy(s, NULL, &p, 2, &cl) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_hls_copy(s, &b0, &p, 1, &cl) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_hls_copy(s, &b1, &p, 1, &cl) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    *objtype = b0 >> 3;
+    if (*objtype == 0 || *objtype == 0x1f) {
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: unsupported adts object type:%ui", *objtype);
+        return NGX_ERROR;
+    }
+
+    (*objtype)--;
+
+    *srindex = ((b0 << 1) & 0x0f) | ((b1 & 0x80) >> 7);
+    if (*srindex == 0x0f) {
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: unsupported adts sample rate:%ui", *srindex);
+        return NGX_ERROR;
+    }
+
+    *chconf = (b1 >> 3) & 0x0f;
+
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: aac object_type:%ui, sample_rate_index:%ui, "
+                   "channel_config:%ui", *objtype, *srindex, *chconf);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
     ngx_chain_t *in)
 {
@@ -704,6 +753,8 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     int64_t                         dts, ddts;
     ngx_rtmp_mpegts_frame_t         frame;
     ngx_buf_t                       out;
+    u_char                         *p;
+    ngx_uint_t                      objtype, srindex, chconf, size;
     static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -713,13 +764,19 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
     
     if (hacf == NULL || !hacf->hls || ctx == NULL ||
-        codec_ctx == NULL  || h->mlen < 1) 
+        codec_ctx == NULL  || h->mlen < 2) 
     {
         return NGX_OK;
     }
 
-    /* fragment is restarted in video handler;
-     * however if video stream is missing then do it here */
+    if (codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_AAC ||
+        codec_ctx->aac_header == NULL)
+    {
+        return NGX_OK;
+    }
+
+    /* Fragment is restarted in video handler.
+     * However if video stream is missing then do it here */
 
     if (codec_ctx->avc_header == NULL &&
         ngx_current_msec - ctx->frag_start > hacf->fraglen) 
@@ -740,12 +797,36 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_memzero(&out, sizeof(out));
 
-    out.pos = buffer;
-    out.last = out.pos +
-               ngx_rtmp_hls_chain2buffer(buffer, sizeof(buffer), in, 1);
+    out.start = buffer;
+    out.end = buffer + sizeof(buffer);
+    out.pos = out.start;
+    out.last = out.pos;
+
+    p = out.last;
+    out.last += 7;
+
+    if (ngx_rtmp_hls_parse_aac_header(s, &objtype, &srindex, &chconf)
+        != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "hls: aac header error");
+        return NGX_OK;
+    }
+
+    size = h->mlen - 2 + 7;
+
+    p[0] = 0xff;
+    p[1] = 0xf1;
+    p[2] = (objtype << 6) | (srindex << 2) | (chconf & 0x04);
+    p[3] = ((chconf & 0x03) << 6) | ((size >> 11) & 0x03);
+    p[4] = (size >> 3);
+    p[5] = (size << 5) | 0x1f;
+    p[6] = 0xfc;
+
+    ngx_rtmp_hls_chain2buffer(&out, in, 2);
 
     if (hacf->sync && codec_ctx->sample_rate) {
-        
+
         /* TODO: We assume here AAC frame size is 1024
          *       Need to handle AAC frames with frame size of 960 */
 
@@ -775,17 +856,8 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     frame.pts = frame.dts;
 
-    if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
-        if (out.pos == out.last) {
-            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                          "hls: malformed AAC packet");
-            return NGX_OK;
-        }
-        out.last--;
-    }
-
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls: audio dts=%uL timestamp=%uD",
+                   "hls: audio dts=%uL, timestamp=%uD",
                    frame.dts, h->timestamp);
 
     if (ngx_rtmp_mpegts_write_frame(&ctx->file, &frame, &out) != NGX_OK) {
