@@ -518,6 +518,7 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     off_t                           len;
     static u_char                   tbuf[NGX_TIME_T_LEN + 1];
     static u_char                   nbuf[NGX_OFF_T_LEN + 1];
+    double load[3];
 
     r->keepalive = 0;
     slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
@@ -566,6 +567,21 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
                   "%ui", ngx_rtmp_naccepted) - nbuf);
     NGX_RTMP_STAT_L("</naccepted>\r\n");
+    
+    if (getloadavg(load, 3) == 3) {
+        NGX_RTMP_STAT_L("<load1>");
+        NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                      "%.2f", load[0]) - nbuf);
+        NGX_RTMP_STAT_L("</load1>");
+        NGX_RTMP_STAT_L("<load5>");
+        NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                      "%.2f", load[1]) - nbuf);
+        NGX_RTMP_STAT_L("</load5>");
+        NGX_RTMP_STAT_L("<load15>");
+        NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                      "%.2f", load[2]) - nbuf);
+        NGX_RTMP_STAT_L("</load15>\r\n");
+    }
 
     ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_in, &ngx_rtmp_bw_out);
 
