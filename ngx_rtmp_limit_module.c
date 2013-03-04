@@ -99,14 +99,14 @@ ngx_rtmp_limit_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     n = ++*nconn;
     ngx_shmtx_unlock(&shpool->mutex);
 
-    rc = n > lmcf->max_conn ? NGX_ERROR : NGX_OK;
+    rc = n > (ngx_uint_t) lmcf->max_conn ? NGX_ERROR : NGX_OK;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "limit: inc conection counter: %uD", n);
 
     if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                      "limit: too many connections: %uD > %ui",
+                      "limit: too many connections: %uD > %i",
                       n, lmcf->max_conn);
     }
 
