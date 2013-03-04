@@ -7,7 +7,5 @@ CORE_MODULES="$CORE_MODULES
 
 NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_hls_module.c        \
+                $ngx_addon_dir/ngx_rtmp_mpegts.c            \
                 "
-
-CORE_LIBS="$CORE_LIBS -lavformat -lavcodec -lavutil"
-
