@@ -41,22 +41,22 @@ static ngx_int_t ngx_rtmp_cmd_set_buflen(ngx_rtmp_session_t *s,
        ngx_rtmp_set_buflen_t *v);
 
 
-ngx_rtmp_connect_pt         ngx_rtmp_connect = ngx_rtmp_cmd_connect;
-ngx_rtmp_disconnect_pt      ngx_rtmp_disconnect = ngx_rtmp_cmd_disconnect;
-ngx_rtmp_create_stream_pt   ngx_rtmp_create_stream = ngx_rtmp_cmd_create_stream;
-ngx_rtmp_close_stream_pt    ngx_rtmp_close_stream = ngx_rtmp_cmd_close_stream;
-ngx_rtmp_delete_stream_pt   ngx_rtmp_delete_stream = ngx_rtmp_cmd_delete_stream;
-ngx_rtmp_publish_pt         ngx_rtmp_publish = ngx_rtmp_cmd_publish;
-ngx_rtmp_play_pt            ngx_rtmp_play = ngx_rtmp_cmd_play;
-ngx_rtmp_seek_pt            ngx_rtmp_seek = ngx_rtmp_cmd_seek;
-ngx_rtmp_pause_pt           ngx_rtmp_pause = ngx_rtmp_cmd_pause;
+ngx_rtmp_connect_pt         ngx_rtmp_connect;
+ngx_rtmp_disconnect_pt      ngx_rtmp_disconnect;
+ngx_rtmp_create_stream_pt   ngx_rtmp_create_stream;
+ngx_rtmp_close_stream_pt    ngx_rtmp_close_stream;
+ngx_rtmp_delete_stream_pt   ngx_rtmp_delete_stream;
+ngx_rtmp_publish_pt         ngx_rtmp_publish;
+ngx_rtmp_play_pt            ngx_rtmp_play;
+ngx_rtmp_seek_pt            ngx_rtmp_seek;
+ngx_rtmp_pause_pt           ngx_rtmp_pause;
 
 
-ngx_rtmp_stream_begin_pt    ngx_rtmp_stream_begin = ngx_rtmp_cmd_stream_begin;
-ngx_rtmp_stream_eof_pt      ngx_rtmp_stream_eof = ngx_rtmp_cmd_stream_eof;
-ngx_rtmp_stream_dry_pt      ngx_rtmp_stream_dry = ngx_rtmp_cmd_stream_dry;
-ngx_rtmp_recorded_pt        ngx_rtmp_recorded = ngx_rtmp_cmd_recorded;
-ngx_rtmp_set_buflen_pt      ngx_rtmp_set_buflen = ngx_rtmp_cmd_set_buflen;
+ngx_rtmp_stream_begin_pt    ngx_rtmp_stream_begin;
+ngx_rtmp_stream_eof_pt      ngx_rtmp_stream_eof;
+ngx_rtmp_stream_dry_pt      ngx_rtmp_stream_dry;
+ngx_rtmp_recorded_pt        ngx_rtmp_recorded;
+ngx_rtmp_set_buflen_pt      ngx_rtmp_set_buflen;
 
 
 static ngx_int_t ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf);
@@ -765,6 +765,22 @@ ngx_rtmp_cmd_postconfiguration(ngx_conf_t *cf)
     for(n = 0; n < ncalls; ++n, ++ch, ++bh) {
         *ch = *bh;
     }
+
+    ngx_rtmp_connect = ngx_rtmp_cmd_connect;
+    ngx_rtmp_disconnect = ngx_rtmp_cmd_disconnect;
+    ngx_rtmp_create_stream = ngx_rtmp_cmd_create_stream;
+    ngx_rtmp_close_stream = ngx_rtmp_cmd_close_stream;
+    ngx_rtmp_delete_stream = ngx_rtmp_cmd_delete_stream;
+    ngx_rtmp_publish = ngx_rtmp_cmd_publish;
+    ngx_rtmp_play = ngx_rtmp_cmd_play;
+    ngx_rtmp_seek = ngx_rtmp_cmd_seek;
+    ngx_rtmp_pause = ngx_rtmp_cmd_pause;
+
+    ngx_rtmp_stream_begin = ngx_rtmp_cmd_stream_begin;
+    ngx_rtmp_stream_eof = ngx_rtmp_cmd_stream_eof;
+    ngx_rtmp_stream_dry = ngx_rtmp_cmd_stream_dry;
+    ngx_rtmp_recorded = ngx_rtmp_cmd_recorded;
+    ngx_rtmp_set_buflen = ngx_rtmp_cmd_set_buflen;
 
     return NGX_OK;
 }
