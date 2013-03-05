@@ -1134,12 +1134,12 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 static void *
 ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
 {
-	ngx_rtmp_hls_app_conf_t       *conf;
+    ngx_rtmp_hls_app_conf_t       *conf;
 
-	conf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_hls_app_conf_t));
-	if (conf == NULL) {
-		return NULL;
-	}
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_hls_app_conf_t));
+    if (conf == NULL) {
+        return NULL;
+    }
 
     conf->hls = NGX_CONF_UNSET;
     conf->fraglen = NGX_CONF_UNSET;
