@@ -83,3 +83,23 @@ CFLAGS="$CFLAGS -I$ngx_addon_dir"
 
 USE_OPENSSL=YES
 
+ngx_feature="sysinfo()"
+ngx_feature_name="NGX_HAVE_SYSINFO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/sysinfo.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct sysinfo s;
+                  sysinfo(&s);"
+. auto/feature
+
+ngx_feature="getloadavg()"
+ngx_feature_name="NGX_HAVE_GETLOADAVG"
+ngx_feature_run=no
+ngx_feature_incs="#include <stdlib.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="double loadavg[3];
+                  getloadavg(loadavg, 3);"
+. auto/feature
+
