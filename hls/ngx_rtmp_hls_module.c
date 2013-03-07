@@ -536,7 +536,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     ngx_file_t                      file;
     ssize_t                         ret;
     u_char                          buffer[sizeof(NGX_RTMP_HLS_RESTORE_PREFIX) -
-                                           1 + NGX_OFF_T_LEN];
+                                           1 + NGX_INT64_LEN];
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
@@ -637,7 +637,7 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ctx->stream.len = p - ctx->playlist.data;
     ctx->stream.data = ngx_palloc(s->connection->pool,
-                       ctx->stream.len + 1 + NGX_OFF_T_LEN + sizeof(".ts"));
+                       ctx->stream.len + 1 + NGX_INT64_LEN + sizeof(".ts"));
 
     ngx_memcpy(ctx->stream.data, ctx->playlist.data, ctx->stream.len);
 
