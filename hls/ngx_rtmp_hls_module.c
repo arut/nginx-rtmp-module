@@ -25,8 +25,6 @@ static char * ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf,
 
 
 typedef struct {
-    ngx_uint_t                          flags;
-
     unsigned                            publishing:1;
     unsigned                            opened:1;
 
@@ -60,8 +58,6 @@ typedef struct {
     ngx_uint_t                          nfrags;
     ngx_flag_t                          continuous;
     ngx_flag_t                          nodelete;
-    ngx_rtmp_hls_ctx_t                **ctx;
-    ngx_uint_t                          nbuckets;
     ngx_str_t                           path;
 } ngx_rtmp_hls_app_conf_t;
 
@@ -1160,7 +1156,6 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->continuous = NGX_CONF_UNSET;
     conf->nodelete = NGX_CONF_UNSET;
     conf->factor = NGX_CONF_UNSET;
-    conf->nbuckets = 1024;
 
     return conf;
 }
@@ -1181,12 +1176,6 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->continuous, prev->continuous, 1);
     ngx_conf_merge_value(conf->nodelete, prev->nodelete, 0);
     ngx_conf_merge_value(conf->factor, prev->factor, 2);
-
-    conf->ctx = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_hls_ctx_t *) *
-                                      conf->nbuckets);
-    if (conf->ctx == NULL) {
-        return NGX_CONF_ERROR;
-    }
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
