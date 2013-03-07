@@ -812,7 +812,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_memzero(&frame, sizeof(frame));
 
-    frame.dts = (uint64_t) h->timestamp * 90L + ctx->offset;
+    frame.dts = (uint64_t) h->timestamp * 90 + ctx->offset;
     frame.cc = ctx->audio_cc;
     frame.pid = 0x101;
     frame.sid = 0xc0;
@@ -948,7 +948,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     uint8_t                         fmt, ftype, htype, nal_type, src_nal_type;
     uint32_t                        len, rlen;
     ngx_buf_t                       out;
-    int32_t                         cts;
+    uint32_t                        cts;
     ngx_rtmp_mpegts_frame_t         frame;
     ngx_uint_t                      nal_bytes;
     ngx_int_t                       aud_sent, sps_pps_sent, rc;
@@ -1110,7 +1110,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_memzero(&frame, sizeof(frame));
 
     frame.cc = ctx->video_cc;
-    frame.dts = (uint64_t) h->timestamp * 90L + ctx->offset;
+    frame.dts = (uint64_t) h->timestamp * 90 + ctx->offset;
     frame.pts = frame.dts + cts * 90;
     frame.pid = 0x100;
     frame.sid = 0xe0;
