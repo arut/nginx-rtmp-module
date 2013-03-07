@@ -40,8 +40,8 @@ typedef struct {
     ngx_uint_t                          audio_cc;
     ngx_uint_t                          video_cc;
 
-    int64_t                             aframe_base;
-    int64_t                             aframe_num;
+    uint64_t                            aframe_base;
+    uint64_t                            aframe_num;
 
     uint64_t                            offset;
 } ngx_rtmp_hls_ctx_t;
@@ -785,7 +785,8 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_hls_ctx_t             *ctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
-    int64_t                         dts, ddts;
+    uint64_t                        dts;
+    int64_t                         ddts;
     ngx_rtmp_mpegts_frame_t         frame;
     ngx_buf_t                       out;
     u_char                         *p;
@@ -854,7 +855,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         dts = ctx->aframe_base + ctx->aframe_num * 90000 * 1024 /
                                  codec_ctx->sample_rate;
-        ddts = dts - frame.dts;
+        ddts = (int64_t) (dts - frame.dts);
 
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: sync stat ddts=%L (%.5fs)",
