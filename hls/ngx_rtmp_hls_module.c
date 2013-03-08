@@ -384,6 +384,41 @@ ngx_rtmp_hls_init_audio(ngx_rtmp_session_t *s)
     return NGX_OK;
 }
 
+//add function, append string "#EXT-X-ENDLIST\r\n" to m3u8 file.
+static void
+ngx_rtmp_hls_update_endlist(ngx_rtmp_session_t *s)
+{
+    static u_char                   buffer[1024];
+    int                             fd;
+    u_char                         *p;
+    ngx_rtmp_hls_ctx_t             *ctx;
+    ssize_t                         n;
+    ngx_rtmp_hls_app_conf_t        *hacf;
+
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    fd = ngx_open_file(ctx->playlist.data, NGX_FILE_WRONLY,
+            NGX_FILE_APPEND, NGX_FILE_DEFAULT_ACCESS);
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "hls: open failed: '%V'",
+                &ctx->playlist);
+        return;
+    }
+    p = ngx_snprintf(buffer, sizeof(buffer),
+            "#EXT-X-ENDLIST\r\n");
+    n = write(fd, buffer, p - buffer);
+    if (n < 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "hls: write endlist failed: '%V'",
+                &ctx->playlist);
+        ngx_close_file(fd);
+        return;
+    }
+
+    ngx_close_file(fd);
+}
 
 static ngx_int_t
 ngx_rtmp_hls_update_playlist(ngx_rtmp_session_t *s)
@@ -818,7 +853,7 @@ ngx_rtmp_hls_restore_frag(ngx_rtmp_session_t *s)
     ngx_file_info_t                 fi;
     ssize_t                         ret;
     u_char                         *p, *last;
-    u_char                          buffer[sizeof("-.ts\r\n") +
+    u_char                          buffer[sizeof("-.ts\r\n#EXT-X-ENDLIST\r\n") +
                                            NGX_OFF_T_LEN];
 
     /* try to restore frag from previously stored playlist */
@@ -849,11 +884,11 @@ ngx_rtmp_hls_restore_frag(ngx_rtmp_session_t *s)
     /* last line example:
      * mystream-14.ts\r\n */
 
-    if (ret < (ssize_t) sizeof(".ts\r\n")) {
+    if (ret < (ssize_t) sizeof(".ts\r\n#EXT-X-ENDLIST\r\n")) {
         goto done;
     }
 
-    ret -= (sizeof(".ts\r\n") - 1);
+    ret -= (sizeof(".ts\r\n#EXT-X-ENDLIST\r\n") - 1);
 
     last = buffer + ret;
     p = last;
@@ -984,7 +1019,9 @@ ngx_rtmp_hls_delete_stream(ngx_rtmp_session_t *s, ngx_rtmp_delete_stream_t *v)
     if (ctx->opened) {
         ngx_rtmp_hls_close_file(s);
     }
-
+    //add function
+    ngx_rtmp_hls_update_endlist(s);
+    
     if (ctx->out_format) {
         avformat_free_context(ctx->out_format);
         ctx->out_format = NULL;
