@@ -490,6 +490,13 @@ ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
         goto next;
     }
 
+    if (!ctx->opened) {
+        ctx->post_seek = v->offset;
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "play: post seek=%ui", ctx->post_seek);
+        goto next;
+    }
+
     if (ngx_rtmp_send_stream_eof(s, NGX_RTMP_MSID) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -519,6 +526,12 @@ ngx_rtmp_play_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
     if (ctx == NULL || ctx->file.fd == NGX_INVALID_FILE) {
+        goto next;
+    }
+
+    if (!ctx->opened) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "play: pause ignored");
         goto next;
     }
 
@@ -676,6 +689,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ctx->file.fd = NGX_INVALID_FILE;
     ctx->nentry = NGX_CONF_UNSET_UINT;
+    ctx->post_seek = NGX_CONF_UNSET_UINT;
 
     sfx = &ctx->fmt->sfx;
 
@@ -780,6 +794,7 @@ ngx_rtmp_play_open(ngx_rtmp_session_t *s, double start)
 {
     ngx_rtmp_play_ctx_t    *ctx;
     ngx_event_t            *e;
+    ngx_uint_t              timestamp;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
@@ -809,13 +824,18 @@ ngx_rtmp_play_open(ngx_rtmp_session_t *s, double start)
         return NGX_ERROR;
     }
 
-    if (ngx_rtmp_play_do_seek(s, start < 0 ? 0 : start) != NGX_OK) {
+    timestamp = ctx->post_seek != NGX_CONF_UNSET_UINT ? ctx->post_seek :
+                (start < 0 ? 0 : (ngx_uint_t) start);
+
+    if (ngx_rtmp_play_do_seek(s, timestamp) != NGX_OK) {
         return NGX_ERROR;
     }
 
     if (ngx_rtmp_play_do_start(s) != NGX_OK) {
         return NGX_ERROR;
     }
+
+    ctx->opened = 1;
 
     return NGX_OK;
 }

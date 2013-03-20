@@ -43,6 +43,7 @@ typedef struct {
     ngx_rtmp_play_fmt_t    *fmt;
     ngx_event_t             send_evt;
     unsigned                playing:1;
+    unsigned                opened:1;
     ngx_uint_t              ncrs;
     ngx_uint_t              nheader;
     ngx_uint_t              nbody;
@@ -51,6 +52,7 @@ typedef struct {
     ngx_uint_t              file_id;
     ngx_int_t               aindex, vindex;
     ngx_uint_t              nentry;
+    ngx_uint_t              post_seek;
 } ngx_rtmp_play_ctx_t;
 
 
