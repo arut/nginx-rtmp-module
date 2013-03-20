@@ -5,16 +5,14 @@
 <div id="container">Loading the player ...</div>
     <script type="text/javascript">
         jwplayer("container").setup({
-        modes: [
-            {   type: "flash",
-                src: "/jwplayer/player.swf",
-                config: {
-                    bufferlength: 1,
-                    file: "mystream",
-                    streamer: "rtmp://localhost/myapp",
-                    provider: "rtmp",
-                }
+        sources: [
+            {
+                file: "rtmp://localhost/myapp?carg=1/mystream?sarg=2"
             }
-        ]
+        ],
+        autostart: true,
+        width: 640,
+        height: 480,
+        primary: "flash"
 });
 </script>
