@@ -39,9 +39,7 @@
 
 * Online transcoding with FFmpeg
 
-* HLS (HTTP Live Streaming) support;
-  requires recent libavformat 
-  (>= 53.31.100) from ffmpeg (ffmpeg.org)
+* HLS (HTTP Live Streaming) support
 
 * HTTP callbacks (publish/play/record/update etc)
 
@@ -235,10 +233,6 @@ rtmp_auto_push directive.
 
 
             # HLS
-
-            # HLS requires libavformat & should be configured as a separate
-            # NGINX module in addition to nginx-rtmp-module:
-            # ./configure ... --add-module=/path/to/nginx-rtmp-module/hls ...
 
             # For HLS to work please create a directory in tmpfs (/tmp/app here)
             # for the fragments. The directory contents is served via HTTP (see
