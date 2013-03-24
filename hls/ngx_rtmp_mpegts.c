@@ -176,6 +176,9 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
             }
 
             pes_size = (b->last - b->pos) + header_size + 3;
+            if (pes_size > 0xffff) {
+                pes_size = 0;
+            }
 
             *p++ = (pes_size >> 8);
             *p++ = pes_size;
