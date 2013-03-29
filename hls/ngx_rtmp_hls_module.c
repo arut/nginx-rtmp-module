@@ -769,7 +769,7 @@ ngx_rtmp_hls_set_frag(ngx_rtmp_session_t *s, uint64_t ts)
     }
 
     if (frag != ctx->frag + 1) {
-        ctx->offset = (ctx->frag + 1) * (uint64_t) hacf->fraglen * 90 - ts;
+        ctx->offset += (ctx->frag + 1) * (uint64_t) hacf->fraglen * 90 - ts;
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: time gap offset=%uL", ctx->offset);
     }
