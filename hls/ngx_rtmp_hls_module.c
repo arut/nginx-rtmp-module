@@ -187,6 +187,27 @@ ngx_rtmp_hls_chain2buffer(ngx_buf_t *out, ngx_chain_t *in, size_t skip)
 
 
 static ngx_int_t
+ngx_rtmp_hls_create_parent_dir(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_hls_app_conf_t  *hacf;
+
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: creating target folder: '%V'", &hacf->path);
+
+    if (ngx_create_dir(hacf->path.data, NGX_RTMP_HLS_DIR_ACCESS) == NGX_OK) {
+        return NGX_OK;
+    }
+
+    ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                  "hls: error creating target folder: '%V'", &hacf->path);
+
+    return NGX_ERROR;
+}
+
+
+static ngx_int_t
 ngx_rtmp_hls_update_playlist(ngx_rtmp_session_t *s)
 {
     static u_char                   buffer[1024];
@@ -209,20 +230,16 @@ retry:
                        NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
 
     if (fd == NGX_INVALID_FILE) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: open failed: '%V'", &ctx->playlist_bak);
 
-        /* try to create parent folder */
-
-        if (nretry == 0 && 
-            ngx_create_dir(hacf->path.data, NGX_RTMP_HLS_DIR_ACCESS) != 
-            NGX_INVALID_FILE)
+        if (ngx_errno == NGX_ENOENT && nretry == 0 &&
+            ngx_rtmp_hls_create_parent_dir(s) == NGX_OK)
         {
-            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "hls: creating target folder: '%V'", &hacf->path);
-            ++nretry;
+            nretry++;
             goto retry;
         }
+
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: open failed: '%V'", &ctx->playlist_bak);
 
         return NGX_ERROR;
     }
@@ -457,6 +474,7 @@ ngx_rtmp_hls_next_frag(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_hls_app_conf_t    *hacf;
     ngx_rtmp_hls_ctx_t         *ctx;
+    ngx_int_t                   nretry;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
@@ -500,10 +518,22 @@ ngx_rtmp_hls_next_frag(ngx_rtmp_session_t *s)
 
     ngx_str_set(&ctx->file.name, "hls");
 
+    nretry = 0;
+
+retry:
+
     ctx->file.fd = ngx_open_file(ctx->stream.data, NGX_FILE_WRONLY,
                                  NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
 
     if (ctx->file.fd == NGX_INVALID_FILE) {
+
+        if (ngx_errno == NGX_ENOENT && nretry == 0 &&
+            ngx_rtmp_hls_create_parent_dir(s) == NGX_OK)
+        {
+            nretry++;
+            goto retry;
+        }
+
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: error creating fragment file");
         return;
@@ -769,7 +799,7 @@ ngx_rtmp_hls_set_frag(ngx_rtmp_session_t *s, uint64_t ts)
     }
 
     if (frag != ctx->frag + 1) {
-        ctx->offset = (ctx->frag + 1) * (uint64_t) hacf->fraglen * 90 - ts;
+        ctx->offset += (ctx->frag + 1) * (uint64_t) hacf->fraglen * 90 - ts;
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: time gap offset=%uL", ctx->offset);
     }
