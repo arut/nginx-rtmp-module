@@ -16,12 +16,14 @@
                             bytes = '';
                             document.querySelector('#chooser_bits').style.fontWeight = 'normal';
                             document.querySelector('#chooser_bytes').style.fontWeight = 'bold';
+                            setCookie('units', 'bytes', 30);
                         }
                         else {
                             bits = '';
                             bytes = 'none';
                             document.querySelector('#chooser_bits').style.fontWeight = 'bold';
                             document.querySelector('#chooser_bytes').style.fontWeight = 'normal';
+                            setCookie('units', 'bits', 30);
                         }
                         elements = document.querySelectorAll('.unit_bits');
                         for (var e = 0; e < elements.length; e++){
@@ -30,6 +32,30 @@
                         elements = document.querySelectorAll('.unit_bytes');
                         for (var e = 0; e < elements.length; e++){
                             elements[e].style.display = bytes;
+                        }
+                    }
+                    function onload_units(){
+                        units((getCookie('units') == 'bits' ? '0' : 1));
+                    }
+                    function setCookie(c_name,value,exdays)
+                    {
+                        var exdate=new Date();
+                        exdate.setDate(exdate.getDate() + exdays);
+                        var c_value=escape(value) + ((exdays==null) ? "" : "; expires="+exdate.toUTCString());
+                        document.cookie=c_name + "=" + c_value;
+                    }
+                    function getCookie(c_name)
+                    {
+                        var i,x,y,ARRcookies=document.cookie.split(";");
+                        for (i=0;i<ARRcookies.length;i++)
+                        {
+                            x=ARRcookies[i].substr(0,ARRcookies[i].indexOf("="));
+                            y=ARRcookies[i].substr(ARRcookies[i].indexOf("=")+1);
+                            x=x.replace(/^\s+|\s+$/g,"");
+                            if (x==c_name)
+                            {
+                                return unescape(y);
+                            }
                         }
                     }
                     ]]>
@@ -41,7 +67,7 @@
                 }
             </style>
         </head>
-        <body onload="units(0)">
+        <body onload="onload_units();">
             <div>Units: <a id="chooser_bits" class="span_link" onclick="units(0); this.style.fontWeight = 'bold'; return false;">bits/s</a> | <a id="chooser_bytes" class="span_link" onclick="units(1); this.style.fontWeight = 'bold'; return false;">bytes/s</a></div>
             <xsl:apply-templates select="rtmp"/>
             <hr/>
