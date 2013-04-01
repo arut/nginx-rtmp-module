@@ -26,8 +26,8 @@
             <th>#clients</th>
             <th>In bytes</th>
             <th>Out bytes</th>
-            <th>In Kbps</th>
-            <th>Out Kbps</th>
+            <th>In Bandwidth</th>
+            <th>Out Bandwidth</th>
             <th>Size</th>
             <th>Frame Rate</th>
             <th>Video</th>
@@ -36,21 +36,46 @@
             <th>Time</th>
         </tr>
         <tr>
-            <td>@<xsl:value-of select="naccepted"/></td>
-            <td/>
-            <td><xsl:value-of select="in"/></td>
-            <td><xsl:value-of select="out"/></td>
-            <td><xsl:value-of select="round(bwin div 1024)"/></td>
-            <td><xsl:value-of select="round(bwout div 1024)"/></td>
-            <td colspan="5"/>
+            <td colspan="2">Accepted: <xsl:value-of select="naccepted"/></td>
             <td>
-                <xsl:call-template name="showtime">
-                    <xsl:with-param name="time" select="/rtmp/uptime * 1000"/>
+                <xsl:call-template name="showsize">
+                    <xsl:with-param name="size" select="in"/>
                 </xsl:call-template>
             </td>
-        </tr>
-        <xsl:apply-templates select="server"/>
-    </table>
+            <td>
+               <xsl:call-template name="showsize">
+                   <xsl:with-param name="size" select="out"/>
+               </xsl:call-template>
+           </td>
+            <td>
+               <xsl:call-template name="showsize">
+                   <xsl:with-param name="size" select="bwin div 8"/>
+               </xsl:call-template>/s
+               <br />
+               <xsl:call-template name="showsize">
+                   <xsl:with-param name="size" select="bwin"/>
+                   <xsl:with-param name="bits" select="1"/>
+               </xsl:call-template>/s
+           </td>
+           <td>
+                <xsl:call-template name="showsize">
+                   <xsl:with-param name="size" select="bwout div 8"/>
+               </xsl:call-template>/s
+               <br />
+               <xsl:call-template name="showsize">
+                   <xsl:with-param name="size" select="bwout"/>
+                   <xsl:with-param name="bits" select="1"/>
+               </xsl:call-template>/s
+           </td>
+           <td colspan="5"/>
+           <td>
+            <xsl:call-template name="showtime">
+                <xsl:with-param name="time" select="/rtmp/uptime * 1000"/>
+            </xsl:call-template>
+        </td>
+    </tr>
+    <xsl:apply-templates select="server"/>
+</table>
 </xsl:template>
 
 <xsl:template match="server">
@@ -100,10 +125,35 @@
             </a>
         </td>
         <td align="middle"> <xsl:value-of select="nclients"/> </td>
-        <td><xsl:value-of select="in"/></td>
-        <td><xsl:value-of select="out"/></td>
-        <td><xsl:value-of select="round(bwin div 1024)"/></td>
-        <td><xsl:value-of select="round(bwout div 1024)"/></td>
+        <td>
+            <xsl:call-template name="showsize">
+               <xsl:with-param name="size" select="in"/>
+           </xsl:call-template>
+       </td>
+       <td>
+        <xsl:call-template name="showsize">
+           <xsl:with-param name="size" select="out"/>
+       </xsl:call-template>
+   </td>
+   <td>
+    <xsl:call-template name="showsize">
+       <xsl:with-param name="size" select="bwin div 8"/>
+   </xsl:call-template>/s
+   <br />
+   <xsl:call-template name="showsize">
+       <xsl:with-param name="size" select="bwin"/>
+       <xsl:with-param name="bits" select="1"/>
+   </xsl:call-template>/s
+</td>
+<td><xsl:call-template name="showsize">
+   <xsl:with-param name="size" select="bwout div 8"/>
+</xsl:call-template>/s
+<br />
+<xsl:call-template name="showsize">
+   <xsl:with-param name="size" select="bwout"/>
+   <xsl:with-param name="bits" select="1"/>
+</xsl:call-template>/s
+</td>
         <td><xsl:value-of select="meta/width"/>x<xsl:value-of select="meta/height"/></td>
         <td align="middle"><xsl:value-of select="meta/framerate"/></td>
         <td>
@@ -164,6 +214,29 @@
     <xsl:value-of select="$sec mod 60"/>s
 </xsl:template>
 
+<xsl:template name="showsize">
+    <xsl:param name="size"/>
+    <xsl:param name="bits" select="0" />
+    <xsl:variable name="sizen">
+        <xsl:value-of select="floor($size div 1024)"/>
+    </xsl:variable>
+    <xsl:choose>
+        <xsl:when test="$sizen &gt;= 1073741824">
+            <xsl:value-of select="format-number($sizen div 1073741824,'#.###')"/> T</xsl:when>
+
+        <xsl:when test="$sizen &gt;= 1048576">
+            <xsl:value-of select="format-number($sizen div 1048576,'#.###')"/> G</xsl:when>
+
+        <xsl:when test="$sizen &gt;= 1024">
+            <xsl:value-of select="format-number($sizen div 1024,'#.##')"/> M</xsl:when>
+        <xsl:when test="$sizen &gt;= 0">
+            <xsl:value-of select="$sizen"/>K</xsl:when>
+    </xsl:choose>
+    <xsl:choose>
+        <xsl:when test="$bits = 1">b</xsl:when>
+        <xsl:otherwise>B</xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
 
 <xsl:template name="streamstate">
     <xsl:choose>
