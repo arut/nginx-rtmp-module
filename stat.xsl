@@ -274,7 +274,7 @@
         <xsl:when test="$sizen &gt;= 1024">
             <xsl:value-of select="format-number($sizen div 1024,'#.##')"/> M</xsl:when>
         <xsl:when test="$sizen &gt;= 0">
-            <xsl:value-of select="$sizen"/>K</xsl:when>
+            <xsl:value-of select="$sizen"/> k</xsl:when>
     </xsl:choose>
     <xsl:choose>
         <xsl:when test="$bits = 1">b</xsl:when>
