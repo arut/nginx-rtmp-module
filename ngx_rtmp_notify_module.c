@@ -845,10 +845,6 @@ ngx_rtmp_notify_parse_http_header(ngx_rtmp_session_t *s,
         for (p = b->pos; p != b->last; ++p) {
             c = *p;
 
-            ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "header state:%i, n:%ui, c:%c",
-                           (ngx_int_t) state, n, c);
-
             if (c == '\r') {
                 continue;
             }
@@ -943,7 +939,7 @@ ngx_rtmp_notify_connect_handle(ngx_rtmp_session_t *s,
         if (rc > 0) {
             *ngx_cpymem(v->app, app, rc) = 0;
             ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                    "notify: connect redirect to '%s'", v->app);
+                          "notify: connect redirect to '%s'", v->app);
         }
     }
 
@@ -975,7 +971,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         if (rc > 0) {
             *ngx_cpymem(v->name, name, rc) = 0;
             ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                    "notify: publish redirect to '%s'", v->name);
+                          "notify: publish redirect to '%s'", v->name);
         }
     }
 
@@ -1007,7 +1003,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
         if (rc > 0) {
             *ngx_cpymem(v->name, name, rc) = 0;
             ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                    "notify: play redirect to '%s'", v->name);
+                          "notify: play redirect to '%s'", v->name);
         }
     }
 
