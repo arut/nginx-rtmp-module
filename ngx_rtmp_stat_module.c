@@ -519,7 +519,6 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     static u_char                   tbuf[NGX_TIME_T_LEN + 1];
     static u_char                   nbuf[NGX_OFF_T_LEN + 1];
 
-    r->keepalive = 0;
     slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
     if (slcf->stat == 0) {
         return NGX_DECLINED;
