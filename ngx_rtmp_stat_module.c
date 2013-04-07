@@ -14,6 +14,7 @@
 #include "ngx_rtmp_codec_module.h"
 
 
+static char *ngx_rtmp_stat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_rtmp_stat_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_stat_create_loc_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_stat_merge_loc_conf(ngx_conf_t *cf, 
@@ -52,7 +53,7 @@ static ngx_command_t  ngx_rtmp_stat_commands[] = {
 
     { ngx_string("rtmp_stat"),
         NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
-        ngx_conf_set_bitmask_slot,
+        ngx_rtmp_stat,
         NGX_HTTP_LOC_CONF_OFFSET,
         offsetof(ngx_rtmp_stat_loc_conf_t, stat),
         ngx_rtmp_stat_masks },
@@ -522,7 +523,6 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     static u_char                   tbuf[NGX_TIME_T_LEN + 1];
     static u_char                   nbuf[NGX_OFF_T_LEN + 1];
 
-    r->keepalive = 0;
     slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
     if (slcf->stat == 0) {
         return NGX_DECLINED;
@@ -657,22 +657,22 @@ ngx_rtmp_stat_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+static char *
+ngx_rtmp_stat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_core_loc_conf_t  *clcf;
+
+    clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
+    clcf->handler = ngx_rtmp_stat_handler;
+
+    return ngx_conf_set_bitmask_slot(cf, cmd, conf);
+}
+
+
 static ngx_int_t
 ngx_rtmp_stat_postconfiguration(ngx_conf_t *cf)
 {
-    ngx_http_handler_pt            *h;
-    ngx_http_core_main_conf_t      *cmcf;
-
-    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
-
-    h = ngx_array_push(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers);
-    if (h == NULL) {
-        return NGX_ERROR;
-    }
-    *h = ngx_rtmp_stat_handler;
-
     start_time = ngx_cached_time->sec;
 
     return NGX_OK;
 }
-

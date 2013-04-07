@@ -123,7 +123,7 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
     ngx_buf_t *b)
 {
     ngx_uint_t  pes_size, header_size, body_size, in_size, stuff_size, flags;
-    u_char      packet[188], *p;
+    u_char      packet[188], *p, *base;
     ngx_int_t   first, rc;
 
     ngx_log_debug6(NGX_LOG_DEBUG_HTTP, file->log, 0,
@@ -208,19 +208,24 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
             stuff_size = (body_size - in_size);
 
             if (packet[3] & 0x20) {
+
+                /* has adaptation */
+
+                base = &packet[5] + packet[4];
+                p = ngx_movemem(base + stuff_size, base, p - base);
+                ngx_memset(base, 0xff, stuff_size);
                 packet[4] += stuff_size;
-                p = ngx_movemem(&packet[6] + stuff_size, &packet[6], p - &packet[4]);
-                ngx_memset(&packet[6], 0xff, stuff_size);
 
             } else {
+
+                /* no adaptation */
+
                 packet[3] |= 0x20;
-                if (stuff_size == 1) {
-                    p = ngx_movemem(&packet[5], &packet[4], p - &packet[4]);
-                    packet[4] = 0;
-                } else {
-                    p = ngx_movemem(&packet[4] + stuff_size, &packet[4],
-                                    p - &packet[4]);
-                    packet[4] = stuff_size - 1;
+                p = ngx_movemem(&packet[4] + stuff_size, &packet[4],
+                                p - &packet[4]);
+
+                packet[4] = stuff_size - 1;
+                if (stuff_size >= 2) {
                     packet[5] = 0;
                     ngx_memset(&packet[6], 0xff, stuff_size - 2);
                 }
