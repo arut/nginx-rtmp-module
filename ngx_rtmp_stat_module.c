@@ -5,6 +5,9 @@
 
 #include <nginx.h>
 #include <ngx_http.h>
+#ifdef NGX_HAVE_SYSINFO
+#include <sys/sysinfo.h>
+#endif
 
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_live_module.h"
@@ -566,6 +569,37 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
                   "%ui", ngx_rtmp_naccepted) - nbuf);
     NGX_RTMP_STAT_L("</naccepted>\r\n");
+
+#if (NGX_HAVE_GETLOADAVG || NGX_HAVE_SYSINFO)
+    double loadavg[3] = {-1, -1, -1};
+
+#ifdef NGX_HAVE_GETLOADAVG
+    getloadavg(loadavg, 3);
+#elif NGX_HAVE_SYSINFO
+    struct sysinfo si_data;
+
+    if (sysinfo(&s) == 0) {
+        loadavg[0] = (double) si_data.loads[0] / 65535;
+        loadavg[1] = (double) si_data.loads[1] / 65535;
+        loadavg[2] = (double) si_data.loads[2] / 65535;
+    }
+#endif
+
+if (loadavg[2] != -1) {
+    NGX_RTMP_STAT_L("<load1>");
+    NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                  "%.2f", loadavg[0]) - nbuf);
+    NGX_RTMP_STAT_L("</load1>");
+    NGX_RTMP_STAT_L("<load5>");
+    NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                  "%.2f", loadavg[1]) - nbuf);
+    NGX_RTMP_STAT_L("</load5>");
+    NGX_RTMP_STAT_L("<load15>");
+    NGX_RTMP_STAT(nbuf, ngx_snprintf(nbuf, sizeof(nbuf),
+                  "%.2f", loadavg[2]) - nbuf);
+    NGX_RTMP_STAT_L("</load15>\r\n");
+}
+#endif
 
     ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_in, &ngx_rtmp_bw_out);
 
