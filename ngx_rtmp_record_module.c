@@ -477,11 +477,17 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     }
 
     if (rracf->lock_file) {
+#if (NGX_WIN32)
+        err = NGX_EACCES;
+        ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
+                      "record: %V lock not supported", &rracf->id);
+#else
         err = ngx_lock_fd(rctx->file.fd);
         if (err) {
             ngx_log_error(NGX_LOG_CRIT, s->connection->log, err,
                           "record: %V lock failed", &rracf->id);
         }
+#endif
     }
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
