@@ -212,7 +212,7 @@ static ngx_int_t
 ngx_rtmp_hls_update_playlist(ngx_rtmp_session_t *s)
 {
     static u_char                   buffer[1024];
-    int                             fd;
+    ngx_fd_t                        fd;
     u_char                         *p;
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
@@ -255,7 +255,7 @@ retry:
                      "#EXT-X-ALLOW-CACHE:NO\r\n\r\n",
                      ctx->frag, (ngx_uint_t) (hacf->fraglen / 1000));
 
-    n = write(fd, buffer, p - buffer);
+    n = ngx_write_fd(fd, buffer, p - buffer);
     if (n < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: write failed: '%V'", &ctx->playlist_bak);
@@ -270,7 +270,7 @@ retry:
                          (ngx_int_t) (hacf->fraglen / 1000), &ctx->name,
                          ngx_rtmp_hls_frag(hacf, ffrag));
 
-        n = write(fd, buffer, p - buffer);
+        n = ngx_write_fd(fd, buffer, p - buffer);
         if (n < 0) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                           "hls: write failed '%V'", &ctx->playlist_bak);
