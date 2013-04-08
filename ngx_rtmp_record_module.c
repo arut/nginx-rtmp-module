@@ -503,7 +503,17 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
         file_size = 0;
         timestamp = 0;
 
+#if (NGX_WIN32)
+        {
+            LONG offLo, offHi;
+            offLo = 0;
+            offHi = 0;
+            offLo = SetFilePointer(rctx->file.fd, offLo, &offHi, FILE_END);
+            file_size = (offLo == INVALID_SET_FILE_POINTER) ? ((off_t)-1) : ((((off_t)offHi) << 32) | offLo);
+        }
+#else
         file_size = lseek(rctx->file.fd, 0, SEEK_END);
+#endif
         if (file_size == (off_t) -1) {
             ngx_log_error(NGX_LOG_CRIT, s->connection->log, ngx_errno,
                           "record: %V seek failed", &rracf->id);
