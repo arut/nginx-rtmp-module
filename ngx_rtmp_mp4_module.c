@@ -160,6 +160,9 @@ typedef struct {
 
 
 typedef struct {
+#if (NGX_WIN32)
+    ngx_fd_t                            mmapfd;
+#endif
     void                               *mmaped;
     size_t                              mmaped_size;
 
@@ -2272,6 +2275,32 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
     page_offset = offset & (ngx_pagesize - 1);
     ctx->mmaped_size = page_offset + size;
 
+#if (NGX_WIN32)
+    {
+        SECURITY_ATTRIBUTES sa;
+
+        sa.nLength = sizeof (SECURITY_ATTRIBUTES);
+        sa.bInheritHandle = TRUE;
+        sa.lpSecurityDescriptor = 0;
+
+        ctx->mmaped = NULL;
+        ctx->mmapfd = CreateFileMapping(f->fd, &sa, PAGE_READONLY, 0, ctx->mmaped_size, NULL);
+        if (ctx->mmapfd != NULL) {
+            ctx->mmaped = MapViewOfFile(ctx->mmapfd, FILE_MAP_READ, 0, offset - page_offset, ctx->mmaped_size);
+        }
+    }
+    if (ctx->mmaped == NULL) {
+        DWORD mmap_errno = ngx_errno;
+        if (ctx->mmapfd != NULL) {
+            CloseHandle(ctx->mmapfd);
+            ctx->mmapfd = NULL;
+        }
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, mmap_errno,
+                      "mp4: mmap failed at offset=%ui, size=%uz",
+                      offset, size);
+        return NGX_ERROR;
+    }
+#else
     ctx->mmaped = mmap(NULL, ctx->mmaped_size, PROT_READ, MAP_SHARED,
                        f->fd, offset - page_offset);
 
@@ -2282,6 +2311,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
                       offset, size);
         return NGX_ERROR;
     }
+#endif
 
     return ngx_rtmp_mp4_parse(s, (u_char *) ctx->mmaped + page_offset, 
                                  (u_char *) ctx->mmaped + page_offset + size);
@@ -2299,11 +2329,30 @@ ngx_rtmp_mp4_done(ngx_rtmp_session_t *s, ngx_file_t *f)
         return NGX_OK;
     }
 
+#if (NGX_WIN32)
+    {
+        BOOL res;
+        DWORD mmap_errno;
+        res = UnmapViewOfFile(ctx->mmaped);
+        mmap_errno = ngx_errno;
+        ctx->mmaped = NULL;
+        if (ctx->mmapfd != NULL) {
+            CloseHandle(ctx->mmapfd);
+            ctx->mmapfd = NULL;
+        }
+        if (!res) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, mmap_errno,
+                          "mp4: munmap failed");
+            return NGX_ERROR;
+        }
+    }
+#else
     if (munmap(ctx->mmaped, ctx->mmaped_size)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "mp4: munmap failed");
         return NGX_ERROR;
     }
+#endif
 
     ctx->mmaped = NULL;
     ctx->mmaped_size = 0;
