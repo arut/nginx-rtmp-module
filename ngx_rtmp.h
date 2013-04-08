@@ -11,6 +11,7 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 #include <ngx_event_connect.h>
+#include <stdint.h>
 
 #include "ngx_rtmp_amf.h"
 #include "ngx_rtmp_bandwidth.h"
