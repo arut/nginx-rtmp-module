@@ -609,7 +609,10 @@ ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async)
     }
 
     if (async) {
-        ngx_post_event(c->write, &ngx_posted_events);
+        ngx_add_timer(c->write, s->timeout);
+        if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+            ngx_rtmp_finalize_session(s);
+        }
         return;
     }
 
