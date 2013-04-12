@@ -63,9 +63,7 @@ typedef struct {
     ngx_msec_t                          muxdelay;
     ngx_msec_t                          sync;
     ngx_msec_t                          playlen;
-    ngx_int_t                           factor;
     ngx_uint_t                          winfrags;
-    ngx_uint_t                          nfrags;
     ngx_flag_t                          continuous;
     ngx_flag_t                          nodelete;
     ngx_str_t                           path;
@@ -128,13 +126,6 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       ngx_conf_set_flag_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, nodelete),
-      NULL },
-
-    { ngx_string("hls_playlist_factor"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
-      NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_hls_app_conf_t, factor),
       NULL },
 
     ngx_null_command
@@ -1427,7 +1418,6 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->playlen = NGX_CONF_UNSET;
     conf->continuous = NGX_CONF_UNSET;
     conf->nodelete = NGX_CONF_UNSET;
-    conf->factor = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -1447,11 +1437,9 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->path, prev->path, "");
     ngx_conf_merge_value(conf->continuous, prev->continuous, 1);
     ngx_conf_merge_value(conf->nodelete, prev->nodelete, 0);
-    ngx_conf_merge_value(conf->factor, prev->factor, 2);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
-        conf->nfrags = conf->winfrags * conf->factor;
     }
 
     return NGX_CONF_OK;
