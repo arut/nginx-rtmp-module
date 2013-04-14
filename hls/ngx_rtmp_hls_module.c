@@ -61,7 +61,7 @@ typedef struct {
 
 typedef struct {
     ngx_str_t                           path;
-    ngx_msec_t                          max_age;
+    ngx_msec_t                          playlen;
 } ngx_rtmp_hls_cleanup_t;
 
 
@@ -1422,19 +1422,19 @@ ngx_rtmp_hls_cleanup(void *data)
     u_char                 *p;
     static u_char           path[NGX_MAX_PATH + 1];
 
-    max_age = (time_t) (cleanup->max_age / 1000);
-
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
-                   "hls: cleanup path='%V', max_age=%T",
-                   &cleanup->path, max_age);
+                   "hls: cleanup path='%V', playlen=%M",
+                   &cleanup->path, cleanup->playlen);
 
-    next = max_age;
+    next = cleanup->playlen / 500;
 
     if (ngx_open_dir(&cleanup->path, &dir) != NGX_OK) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, ngx_errno,
                       "hls: cleanup open dir failed '%V'", &cleanup->path);
         return next;
     }
+
+    /*TODO: make first loop for m3u8*/
 
     for ( ;; ) {
         ngx_set_errno(0);
@@ -1458,6 +1458,28 @@ ngx_rtmp_hls_cleanup(void *data)
 
         name.len = ngx_de_namelen(&dir);
 
+        if (name.len >= 3 && name.data[name.len - 3] == '.' &&
+                             name.data[name.len - 2] == 't' &&
+                             name.data[name.len - 1] == 's')
+        {
+            max_age = cleanup->playlen / 500;
+
+        } else if (name.len >= 5 && name.data[name.len - 5] == '.' &&
+                                    name.data[name.len - 4] == 'm' &&
+                                    name.data[name.len - 3] == '3' &&
+                                    name.data[name.len - 2] == 'u' &&
+                                    name.data[name.len - 1] == '8')
+        {
+            /* playlist should never reference erased file */
+
+            max_age = cleanup->playlen / 1000;
+
+        } else {
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
+                           "hls: cleanup skip unknown file type '%V'", &name);
+            continue;
+        }
+
         p = ngx_snprintf(path, sizeof(path) - 1, "%V/%V",
                          &cleanup->path, &name);
         *p = 0;
@@ -1476,11 +1498,6 @@ ngx_rtmp_hls_cleanup(void *data)
         }
 
         mtime = ngx_de_mtime(&dir);
-/*
-        ngx_log_debug3(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
-                       "hls: cleanup check '%V' mtime=%T time=%T",
-                       &name, mtime, ngx_cached_time->sec);
-*/
         if (mtime + max_age > ngx_cached_time->sec) {
             continue;
         }
@@ -1589,8 +1606,8 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (conf->slot) {
         cleanup = conf->slot->data;
-        if (cleanup->max_age < conf->playlen * 2) {
-            cleanup->max_age = conf->playlen * 2;
+        if (cleanup->playlen < conf->playlen) {
+            cleanup->playlen = conf->playlen;
         }
     }
 
