@@ -255,7 +255,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_int_t                       nretry;
     ngx_rtmp_hls_frag_t            *f;
-    ngx_uint_t                      i;
+    ngx_uint_t                      i, max_frag;
 
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -283,7 +283,14 @@ retry:
         return NGX_ERROR;
     }
 
-    /*TODO set target duration big enough*/
+    max_frag = hacf->fraglen / 1000;
+
+    for (i = 0; i < ctx->nfrags; i++) {
+        f = ngx_rtmp_hls_get_frag(s, i);
+        if (f->duration > max_frag) {
+            max_frag = f->duration + .5;
+        }
+    }
 
     p = ngx_snprintf(buffer, sizeof(buffer), 
                      "#EXTM3U\n"
@@ -291,7 +298,7 @@ retry:
                      "#EXT-X-MEDIA-SEQUENCE:%uL\n"
                      "#EXT-X-TARGETDURATION:%ui\n"
                      "#EXT-X-ALLOW-CACHE:NO\n\n",
-                     ctx->frag, (ngx_uint_t) (hacf->fraglen / 1000));
+                     ctx->frag, max_frag);
 
     n = write(fd, buffer, p - buffer);
     if (n < 0) {
@@ -301,7 +308,7 @@ retry:
         return NGX_ERROR;
     }
 
-    for (i = 0; i < ctx->nfrags; ++i) {
+    for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
 
         p = ngx_snprintf(buffer, sizeof(buffer), 
