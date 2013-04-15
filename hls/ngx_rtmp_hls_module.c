@@ -1434,8 +1434,6 @@ ngx_rtmp_hls_cleanup(void *data)
         return next;
     }
 
-    /*TODO: make first loop for m3u8*/
-
     for ( ;; ) {
         ngx_set_errno(0);
 
@@ -1470,8 +1468,6 @@ ngx_rtmp_hls_cleanup(void *data)
                                     name.data[name.len - 2] == 'u' &&
                                     name.data[name.len - 1] == '8')
         {
-            /* playlist should never reference erased file */
-
             max_age = cleanup->playlen / 1000;
 
         } else {
