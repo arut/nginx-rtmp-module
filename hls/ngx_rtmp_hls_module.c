@@ -73,7 +73,7 @@ typedef struct {
     ngx_msec_t                          playlen;
     ngx_uint_t                          winfrags;
     ngx_flag_t                          continuous;
-    ngx_flag_t                          nodelete;
+    ngx_flag_t                          nested;
     ngx_str_t                           path;
     ngx_path_t                         *slot;
 } ngx_rtmp_hls_app_conf_t;
@@ -130,11 +130,11 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       offsetof(ngx_rtmp_hls_app_conf_t, continuous),
       NULL },
 
-    { ngx_string("hls_nodelete"),
+    { ngx_string("hls_nested"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_flag_slot,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_hls_app_conf_t, nodelete),
+      offsetof(ngx_rtmp_hls_app_conf_t, nested),
       NULL },
 
     ngx_null_command
@@ -197,20 +197,54 @@ static ngx_int_t
 ngx_rtmp_hls_create_parent_dir(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_hls_app_conf_t  *hacf;
+    ngx_rtmp_hls_ctx_t       *ctx;
+    ngx_err_t                 err;
+    size_t                    len;
+    static u_char             path[NGX_MAX_PATH + 1];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+
+    if (hacf->path.len == 0) {
+        return NGX_ERROR;
+    }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: creating target folder: '%V'", &hacf->path);
 
-    if (ngx_create_dir(hacf->path.data, NGX_RTMP_HLS_DIR_ACCESS) == NGX_OK) {
+    if (ngx_create_dir(hacf->path.data, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
+        err = ngx_errno;
+        if (err != NGX_EEXIST) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, err,
+                          "hls: error creating target folder: '%V'",
+                          &hacf->path);
+            return NGX_ERROR;
+        }
+    }
+
+    if (!hacf->nested) {
         return NGX_OK;
     }
 
-    ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                  "hls: error creating target folder: '%V'", &hacf->path);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
-    return NGX_ERROR;
+    len = hacf->path.len;
+    if (hacf->path.data[len - 1] == '/') {
+        len--;
+    }
+
+    *ngx_snprintf(path, sizeof(path) - 1, "%*s/%V", len, hacf->path.data,
+                  &ctx->name) = 0;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: creating nested folder: '%s'", path);
+
+    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: error creating nested folder: '%s'", path);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
 }
 
 
@@ -817,6 +851,7 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_rtmp_hls_ctx_t             *ctx;
     u_char                         *p;
     ngx_rtmp_hls_frag_t            *f;
+    size_t                          len;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     if (hacf == NULL || !hacf->hls || hacf->path.len == 0) {
@@ -864,12 +899,20 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     }
     *ngx_cpymem(ctx->name.data, v->name, ctx->name.len) = 0;
 
-    ctx->playlist.data = ngx_palloc(s->connection->pool,
-                                    hacf->path.len + 1 + ctx->name.len +
-                                    sizeof(".m3u8"));
+    len = hacf->path.len + 1 + ctx->name.len + sizeof(".m3u8");
+    if (hacf->nested) {
+        len += ctx->name.len + 1;
+    }
+
+    ctx->playlist.data = ngx_palloc(s->connection->pool, len);
     p = ngx_cpymem(ctx->playlist.data, hacf->path.data, hacf->path.len);
 
     if (p[-1] != '/') {
+        *p++ = '/';
+    }
+
+    if (hacf->nested) {
+        p = ngx_cpymem(p, ctx->name.data, ctx->name.len);
         *p++ = '/';
     }
 
@@ -1417,29 +1460,29 @@ ngx_rtmp_hls_stream_eof(ngx_rtmp_session_t *s, ngx_rtmp_stream_eof_t *v)
 }
 
 
-static time_t
-ngx_rtmp_hls_cleanup(void *data)
+static ngx_int_t
+ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 {
-    ngx_rtmp_hls_cleanup_t *cleanup = data;
-
     ngx_dir_t               dir;
-    time_t                  next, mtime, max_age;
+    time_t                  mtime, max_age;
     ngx_err_t               err;
-    ngx_str_t               name;
+    ngx_str_t               name, spath;
     u_char                 *p;
-    static u_char           path[NGX_MAX_PATH + 1];
+    ngx_int_t               nentries, nerased;
+    u_char                  path[NGX_MAX_PATH + 1];
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
-                   "hls: cleanup path='%V', playlen=%M",
-                   &cleanup->path, cleanup->playlen);
+                   "hls: cleanup path='%V' playlen=%M",
+                   ppath, playlen);
 
-    next = cleanup->playlen / 500;
-
-    if (ngx_open_dir(&cleanup->path, &dir) != NGX_OK) {
+    if (ngx_open_dir(ppath, &dir) != NGX_OK) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, ngx_errno,
-                      "hls: cleanup open dir failed '%V'", &cleanup->path);
-        return next;
+                      "hls: cleanup open dir failed '%V'", ppath);
+        return NGX_ERROR;
     }
+
+    nentries = 0;
+    nerased = 0;
 
     for ( ;; ) {
         ngx_set_errno(0);
@@ -1447,13 +1490,14 @@ ngx_rtmp_hls_cleanup(void *data)
         if (ngx_read_dir(&dir) == NGX_ERROR) {
             err = ngx_errno;
 
-            if (err != NGX_ENOMOREFILES) {
-                ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, err,
-                              "hls: cleanup " ngx_read_dir_n
-                              " \"%V\" failed", &cleanup->path);
+            if (err == NGX_ENOMOREFILES) {
+                return nentries - nerased;
             }
 
-            break;
+            ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, err,
+                          "hls: cleanup " ngx_read_dir_n
+                          " \"%V\" failed", ppath);
+            return NGX_ERROR;
         }
 
         name.data = ngx_de_name(&dir);
@@ -1463,11 +1507,48 @@ ngx_rtmp_hls_cleanup(void *data)
 
         name.len = ngx_de_namelen(&dir);
 
+        p = ngx_snprintf(path, sizeof(path) - 1, "%V/%V", ppath, &name);
+        *p = 0;
+
+        spath.data = path;
+        spath.len = p - path;
+
+        nentries++;
+
+        if (ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
+                          "hls: cleanup " ngx_de_info_n " \"%V\" failed",
+                          &spath);
+
+            continue;
+        }
+
+        if (ngx_de_is_dir(&dir)) {
+
+            if (ngx_rtmp_hls_cleanup_dir(&spath, playlen) == 0) {
+                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
+                               "hls: cleanup dir '%V'", &name);
+
+                if (ngx_delete_dir(spath.data) != NGX_OK) {
+                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
+                                  "hls: cleanup dir error '%V'", &spath);
+                } else {
+                    nerased++;
+                }
+            }
+
+            continue;
+        }
+
+        if (!ngx_de_is_file(&dir)) {
+            continue;
+        }
+
         if (name.len >= 3 && name.data[name.len - 3] == '.' &&
                              name.data[name.len - 2] == 't' &&
                              name.data[name.len - 1] == 's')
         {
-            max_age = cleanup->playlen / 500;
+            max_age = playlen / 500;
 
         } else if (name.len >= 5 && name.data[name.len - 5] == '.' &&
                                     name.data[name.len - 4] == 'm' &&
@@ -1475,28 +1556,11 @@ ngx_rtmp_hls_cleanup(void *data)
                                     name.data[name.len - 2] == 'u' &&
                                     name.data[name.len - 1] == '8')
         {
-            max_age = cleanup->playlen / 1000;
+            max_age = playlen / 1000;
 
         } else {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                            "hls: cleanup skip unknown file type '%V'", &name);
-            continue;
-        }
-
-        p = ngx_snprintf(path, sizeof(path) - 1, "%V/%V",
-                         &cleanup->path, &name);
-        *p = 0;
-
-        if (ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
-            ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
-                          "hls: cleanup " ngx_de_info_n " \"%s\" failed",
-                          path);
-
-            continue;
-        }
-
-        /*TODO: nested cleanup?*/
-        if (!ngx_de_is_file(&dir)) {
             continue;
         }
 
@@ -1509,14 +1573,25 @@ ngx_rtmp_hls_cleanup(void *data)
                        "hls: cleanup '%V' mtime=%T age=%T",
                        &name, mtime, ngx_cached_time->sec - mtime);
 
-        if (ngx_delete_file(path) != NGX_OK) {
+        if (ngx_delete_file(spath.data) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                          "hls: cleanup error '%s'", path);
+                          "hls: cleanup error '%V'", &spath);
             continue;
         }
-    }
 
-    return next;
+        nerased++;
+    }
+}
+
+
+static time_t
+ngx_rtmp_hls_cleanup(void *data)
+{
+    ngx_rtmp_hls_cleanup_t *cleanup = data;
+
+    ngx_rtmp_hls_cleanup_dir(&cleanup->path, cleanup->playlen);
+
+    return cleanup->playlen / 500;
 }
 
 
@@ -1581,7 +1656,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->sync = NGX_CONF_UNSET;
     conf->playlen = NGX_CONF_UNSET;
     conf->continuous = NGX_CONF_UNSET;
-    conf->nodelete = NGX_CONF_UNSET;
+    conf->nested = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -1601,7 +1676,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
     ngx_conf_merge_str_value(conf->path, prev->path, "");
     ngx_conf_merge_value(conf->continuous, prev->continuous, 1);
-    ngx_conf_merge_value(conf->nodelete, prev->nodelete, 0);
+    ngx_conf_merge_value(conf->nested, prev->nested, 0);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
