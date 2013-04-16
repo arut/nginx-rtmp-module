@@ -1025,6 +1025,16 @@ ngx_rtmp_hls_parse_aac_header(ngx_rtmp_session_t *s, ngx_uint_t *objtype,
         return NGX_ERROR;
     }
 
+    if (*objtype > 4) {
+
+        /* 
+         * Mark all extended profiles as LC
+         * to make Android as happy as possible.
+         */
+
+        *objtype = 2;
+    }
+
     *srindex = ((b0 << 1) & 0x0f) | ((b1 & 0x80) >> 7);
     if (*srindex == 0x0f) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
