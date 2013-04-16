@@ -75,8 +75,22 @@ typedef struct {
     ngx_flag_t                          continuous;
     ngx_flag_t                          nested;
     ngx_str_t                           path;
+    ngx_uint_t                          naming;
     ngx_path_t                         *slot;
 } ngx_rtmp_hls_app_conf_t;
+
+
+#define NGX_RTMP_HLS_NAMING_SEQUENTIAL  1
+#define NGX_RTMP_HLS_NAMING_TIMESTAMP   2
+#define NGX_RTMP_HLS_NAMING_SYSTEM      3
+
+
+static ngx_conf_enum_t                  ngx_rtmp_hls_naming_slots[] = {
+    { ngx_string("sequential"),         NGX_RTMP_HLS_NAMING_SEQUENTIAL },
+    { ngx_string("timestamp"),          NGX_RTMP_HLS_NAMING_TIMESTAMP  },
+    { ngx_string("system"),             NGX_RTMP_HLS_NAMING_SYSTEM     },
+    { ngx_null_string,                  0 }
+}; 
 
 
 static ngx_command_t ngx_rtmp_hls_commands[] = {
@@ -136,6 +150,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, nested),
       NULL },
+
+    { ngx_string("hls_fragment_naming"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, naming),
+      &ngx_rtmp_hls_naming_slots },
 
     ngx_null_command
 };
@@ -558,40 +579,28 @@ ngx_rtmp_hls_append_sps_pps(ngx_rtmp_session_t *s, ngx_buf_t *out)
 
 
 static uint64_t
-ngx_rtmp_hls_get_fragment_id(ngx_rtmp_session_t *s)
+ngx_rtmp_hls_get_fragment_id(ngx_rtmp_session_t *s, uint64_t ts)
 {
     ngx_rtmp_hls_ctx_t         *ctx;
+    ngx_rtmp_hls_app_conf_t    *hacf;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
-    /*TODO: implement more methods*/
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
-/*#define ngx_rtmp_hls_frag(hacf, f) (hacf->nfrags ? (f) % hacf->nfrags : (f))*/
+    switch (hacf->naming) {
 
-    return ctx->frag + ctx->nfrags;
+    case NGX_RTMP_HLS_NAMING_TIMESTAMP:
+        return ts;
+
+    case NGX_RTMP_HLS_NAMING_SYSTEM:
+         return ngx_current_msec;
+
+    default: /* NGX_RTMP_HLS_NAMING_SEQUENTIAL */
+        return ctx->frag + ctx->nfrags;
+    }
 }
 
-/*
-static ngx_int_t
-ngx_rtmp_hls_delete_fragment(ngx_rtmp_session_t *s, ngx_uint_t n)
-{
-    ngx_rtmp_hls_ctx_t         *ctx;
-    ngx_rtmp_hls_frag_t        *f;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-
-    f = ngx_rtmp_hls_get_frag(s, n);
-
-    *ngx_sprintf(ctx->stream.data + ctx->stream.len, "-%uL.ts", f->id) = 0;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls: delete fragment '%s'", ctx->stream.data);
-
-    ngx_delete_file(ctx->stream.data);
-
-    return NGX_OK;
-}
-*/
 
 static ngx_int_t
 ngx_rtmp_hls_close_fragment(ngx_rtmp_session_t *s, ngx_int_t discont)
@@ -639,7 +648,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
         f->discont = 1;
     }
 
-    id = ngx_rtmp_hls_get_fragment_id(s);
+    id = ngx_rtmp_hls_get_fragment_id(s, ts);
 
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "-%uL.ts", id) = 0;
 
@@ -1657,6 +1666,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->playlen = NGX_CONF_UNSET;
     conf->continuous = NGX_CONF_UNSET;
     conf->nested = NGX_CONF_UNSET;
+    conf->naming = NGX_CONF_UNSET_UINT;
 
     return conf;
 }
@@ -1677,6 +1687,8 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->path, prev->path, "");
     ngx_conf_merge_value(conf->continuous, prev->continuous, 1);
     ngx_conf_merge_value(conf->nested, prev->nested, 0);
+    ngx_conf_merge_uint_value(conf->naming, prev->naming,
+                              NGX_RTMP_HLS_NAMING_SEQUENTIAL);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
