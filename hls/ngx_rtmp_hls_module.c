@@ -724,7 +724,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     u_char                         *p, *last, *end, *next, *pa;
     ngx_rtmp_hls_frag_t            *f;
     double                          duration;
-    ngx_uint_t                      mag;
+    uint64_t                        mag;
     static u_char                   buffer[4096];
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
