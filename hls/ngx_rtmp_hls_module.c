@@ -311,6 +311,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_int_t                       nretry;
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
+    static ngx_str_t                empty = ngx_null_string;
 
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -368,10 +369,12 @@ retry:
 
         p = ngx_snprintf(buffer, sizeof(buffer), 
                          "#EXTINF:%.3f,\n"
-                         "%V-%uL.ts\n"
+                         "%V%s%uL.ts\n"
                          "%s",
-                         f->duration, &ctx->name, f->id,
-                         f->discont ? "#EXT-X-DISCONTINUITY\n" : "");
+                         f->duration,
+                         hacf->nested ? &empty : &ctx->name,
+                         hacf->nested ? "" : "-",
+                         f->id, f->discont ? "#EXT-X-DISCONTINUITY\n" : "");
 
         ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: fragment frag=%uL, n=%ui/%ui, duration=%.3f, "
@@ -650,7 +653,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 
     id = ngx_rtmp_hls_get_fragment_id(s, ts);
 
-    *ngx_sprintf(ctx->stream.data + ctx->stream.len, "-%uL.ts", id) = 0;
+    *ngx_sprintf(ctx->stream.data + ctx->stream.len, "%uL.ts", id) = 0;
 
     ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: open fragment file='%s', frag=%uL, n=%uL, time=%uL, "
@@ -903,14 +906,16 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ctx->name.len = ngx_strlen(v->name);
     ctx->name.data = ngx_palloc(s->connection->pool, ctx->name.len + 1);
+    
     if (ctx->name.data == NULL) {
         return NGX_ERROR;
     }
+
     *ngx_cpymem(ctx->name.data, v->name, ctx->name.len) = 0;
 
     len = hacf->path.len + 1 + ctx->name.len + sizeof(".m3u8");
     if (hacf->nested) {
-        len += ctx->name.len + 1;
+        len += sizeof("/index") - 1;
     }
 
     ctx->playlist.data = ngx_palloc(s->connection->pool, len);
@@ -920,27 +925,31 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         *p++ = '/';
     }
 
-    if (hacf->nested) {
-        p = ngx_cpymem(p, ctx->name.data, ctx->name.len);
-        *p++ = '/';
-    }
-
     p = ngx_cpymem(p, ctx->name.data, ctx->name.len);
 
     /* ctx->stream_path holds initial part of stream file path 
      * however the space for the whole stream path
      * is allocated */
 
-    ctx->stream.len = p - ctx->playlist.data;
+    ctx->stream.len = p - ctx->playlist.data + 1;
     ctx->stream.data = ngx_palloc(s->connection->pool,
-                       ctx->stream.len + 1 + NGX_INT64_LEN + sizeof(".ts"));
+                                  ctx->stream.len + NGX_INT64_LEN +
+                                  sizeof(".ts"));
 
-    ngx_memcpy(ctx->stream.data, ctx->playlist.data, ctx->stream.len);
+    ngx_memcpy(ctx->stream.data, ctx->playlist.data, ctx->stream.len - 1);
+    ctx->stream.data[ctx->stream.len - 1] = (hacf->nested ? '/' : '-');
+    
 
     /* playlist path */
 
-    p = ngx_cpymem(p, ".m3u8", sizeof(".m3u8") - 1);
+    if (hacf->nested) {
+        p = ngx_cpymem(p, "/index.m3u8", sizeof("/index.m3u8") - 1);
+    } else {
+        p = ngx_cpymem(p, ".m3u8", sizeof(".m3u8") - 1);
+    }
+
     ctx->playlist.len = p - ctx->playlist.data;
+
     *p = 0;
 
     /* playlist bak (new playlist) path */
