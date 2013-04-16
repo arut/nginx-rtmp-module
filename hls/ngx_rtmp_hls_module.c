@@ -830,7 +830,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
                 f->id = 0;
 
                 mag = 1;
-                for (pa = last - 4; pa != p; pa--) {
+                for (pa = last - 4; pa >= p; pa--) {
                     if (*pa < '0' || *pa > '9') {
                         break;
                     }
