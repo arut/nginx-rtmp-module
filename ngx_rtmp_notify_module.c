@@ -915,6 +915,17 @@ ngx_rtmp_notify_parse_http_header(ngx_rtmp_session_t *s,
 }
 
 
+static void
+ngx_rtmp_notify_clear_flag(ngx_rtmp_session_t *s, ngx_uint_t flag)
+{
+    ngx_rtmp_notify_ctx_t  *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
+
+    ctx->flags &= ~flag;
+}
+
+
 static ngx_int_t 
 ngx_rtmp_notify_connect_handle(ngx_rtmp_session_t *s, 
         void *arg, ngx_chain_t *in)
@@ -959,6 +970,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
 
     rc = ngx_rtmp_notify_parse_http_retcode(s, in);
     if (rc == NGX_ERROR) {
+        ngx_rtmp_notify_clear_flag(s, NGX_RTMP_NOTIFY_PUBLISHING);
         return NGX_ERROR;
     }
 
@@ -991,6 +1003,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
 
     rc = ngx_rtmp_notify_parse_http_retcode(s, in);
     if (rc == NGX_ERROR) {
+        ngx_rtmp_notify_clear_flag(s, NGX_RTMP_NOTIFY_PLAYING);
         return NGX_ERROR;
     }
 
