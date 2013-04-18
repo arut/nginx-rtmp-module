@@ -76,6 +76,7 @@ typedef struct {
     ngx_flag_t                          nested;
     ngx_str_t                           path;
     ngx_uint_t                          naming;
+    ngx_uint_t                          slicing;
     ngx_path_t                         *slot;
 } ngx_rtmp_hls_app_conf_t;
 
@@ -85,10 +86,21 @@ typedef struct {
 #define NGX_RTMP_HLS_NAMING_SYSTEM      3
 
 
+#define NGX_RTMP_HLS_SLICING_PLAIN      1
+#define NGX_RTMP_HLS_SLICING_ALIGNED    2
+
+
 static ngx_conf_enum_t                  ngx_rtmp_hls_naming_slots[] = {
     { ngx_string("sequential"),         NGX_RTMP_HLS_NAMING_SEQUENTIAL },
     { ngx_string("timestamp"),          NGX_RTMP_HLS_NAMING_TIMESTAMP  },
     { ngx_string("system"),             NGX_RTMP_HLS_NAMING_SYSTEM     },
+    { ngx_null_string,                  0 }
+}; 
+
+
+static ngx_conf_enum_t                  ngx_rtmp_hls_slicing_slots[] = {
+    { ngx_string("plain"),              NGX_RTMP_HLS_SLICING_PLAIN },
+    { ngx_string("aligned"),            NGX_RTMP_HLS_SLICING_ALIGNED  },
     { ngx_null_string,                  0 }
 }; 
 
@@ -157,6 +169,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, naming),
       &ngx_rtmp_hls_naming_slots },
+
+    { ngx_string("hls_fragment_slicing"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, slicing),
+      &ngx_rtmp_hls_slicing_slots },
 
     ngx_null_command
 };
@@ -352,8 +371,7 @@ retry:
                      "#EXTM3U\n"
                      "#EXT-X-VERSION:3\n"
                      "#EXT-X-MEDIA-SEQUENCE:%uL\n"
-                     "#EXT-X-TARGETDURATION:%ui\n"
-                     "#EXT-X-ALLOW-CACHE:NO\n\n",
+                     "#EXT-X-TARGETDURATION:%ui\n",
                      ctx->frag, max_frag);
 
     n = write(fd, buffer, p - buffer);
@@ -697,11 +715,7 @@ retry:
     ctx->opened = 1;
 
     f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
-/*
-    if (f->active) {
-        ngx_rtmp_hls_delete_fragment(s, ctx->nfrags);
-    }
-*/
+    
     ngx_memzero(f, sizeof(*f));
 
     f->active = 1;
@@ -1067,30 +1081,51 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 {
     ngx_rtmp_hls_ctx_t         *ctx;
     ngx_rtmp_hls_app_conf_t    *hacf;
-    ngx_int_t                   restart;
     ngx_rtmp_hls_frag_t        *f;
+    ngx_msec_t                  ts_frag_len;
+    ngx_int_t                   same_frag;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
+    f = NULL;
     if (ctx->opened) {
         f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
         f->duration = (ts - ctx->frag_ts) / 90000.;
-        if (f->duration < hacf->fraglen / 1000.) {
-            return;
-        }
+    }
+
+    switch (hacf->slicing) {
+        case NGX_RTMP_HLS_SLICING_PLAIN:
+            if (f && f->duration < hacf->fraglen / 1000.) {
+                boundary = 0;
+            }
+            break;
+
+        case NGX_RTMP_HLS_SLICING_ALIGNED:
+
+            ts_frag_len = hacf->fraglen * 90;
+            same_frag = ctx->frag_ts / ts_frag_len == ts / ts_frag_len;
+
+            if (f && same_frag) {
+                boundary = 0;
+            }
+
+            if (f == NULL && (ctx->frag_ts == 0 || same_frag)) {
+                ctx->frag_ts = ts;
+                boundary = 0;
+            }
+
+            break;
     }
 
     if (!boundary) {
         return;
     }
 
-    restart = ctx->opened;
-
     ngx_rtmp_hls_close_fragment(s, 0);
 
-    ngx_rtmp_hls_open_fragment(s, ts, !restart);
+    ngx_rtmp_hls_open_fragment(s, ts, !f);
 }
 
 
@@ -1686,6 +1721,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->continuous = NGX_CONF_UNSET;
     conf->nested = NGX_CONF_UNSET;
     conf->naming = NGX_CONF_UNSET_UINT;
+    conf->slicing = NGX_CONF_UNSET_UINT;
 
     return conf;
 }
@@ -1708,6 +1744,8 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->nested, prev->nested, 0);
     ngx_conf_merge_uint_value(conf->naming, prev->naming,
                               NGX_RTMP_HLS_NAMING_SEQUENTIAL);
+    ngx_conf_merge_uint_value(conf->slicing, prev->slicing,
+                              NGX_RTMP_HLS_SLICING_PLAIN);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
