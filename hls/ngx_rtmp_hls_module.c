@@ -21,10 +21,11 @@ static ngx_int_t ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, 
        void *parent, void *child);
+static ngx_int_t ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s);
 
 
 #define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
-
+#define NGX_RTMP_HLS_MAX_AUDIO_DELAY    30000
 #define NGX_RTMP_HLS_DIR_ACCESS         0744
 
 
@@ -56,6 +57,9 @@ typedef struct {
 
     uint64_t                            aframe_base;
     uint64_t                            aframe_num;
+
+    ngx_buf_t                          *aframe;
+    uint64_t                            aframe_pts;
 } ngx_rtmp_hls_ctx_t;
 
 
@@ -210,27 +214,6 @@ ngx_module_t  ngx_rtmp_hls_module = {
 	NULL,                               /* exit master */
 	NGX_MODULE_V1_PADDING
 };
-
-
-static void
-ngx_rtmp_hls_chain2buffer(ngx_buf_t *out, ngx_chain_t *in, size_t skip)
-{
-    size_t  size;
-
-    for (; in; in = in->next) {
-        
-        size = in->buf->last - in->buf->pos;
-        if (size < skip) {
-            skip -= size;
-            continue;
-        }
-
-        out->last = ngx_cpymem(out->last, in->buf->pos + skip,
-                              ngx_min(size - skip,
-                                      (size_t) (out->end - out->last)));
-        skip = 0;
-    }
-}
 
 
 static ngx_int_t
@@ -723,6 +706,10 @@ retry:
 
     ctx->frag_ts = ts;
 
+    /* start fragment with audio to make iPhone happy */
+
+    ngx_rtmp_hls_flush_audio(s);
+
     return NGX_OK;
 }
 
@@ -877,6 +864,7 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_rtmp_hls_ctx_t             *ctx;
     u_char                         *p;
     ngx_rtmp_hls_frag_t            *f;
+    ngx_buf_t                      *b;
     size_t                          len;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -895,12 +883,23 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
     if (ctx == NULL) {
+
         ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_hls_ctx_t));
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_hls_module);
+
     } else {
+
         f = ctx->frags;
+        b = ctx->aframe;
+
         ngx_memzero(ctx, sizeof(ngx_rtmp_hls_ctx_t));
+
         ctx->frags = f;
+        ctx->aframe = b;
+
+        if (b) {
+            b->pos = b->last = b->start;
+        }
     }
 
     if (ctx->frags == NULL) {
@@ -1084,6 +1083,7 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_rtmp_hls_frag_t        *f;
     ngx_msec_t                  ts_frag_len;
     ngx_int_t                   same_frag;
+    ngx_buf_t                  *b;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
@@ -1093,6 +1093,13 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     if (ctx->opened) {
         f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
         f->duration = (ts - ctx->frag_ts) / 90000.;
+
+        b = ctx->aframe;
+        if (b && b->last > b->pos &&
+            ctx->aframe_pts + NGX_RTMP_HLS_MAX_AUDIO_DELAY > ts)
+        {
+            ngx_rtmp_hls_flush_audio(s);
+        }
     }
 
     switch (hacf->slicing) {
@@ -1130,19 +1137,63 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 
 
 static ngx_int_t
+ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_hls_ctx_t             *ctx;
+    ngx_rtmp_mpegts_frame_t         frame;
+    ngx_int_t                       rc;
+    ngx_buf_t                      *b;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    if (!ctx->opened) {
+        return NGX_OK;
+    }
+    
+    b = ctx->aframe;
+    
+    if (b == NULL || b->pos == b->last) {
+        return NGX_OK;
+    }
+
+    ngx_memzero(&frame, sizeof(frame));
+
+    frame.dts = ctx->aframe_pts;
+    frame.pts = frame.dts;
+    frame.cc = ctx->audio_cc;
+    frame.pid = 0x101;
+    frame.sid = 0xc0;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: flush audio pts=%uL", frame.pts);
+
+    rc = ngx_rtmp_mpegts_write_frame(&ctx->file, &frame, b);
+
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "hls: audio flush failed");
+    }
+
+    ctx->audio_cc = frame.cc;
+    b->pos = b->last = b->start;
+
+    return rc;
+}
+
+
+static ngx_int_t
 ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
     ngx_chain_t *in)
 {
     ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_hls_ctx_t             *ctx;
     ngx_rtmp_codec_ctx_t           *codec_ctx;
-    uint64_t                        dts;
-    int64_t                         ddts;
-    ngx_rtmp_mpegts_frame_t         frame;
-    ngx_buf_t                       out;
+    uint64_t                        pts, est_pts;
+    int64_t                         dpts;
+    size_t                          bsize;
+    ngx_buf_t                      *b;
     u_char                         *p;
     ngx_uint_t                      objtype, srindex, chconf, size;
-    static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
@@ -1162,22 +1213,60 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    ngx_memzero(&frame, sizeof(frame));
+    b = ctx->aframe;
 
-    frame.dts = (uint64_t) h->timestamp * 90;
-    frame.cc = ctx->audio_cc;
-    frame.pid = 0x101;
-    frame.sid = 0xc0;
+    if (b == NULL) {
 
-    ngx_memzero(&out, sizeof(out));
+        b = ngx_pcalloc(s->connection->pool, sizeof(ngx_buf_t));
+        if (b == NULL) {
+            return NGX_ERROR;
+        }
 
-    out.start = buffer;
-    out.end = buffer + sizeof(buffer);
-    out.pos = out.start;
-    out.last = out.pos;
+        ctx->aframe = b;
 
-    p = out.last;
-    out.last += 7;
+        b->start = ngx_palloc(s->connection->pool, NGX_RTMP_HLS_BUFSIZE);
+        if (b->pos == NULL) {
+            return NGX_ERROR;
+        }
+
+        b->end = b->start + NGX_RTMP_HLS_BUFSIZE;
+        b->pos = b->last = b->start;
+    }
+
+    size = h->mlen - 2 + 7;
+    pts = (uint64_t) h->timestamp * 90;
+
+    if (b->start + size > b->end) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "hls: too big audio frame");
+        return NGX_OK;
+    }
+
+    ngx_rtmp_hls_update_fragment(s, pts, codec_ctx->avc_header == NULL);
+
+    if (b->last + size > b->end) {
+        ngx_rtmp_hls_flush_audio(s);
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: audio pts=%uL", pts);
+
+    p = b->last;
+    b->last += 5;
+
+    /* copy payload */
+
+    for (; in; in = in->next) {
+
+        bsize = in->buf->last - in->buf->pos;
+        if (b->last + bsize > b->end) {
+            break;
+        }
+
+        b->last = ngx_cpymem(b->last, in->buf->pos, bsize);
+    }
+
+    /* make up ADTS header */
 
     if (ngx_rtmp_hls_parse_aac_header(s, &objtype, &srindex, &chconf)
         != NGX_OK)
@@ -1186,8 +1275,8 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                       "hls: aac header error");
         return NGX_OK;
     }
-
-    size = h->mlen - 2 + 7;
+    
+    /* we have 5 free bytes + 2 bytes of RTMP frame header */
 
     p[0] = 0xff;
     p[1] = 0xf1;
@@ -1197,57 +1286,44 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     p[5] = (size << 5) | 0x1f;
     p[6] = 0xfc;
 
-    ngx_rtmp_hls_chain2buffer(&out, in, 2);
-
-    if (hacf->sync && codec_ctx->sample_rate) {
-
-        /* TODO: We assume here AAC frame size is 1024
-         *       Need to handle AAC frames with frame size of 960 */
-
-        dts = ctx->aframe_base + ctx->aframe_num * 90000 * 1024 /
-                                 codec_ctx->sample_rate;
-        ddts = (int64_t) (dts - frame.dts);
-
-        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "hls: sync stat ddts=%L (%.5fs)",
-                       ddts, ddts / 90000.);
-
-        if (ddts > (int64_t) hacf->sync * 90 ||
-            ddts < (int64_t) hacf->sync * -90)
-        {
-            ctx->aframe_base = frame.dts;
-            ctx->aframe_num  = 0;
-
-            ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "hls: sync breakup ddts=%L (%.5fs)",
-                           ddts, ddts / 90000.);
-        } else {
-            frame.dts = dts;
-        }
-
+    if (p != b->start) {
         ctx->aframe_num++;
-    }
-
-    frame.pts = frame.dts;
-
-    /* Fragment is restarted in video handler.
-     * However if video stream is missing then do it here */
-
-    ngx_rtmp_hls_update_fragment(s, frame.dts, codec_ctx->avc_header == NULL);
-
-    if (!ctx->opened) {
         return NGX_OK;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls: audio dts=%uL", frame.dts);
+    ctx->aframe_pts = pts;
 
-    if (ngx_rtmp_mpegts_write_frame(&ctx->file, &frame, &out) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                      "hls: audio frame failed");
+    if (!hacf->sync || codec_ctx->sample_rate == 0) {
+        return NGX_OK;
     }
 
-    ctx->audio_cc = frame.cc;
+    /* align audio frames */
+
+    /* TODO: We assume here AAC frame size is 1024
+     *       Need to handle AAC frames with frame size of 960 */
+
+    est_pts = ctx->aframe_base + ctx->aframe_num * 90000 * 1024 /
+                                 codec_ctx->sample_rate;
+    dpts = (int64_t) (est_pts - pts);
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: audio sync dpts=%L (%.5fs)",
+                   dpts, dpts / 90000.);
+
+    if (dpts <= (int64_t) hacf->sync * 90 &&
+        dpts >= (int64_t) hacf->sync * -90)
+    {
+        ctx->aframe_num++;
+        ctx->aframe_pts = est_pts;
+        return NGX_OK;
+    }
+
+    ctx->aframe_base = pts;
+    ctx->aframe_num  = 1;
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: audio sync gap dpts=%L (%.5fs)",
+                   dpts, dpts / 90000.);
 
     return NGX_OK;
 }
