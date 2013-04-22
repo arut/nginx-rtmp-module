@@ -26,8 +26,8 @@
             <th>#clients</th>
             <th>In bytes</th>
             <th>Out bytes</th>
-            <th>In Bandwidth</th>
-            <th>Out Bandwidth</th>
+            <th>Input bits/s</th>
+            <th>Output bits/s</th>
             <th>Size</th>
             <th>Frame Rate</th>
             <th>Video</th>
@@ -49,19 +49,11 @@
            </td>
             <td>
                <xsl:call-template name="showsize">
-                   <xsl:with-param name="size" select="bwin div 8"/>
-               </xsl:call-template>/s
-               <br />
-               <xsl:call-template name="showsize">
                    <xsl:with-param name="size" select="bwin"/>
                    <xsl:with-param name="bits" select="1"/>
                </xsl:call-template>/s
            </td>
            <td>
-                <xsl:call-template name="showsize">
-                   <xsl:with-param name="size" select="bwout div 8"/>
-               </xsl:call-template>/s
-               <br />
                <xsl:call-template name="showsize">
                    <xsl:with-param name="size" select="bwout"/>
                    <xsl:with-param name="bits" select="1"/>
@@ -129,31 +121,24 @@
             <xsl:call-template name="showsize">
                <xsl:with-param name="size" select="in"/>
            </xsl:call-template>
-       </td>
-       <td>
-        <xsl:call-template name="showsize">
-           <xsl:with-param name="size" select="out"/>
-       </xsl:call-template>
-   </td>
-   <td>
-    <xsl:call-template name="showsize">
-       <xsl:with-param name="size" select="bwin div 8"/>
-   </xsl:call-template>/s
-   <br />
-   <xsl:call-template name="showsize">
-       <xsl:with-param name="size" select="bwin"/>
-       <xsl:with-param name="bits" select="1"/>
-   </xsl:call-template>/s
-</td>
-<td><xsl:call-template name="showsize">
-   <xsl:with-param name="size" select="bwout div 8"/>
-</xsl:call-template>/s
-<br />
-<xsl:call-template name="showsize">
-   <xsl:with-param name="size" select="bwout"/>
-   <xsl:with-param name="bits" select="1"/>
-</xsl:call-template>/s
-</td>
+        </td>
+        <td>
+            <xsl:call-template name="showsize">
+                <xsl:with-param name="size" select="out"/>
+            </xsl:call-template>
+        </td>
+        <td>
+            <xsl:call-template name="showsize">
+                <xsl:with-param name="size" select="bwin"/>
+                <xsl:with-param name="bits" select="1"/>
+            </xsl:call-template>/s
+        </td>
+        <td>
+            <xsl:call-template name="showsize">
+                <xsl:with-param name="size" select="bwout"/>
+                <xsl:with-param name="bits" select="1"/>
+            </xsl:call-template>/s
+        </td>
         <td><xsl:value-of select="meta/width"/>x<xsl:value-of select="meta/height"/></td>
         <td align="middle"><xsl:value-of select="meta/framerate"/></td>
         <td>
@@ -230,7 +215,7 @@
         <xsl:when test="$sizen &gt;= 1024">
             <xsl:value-of select="format-number($sizen div 1024,'#.##')"/> M</xsl:when>
         <xsl:when test="$sizen &gt;= 0">
-            <xsl:value-of select="$sizen"/>K</xsl:when>
+            <xsl:value-of select="$sizen"/> K</xsl:when>
     </xsl:choose>
     <xsl:choose>
         <xsl:when test="$bits = 1">b</xsl:when>
