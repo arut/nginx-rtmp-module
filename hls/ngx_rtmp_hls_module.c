@@ -25,7 +25,6 @@ static ngx_int_t ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s);
 
 
 #define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
-#define NGX_RTMP_HLS_MAX_AUDIO_DELAY    30000
 #define NGX_RTMP_HLS_DIR_ACCESS         0744
 
 
@@ -33,7 +32,7 @@ typedef struct {
     uint64_t                            id;
     double                              duration;
     unsigned                            active:1;
-    unsigned                            discont:1; /* after */
+    unsigned                            discont:1; /* before */
 } ngx_rtmp_hls_frag_t;
 
 
@@ -72,6 +71,7 @@ typedef struct {
 typedef struct {
     ngx_flag_t                          hls;
     ngx_msec_t                          fraglen;
+    ngx_msec_t                          max_fraglen;
     ngx_msec_t                          muxdelay;
     ngx_msec_t                          sync;
     ngx_msec_t                          playlen;
@@ -82,6 +82,8 @@ typedef struct {
     ngx_uint_t                          naming;
     ngx_uint_t                          slicing;
     ngx_path_t                         *slot;
+    ngx_msec_t                          max_audio_delay;
+    size_t                              audio_buffer_size;
 } ngx_rtmp_hls_app_conf_t;
 
 
@@ -123,6 +125,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, fraglen),
+      NULL },
+
+    { ngx_string("hls_max_fragment"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, max_fraglen),
       NULL },
 
     { ngx_string("hls_path"),
@@ -180,6 +189,20 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, slicing),
       &ngx_rtmp_hls_slicing_slots },
+
+    { ngx_string("hls_max_audio_delay"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, max_audio_delay),
+      NULL },
+
+    { ngx_string("hls_audio_buffer_size"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, audio_buffer_size),
+      NULL },
 
     ngx_null_command
 };
@@ -369,13 +392,13 @@ retry:
         f = ngx_rtmp_hls_get_frag(s, i);
 
         p = ngx_snprintf(buffer, sizeof(buffer), 
+                         "%s"
                          "#EXTINF:%.3f,\n"
-                         "%V%s%uL.ts\n"
-                         "%s",
+                         "%V%s%uL.ts\n",
+                         f->discont ? "#EXT-X-DISCONTINUITY\n" : "",
                          f->duration,
                          hacf->nested ? &empty : &ctx->name,
-                         hacf->nested ? "" : "-",
-                         f->id, f->discont ? "#EXT-X-DISCONTINUITY\n" : "");
+                         hacf->nested ? "" : "-", f->id);
 
         ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: fragment frag=%uL, n=%ui/%ui, duration=%.3f, "
@@ -647,11 +670,6 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
         return NGX_OK;
     }
 
-    if (ctx->nfrags && discont) {
-        f = ngx_rtmp_hls_get_frag(s, ctx->nfrags - 1);
-        f->discont = 1;
-    }
-
     id = ngx_rtmp_hls_get_fragment_id(s, ts);
 
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "%uL.ts", id) = 0;
@@ -702,6 +720,7 @@ retry:
     ngx_memzero(f, sizeof(*f));
 
     f->active = 1;
+    f->discont = discont;
     f->id = id;
 
     ctx->frag_ts = ts;
@@ -725,6 +744,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     u_char                         *p, *last, *end, *next, *pa;
     ngx_rtmp_hls_frag_t            *f;
     double                          duration;
+    ngx_int_t                       discont;
     uint64_t                        mag;
     static u_char                   buffer[4096];
 
@@ -746,6 +766,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     ctx->nfrags = 0;
     f = NULL;
     duration = 0;
+    discont = 0;
 
     for ( ;; ) {
 
@@ -809,9 +830,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
 
             if (ngx_memcmp(p, NGX_RTMP_DISCONT, NGX_RTMP_DISCONT_LEN) == 0) {
 
-                if (f) {
-                    f->discont = 1;
-                }
+                discont = 1;
 
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                                "hls: discontinuity");
@@ -827,8 +846,11 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
                 ngx_memzero(f, sizeof(*f));
 
                 f->duration = duration;
+                f->discont = discont;
                 f->active = 1;
                 f->id = 0;
+
+                discont = 0;
 
                 mag = 1;
                 for (pa = last - 4; pa >= p; pa--) {
@@ -1076,7 +1098,7 @@ ngx_rtmp_hls_parse_aac_header(ngx_rtmp_session_t *s, ngx_uint_t *objtype,
 
 static void
 ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
-    ngx_int_t boundary)
+    ngx_int_t boundary, ngx_uint_t flush_rate)
 {
     ngx_rtmp_hls_ctx_t         *ctx;
     ngx_rtmp_hls_app_conf_t    *hacf;
@@ -1090,15 +1112,16 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
     f = NULL;
+
     if (ctx->opened) {
+
         f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
         f->duration = (ts - ctx->frag_ts) / 90000.;
 
-        b = ctx->aframe;
-        if (b && b->last > b->pos &&
-            ctx->aframe_pts + NGX_RTMP_HLS_MAX_AUDIO_DELAY > ts)
-        {
-            ngx_rtmp_hls_flush_audio(s);
+        if (f->duration * 1000 > hacf->max_fraglen) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                          "hls: max fragment length reached");
+            boundary = 1;
         }
     }
 
@@ -1126,13 +1149,18 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
             break;
     }
 
-    if (!boundary) {
-        return;
+    if (boundary) {
+        ngx_rtmp_hls_close_fragment(s, 0);
+        ngx_rtmp_hls_open_fragment(s, ts, !f);
     }
 
-    ngx_rtmp_hls_close_fragment(s, 0);
-
-    ngx_rtmp_hls_open_fragment(s, ts, !f);
+    b = ctx->aframe;
+    if (ctx->opened && b && b->last > b->pos &&
+        ctx->aframe_pts + (uint64_t) hacf->max_audio_delay * 90 / flush_rate
+        < ts)
+    {
+        ngx_rtmp_hls_flush_audio(s);
+    }
 }
 
 
@@ -1224,12 +1252,12 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         ctx->aframe = b;
 
-        b->start = ngx_palloc(s->connection->pool, NGX_RTMP_HLS_BUFSIZE);
-        if (b->pos == NULL) {
+        b->start = ngx_palloc(s->connection->pool, hacf->audio_buffer_size);
+        if (b->start == NULL) {
             return NGX_ERROR;
         }
 
-        b->end = b->start + NGX_RTMP_HLS_BUFSIZE;
+        b->end = b->start + hacf->audio_buffer_size;
         b->pos = b->last = b->start;
     }
 
@@ -1242,7 +1270,13 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    ngx_rtmp_hls_update_fragment(s, pts, codec_ctx->avc_header == NULL);
+    /* 
+     * start new fragment here if
+     * there's no video at all, otherwise
+     * do it in video handler
+     */
+
+    ngx_rtmp_hls_update_fragment(s, pts, codec_ctx->avc_header == NULL, 2);
 
     if (b->last + size > b->end) {
         ngx_rtmp_hls_flush_audio(s);
@@ -1373,11 +1407,11 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     u_char                         *p;
     uint8_t                         fmt, ftype, htype, nal_type, src_nal_type;
     uint32_t                        len, rlen;
-    ngx_buf_t                       out;
+    ngx_buf_t                       out, *b;
     uint32_t                        cts;
     ngx_rtmp_mpegts_frame_t         frame;
     ngx_uint_t                      nal_bytes;
-    ngx_int_t                       aud_sent, sps_pps_sent, rc;
+    ngx_int_t                       aud_sent, sps_pps_sent, rc, boundary;
     static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -1549,7 +1583,16 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     frame.sid = 0xe0;
     frame.key = (ftype == 1);
 
-    ngx_rtmp_hls_update_fragment(s, frame.dts, frame.key);
+    /* 
+     * start new fragment if
+     * - we have video key frame AND
+     * - we have audio buffered or have no audio at all
+     */
+
+    b = ctx->aframe;
+    boundary = frame.key && (codec_ctx->aac_header == NULL || b->last > b->pos);
+
+    ngx_rtmp_hls_update_fragment(s, frame.dts, boundary, 1);
 
     if (!ctx->opened) {
         return NGX_OK;
@@ -1798,6 +1841,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
 
     conf->hls = NGX_CONF_UNSET;
     conf->fraglen = NGX_CONF_UNSET;
+    conf->max_fraglen = NGX_CONF_UNSET;
     conf->muxdelay = NGX_CONF_UNSET;
     conf->sync = NGX_CONF_UNSET;
     conf->playlen = NGX_CONF_UNSET;
@@ -1805,6 +1849,8 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->nested = NGX_CONF_UNSET;
     conf->naming = NGX_CONF_UNSET_UINT;
     conf->slicing = NGX_CONF_UNSET_UINT;
+    conf->max_audio_delay = NGX_CONF_UNSET;
+    conf->audio_buffer_size = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -1819,6 +1865,8 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->hls, prev->hls, 0);
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
+    ngx_conf_merge_msec_value(conf->max_fraglen, prev->max_fraglen,
+                              conf->fraglen * 10);
     ngx_conf_merge_msec_value(conf->muxdelay, prev->muxdelay, 700);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 300);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
@@ -1829,6 +1877,10 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
                               NGX_RTMP_HLS_NAMING_SEQUENTIAL);
     ngx_conf_merge_uint_value(conf->slicing, prev->slicing,
                               NGX_RTMP_HLS_SLICING_PLAIN);
+    ngx_conf_merge_msec_value(conf->max_audio_delay, prev->max_audio_delay,
+                              300);
+    ngx_conf_merge_size_value(conf->audio_buffer_size, prev->audio_buffer_size,
+                              NGX_RTMP_HLS_BUFSIZE);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
