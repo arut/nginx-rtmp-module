@@ -8,6 +8,7 @@
 
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_live_module.h"
+#include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_codec_module.h"
 
 
@@ -25,6 +26,7 @@ static time_t                       start_time;
 #define NGX_RTMP_STAT_GLOBAL        0x01
 #define NGX_RTMP_STAT_LIVE          0x02
 #define NGX_RTMP_STAT_CLIENTS       0x04
+#define NGX_RTMP_STAT_PLAY          0x08
 
 /*
  * global: stat-{bufs-{total,free,used}, total bytes in/out, bw in/out} - cscf
@@ -293,6 +295,50 @@ ngx_rtmp_stat_dump_pool(ngx_http_request_t *r, ngx_chain_t ***lll,
 #endif
 
 
+
+static void
+ngx_rtmp_stat_client(ngx_http_request_t *r, ngx_chain_t ***lll,
+    ngx_rtmp_session_t *s)
+{
+    u_char  buf[NGX_OFF_T_LEN + 1];
+
+#ifdef NGX_RTMP_POOL_DEBUG
+    ngx_rtmp_stat_dump_pool(r, lll, s->connection->pool);
+#endif
+    NGX_RTMP_STAT_L("<id>");
+    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%ui",
+                       (ngx_uint_t) s->connection->number) - buf);
+    NGX_RTMP_STAT_L("</id>");
+
+    NGX_RTMP_STAT_L("<address>");
+    NGX_RTMP_STAT_S(&s->connection->addr_text);
+    NGX_RTMP_STAT_L("</address>");
+
+    NGX_RTMP_STAT_L("<time>");
+    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%M",
+                       ngx_current_msec - s->epoch) - buf);
+    NGX_RTMP_STAT_L("</time>");
+
+    if (s->flashver.len) {
+        NGX_RTMP_STAT_L("<flashver>");
+        NGX_RTMP_STAT_ES(&s->flashver);
+        NGX_RTMP_STAT_L("</flashver>");
+    }
+
+    if (s->page_url.len) {
+        NGX_RTMP_STAT_L("<pageurl>");
+        NGX_RTMP_STAT_ES(&s->page_url);
+        NGX_RTMP_STAT_L("</pageurl>");
+    }
+
+    if (s->swf_url.len) {
+        NGX_RTMP_STAT_L("<swfurl>");
+        NGX_RTMP_STAT_ES(&s->swf_url);
+        NGX_RTMP_STAT_L("</swfurl>");
+    }
+}
+
+
 static void
 ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll, 
         ngx_rtmp_live_app_conf_t *lacf)
@@ -306,6 +352,10 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     u_char                          buf[NGX_OFF_T_LEN + 1];
     ngx_rtmp_stat_loc_conf_t       *slcf;
     u_char                         *cname;
+
+    if (!lacf->live) {
+        return;
+    }
 
     slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
 
@@ -334,24 +384,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                 if (slcf->stat & NGX_RTMP_STAT_CLIENTS) {
                     NGX_RTMP_STAT_L("<client>");
 
-#ifdef NGX_RTMP_POOL_DEBUG
-                    ngx_rtmp_stat_dump_pool(r, lll, s->connection->pool);
-#endif
-                    NGX_RTMP_STAT_L("<id>");
-                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%ui",
-                                       (ngx_uint_t) s->connection->number)
-                                       - buf);
-                    NGX_RTMP_STAT_L("</id>");
-
-                    NGX_RTMP_STAT_L("<address>");
-                    NGX_RTMP_STAT_S(&s->connection->addr_text);
-                    NGX_RTMP_STAT_L("</address>");
-
-                    NGX_RTMP_STAT_L("<time>");
-                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%M",
-                                                    ngx_current_msec - s->epoch)
-                                       - buf);
-                    NGX_RTMP_STAT_L("</time>");
+                    ngx_rtmp_stat_client(r, lll, s);
 
                     NGX_RTMP_STAT_L("<dropped>");
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
@@ -367,24 +400,6 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                                            - buf);
                     }
                     NGX_RTMP_STAT_L("</avsync>");
-
-                    if (s->flashver.len) {
-                        NGX_RTMP_STAT_L("<flashver>");
-                        NGX_RTMP_STAT_ES(&s->flashver);
-                        NGX_RTMP_STAT_L("</flashver>");
-                    }
-
-                    if (s->page_url.len) {
-                        NGX_RTMP_STAT_L("<pageurl>");
-                        NGX_RTMP_STAT_ES(&s->page_url);
-                        NGX_RTMP_STAT_L("</pageurl>");
-                    }
-
-                    if (s->swf_url.len) {
-                        NGX_RTMP_STAT_L("<swfurl>");
-                        NGX_RTMP_STAT_ES(&s->swf_url);
-                        NGX_RTMP_STAT_L("</swfurl>");
-                    }
 
                     if (ctx->publishing) {
                         NGX_RTMP_STAT_L("<publishing/>");
@@ -465,6 +480,73 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
 
 
 static void
+ngx_rtmp_stat_play(ngx_http_request_t *r, ngx_chain_t ***lll, 
+        ngx_rtmp_play_app_conf_t *pacf)
+{
+    ngx_rtmp_play_ctx_t            *ctx, *sctx;
+    ngx_rtmp_session_t             *s;
+    ngx_uint_t                      n;
+    size_t                          nclients, total_nclients;
+    u_char                          buf[NGX_OFF_T_LEN + 1];
+    ngx_rtmp_stat_loc_conf_t       *slcf;
+
+    if (pacf->entries.nelts == 0) {
+        return;
+    }
+
+    slcf = ngx_http_get_module_loc_conf(r, ngx_rtmp_stat_module);
+
+    NGX_RTMP_STAT_L("<play>\r\n");
+
+    total_nclients = 0;
+    for (n = 0; n < pacf->nbuckets; ++n) {
+        for (ctx = pacf->ctx[n]; ctx; ) {
+            NGX_RTMP_STAT_L("<stream>\r\n");
+
+            NGX_RTMP_STAT_L("<name>");
+            NGX_RTMP_STAT_ECS(ctx->name);
+            NGX_RTMP_STAT_L("</name>\r\n");
+
+            nclients = 0;
+            sctx = ctx;
+            for (; ctx; ctx = ctx->next) {
+                if (ngx_strcmp(ctx->name, sctx->name)) {
+                    break;
+                }
+
+                ++nclients;
+
+                s = ctx->session;
+                if (slcf->stat & NGX_RTMP_STAT_CLIENTS) {
+                    NGX_RTMP_STAT_L("<client>");
+
+                    ngx_rtmp_stat_client(r, lll, s);
+
+                    NGX_RTMP_STAT_L("</client>\r\n");
+                }
+            }
+            total_nclients += nclients;
+
+            NGX_RTMP_STAT_L("<active/>");
+            NGX_RTMP_STAT_L("<nclients>");
+            NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                          "%uz", nclients) - buf);
+            NGX_RTMP_STAT_L("</nclients>\r\n");
+
+            NGX_RTMP_STAT_L("</stream>\r\n");
+        }
+    }
+
+    NGX_RTMP_STAT_L("<nclients>");
+    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                  "%uz", total_nclients) - buf);
+    NGX_RTMP_STAT_L("</nclients>\r\n");
+
+    NGX_RTMP_STAT_L("</play>\r\n");
+}
+
+
+static void
 ngx_rtmp_stat_application(ngx_http_request_t *r, ngx_chain_t ***lll, 
         ngx_rtmp_core_app_conf_t *cacf)
 {
@@ -480,6 +562,11 @@ ngx_rtmp_stat_application(ngx_http_request_t *r, ngx_chain_t ***lll,
     if (slcf->stat & NGX_RTMP_STAT_LIVE) {
         ngx_rtmp_stat_live(r, lll, 
                 cacf->app_conf[ngx_rtmp_live_module.ctx_index]);
+    }
+
+    if (slcf->stat & NGX_RTMP_STAT_PLAY) {
+        ngx_rtmp_stat_play(r, lll, 
+                cacf->app_conf[ngx_rtmp_play_module.ctx_index]);
     }
 
     NGX_RTMP_STAT_L("</application>\r\n");
