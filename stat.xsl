@@ -51,13 +51,15 @@
                <xsl:call-template name="showsize">
                    <xsl:with-param name="size" select="bwin"/>
                    <xsl:with-param name="bits" select="1"/>
-               </xsl:call-template>/s
+                   <xsl:with-param name="persec" select="1"/>
+               </xsl:call-template>
            </td>
            <td>
                <xsl:call-template name="showsize">
                    <xsl:with-param name="size" select="bwout"/>
                    <xsl:with-param name="bits" select="1"/>
-               </xsl:call-template>/s
+                   <xsl:with-param name="persec" select="1"/>
+               </xsl:call-template>
            </td>
            <td colspan="5"/>
            <td>
@@ -81,12 +83,25 @@
         </td>
     </tr>
     <xsl:apply-templates select="live"/>
+    <xsl:apply-templates select="play"/>
 </xsl:template>
 
 <xsl:template match="live">
     <tr bgcolor="#aaaaaa">
         <td>
             <i>live streams</i>
+        </td>
+        <td align="middle">
+            <xsl:value-of select="nclients"/>
+        </td>
+    </tr>
+    <xsl:apply-templates select="stream"/>
+</xsl:template>
+
+<xsl:template match="play">
+    <tr bgcolor="#aaaaaa">
+        <td>
+            <i>vod streams</i>
         </td>
         <td align="middle">
             <xsl:value-of select="nclients"/>
@@ -131,15 +146,21 @@
             <xsl:call-template name="showsize">
                 <xsl:with-param name="size" select="bwin"/>
                 <xsl:with-param name="bits" select="1"/>
-            </xsl:call-template>/s
+                <xsl:with-param name="persec" select="1"/>
+            </xsl:call-template>
         </td>
         <td>
             <xsl:call-template name="showsize">
                 <xsl:with-param name="size" select="bwout"/>
                 <xsl:with-param name="bits" select="1"/>
-            </xsl:call-template>/s
+                <xsl:with-param name="persec" select="1"/>
+            </xsl:call-template>
         </td>
-        <td><xsl:value-of select="meta/width"/>x<xsl:value-of select="meta/height"/></td>
+        <td>
+            <xsl:if test="meta/width &gt; 0">
+                <xsl:value-of select="meta/width"/>x<xsl:value-of select="meta/height"/>
+            </xsl:if>
+        </td>
         <td align="middle"><xsl:value-of select="meta/framerate"/></td>
         <td>
             <xsl:value-of select="meta/video"/>
@@ -180,28 +201,31 @@
 <xsl:template name="showtime">
     <xsl:param name="time"/>
 
-    <xsl:variable name="sec">
-        <xsl:value-of select="floor($time div 1000)"/>
-    </xsl:variable>
+    <xsl:if test="$time &gt; 0">
+        <xsl:variable name="sec">
+            <xsl:value-of select="floor($time div 1000)"/>
+        </xsl:variable>
 
-    <xsl:if test="$sec &gt;= 86400">
-        <xsl:value-of select="floor($sec div 86400)"/>d
+        <xsl:if test="$sec &gt;= 86400">
+            <xsl:value-of select="floor($sec div 86400)"/>d
+        </xsl:if>
+
+        <xsl:if test="$sec &gt;= 3600">
+            <xsl:value-of select="(floor($sec div 3600)) mod 24"/>h
+        </xsl:if>
+
+        <xsl:if test="$sec &gt;= 60">
+            <xsl:value-of select="(floor($sec div 60)) mod 60"/>m
+        </xsl:if>
+
+        <xsl:value-of select="$sec mod 60"/>s
     </xsl:if>
-
-    <xsl:if test="$sec &gt;= 3600">
-        <xsl:value-of select="(floor($sec div 3600)) mod 24"/>h
-    </xsl:if>
-
-    <xsl:if test="$sec &gt;= 60">
-        <xsl:value-of select="(floor($sec div 60)) mod 60"/>m
-    </xsl:if>
-
-    <xsl:value-of select="$sec mod 60"/>s
 </xsl:template>
 
 <xsl:template name="showsize">
     <xsl:param name="size"/>
     <xsl:param name="bits" select="0" />
+    <xsl:param name="persec" select="0" />
     <xsl:variable name="sizen">
         <xsl:value-of select="floor($size div 1024)"/>
     </xsl:variable>
@@ -217,10 +241,13 @@
         <xsl:when test="$sizen &gt;= 0">
             <xsl:value-of select="$sizen"/> K</xsl:when>
     </xsl:choose>
-    <xsl:choose>
-        <xsl:when test="$bits = 1">b</xsl:when>
-        <xsl:otherwise>B</xsl:otherwise>
-    </xsl:choose>
+    <xsl:if test="string-length($size) &gt; 0">
+        <xsl:choose>
+            <xsl:when test="$bits = 1">b</xsl:when>
+            <xsl:otherwise>B</xsl:otherwise>
+        </xsl:choose>
+        <xsl:if test="$persec = 1">/s</xsl:if>
+    </xsl:if>
 </xsl:template>
 
 <xsl:template name="streamstate">
