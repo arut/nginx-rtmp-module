@@ -1623,7 +1623,7 @@ ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
                 rs->cctx = *lst->ctx;
                 rs->cctx.app_conf = cacf->app_conf;
 
-                ngx_post_event(event, &ngx_posted_events);
+                ngx_post_event(event, &ngx_rtmp_init_queue);
             }
         }
     }

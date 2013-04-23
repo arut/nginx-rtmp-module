@@ -29,6 +29,9 @@ static char * ngx_rtmp_merge_applications(ngx_conf_t *cf,
         ngx_uint_t ctx_index);
 
 
+ngx_thread_volatile ngx_event_t    *ngx_rtmp_init_queue;
+
+
 ngx_uint_t  ngx_rtmp_max_module;
 
 
