@@ -434,8 +434,8 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
     int                             pipefd[2];
     int                             ret;
     ngx_rtmp_exec_conf_t           *ec;
-    ngx_str_t                      *arg, a;
-    char                          **args;
+    ngx_str_t                      *arg_in, a;
+    char                          **args, **arg_out;
     ngx_uint_t                      n;
 
     ec = e->conf;
@@ -505,20 +505,32 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             if (args == NULL) {
                 exit(1);
             }
-            arg = ec->args.elts;
-            args[0] = (char *) ec->cmd.data;
-            for (n = 0; n < ec->args.nelts; ++n, ++arg) {
+
+            arg_in = ec->args.elts;
+            arg_out = args;
+            *arg_out++ = (char *) ec->cmd.data;
+
+            for (n = 0; n < ec->args.nelts; n++, ++arg_in) {
+
                 if (e->session == NULL) {
-                    a = *arg;
+                    a = *arg_in;
                 } else {
-                    ngx_rtmp_eval(e->session, arg, ngx_rtmp_exec_eval_p, &a);
+                    ngx_rtmp_eval(e->session, arg_in, ngx_rtmp_exec_eval_p, &a);
                 }
-                args[n + 1] = (char *) a.data;
+                
+                if (ngx_rtmp_eval_streams(&a) != NGX_DONE) {
+                    continue;
+                }
+
+                *arg_out++ = (char *) a.data;
             }
-            args[n + 1] = NULL;
+
+            *arg_out = NULL;
+
             if (execvp((char *) ec->cmd.data, args) == -1) {
                 exit(1);
             }
+
             break;
 
         default:

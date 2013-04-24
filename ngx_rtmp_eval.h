@@ -34,4 +34,7 @@ ngx_int_t ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in,
           ngx_rtmp_eval_t **e, ngx_str_t *out);
 
 
+ngx_int_t ngx_rtmp_eval_streams(ngx_str_t *in);
+
+
 #endif /* _NGX_RTMP_EVAL_H_INCLUDED_ */

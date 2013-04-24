@@ -244,8 +244,8 @@ ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 {
 #if !(NGX_WIN32)
     int                         pid, fd, maxfd;
-    ngx_str_t                   a, *arg;
-    char                      **args;
+    ngx_str_t                   a, *arg_in;
+    char                      **args, **arg_out;
     ngx_uint_t                  n;
 
     pid = fork();
@@ -276,16 +276,29 @@ ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
             if (args == NULL) {
                 exit(1);
             }
-            arg = ec->args.elts;
-            args[0] = (char *)ec->cmd.data;
-            for (n = 0; n < ec->args.nelts; ++n, ++arg) {
-                ngx_rtmp_eval(s, arg, ngx_rtmp_enotify_eval_p, &a);
-                args[n + 1] = (char *) a.data;
+
+            arg_in = ec->args.elts;
+            arg_out = args;
+
+            *arg_out++ = (char *) ec->cmd.data;
+
+            for (n = 0; n < ec->args.nelts; ++n, ++arg_in) {
+
+                ngx_rtmp_eval(s, arg_in, ngx_rtmp_enotify_eval_p, &a);
+
+                if (ngx_rtmp_eval_streams(&a) != NGX_DONE) {
+                    continue;
+                }
+
+                *arg_out++ = (char *) a.data;
             }
-            args[n + 1] = NULL;
-            if (execvp((char *)ec->cmd.data, args) == -1) {
+
+            *arg_out = NULL;
+
+            if (execvp((char *) ec->cmd.data, args) == -1) {
                 exit(1);
             }
+
             break;
 
         default:

@@ -186,3 +186,91 @@ ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in, ngx_rtmp_eval_t **e,
 
     return NGX_OK;
 }
+
+
+ngx_int_t
+ngx_rtmp_eval_streams(ngx_str_t *in)
+{
+    ngx_int_t   mode, create, v, close_src;
+    ngx_fd_t    dst, src;
+    u_char     *path;
+
+    path = in->data;
+
+    while (*path >= '0' && *path <= '9') {
+        path++;
+    }
+
+    switch ((char) *path) {
+
+        case '>':
+
+            v = (path == in->data ? 1 : ngx_atoi(in->data, path - in->data));
+            if (v == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            dst = (ngx_fd_t) v;
+            mode = NGX_FILE_WRONLY;
+            create = NGX_FILE_TRUNCATE;
+            path++;
+
+            if (*path == (u_char) '>') {
+                mode = NGX_FILE_APPEND;
+                create = NGX_FILE_CREATE_OR_OPEN;
+                path++;
+            }
+
+            break;
+
+        case '<':
+
+            v = (path == in->data ? 0 : ngx_atoi(in->data, path - in->data));
+            if (v == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            dst = (ngx_fd_t) v;
+            mode = NGX_FILE_RDONLY;
+            create = NGX_FILE_OPEN;
+            path++;
+
+            break;
+
+        default:
+
+            return NGX_DONE;
+    }
+
+    if (*path == (u_char) '&') {
+        
+        path++;
+        v = ngx_atoi(path, in->data + in->len - path);
+        if (v == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+        src = (ngx_fd_t) v;
+        close_src = 0;
+
+    } else {
+
+        src = ngx_open_file(path, mode, create, NGX_FILE_DEFAULT_ACCESS);
+        if (src == NGX_INVALID_FILE) {
+            return NGX_ERROR;
+        }
+        close_src = 1;
+
+    }
+
+    if (src == dst) {
+        return NGX_OK;
+    }
+
+    dup2(src, dst);
+    
+    if (close_src) {
+        ngx_close_file(src);
+    }
+
+    return NGX_OK;
+}
