@@ -371,6 +371,7 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_rtmp_record_app_conf_t     *rracf;
     u_char                         *p, *l;
+    ngx_tm_t                        tm;
 
     static u_char                   buf[NGX_TIME_T_LEN + 1];
     static u_char                   pbuf[NGX_MAX_PATH + 1];
@@ -395,10 +396,15 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
                        rctx->timestamp) - buf, l - p));
     }
 
-    p = ngx_cpymem(p, rracf->suffix.data, 
-                   ngx_min(rracf->suffix.len, (size_t)(l - p)));
-    *p = 0;
+    if (ngx_strchr(rracf->suffix.data, '%')) {
+        ngx_libc_localtime(ngx_cached_time->sec, &tm);
+        p += strftime((char *) p, l - p, (char *) rracf->suffix.data, &tm);
+    } else {
+        p = ngx_cpymem(p, rracf->suffix.data, 
+                ngx_min(rracf->suffix.len, (size_t)(l - p)));
+    }
 
+    *p = 0;
     path->data = pbuf;
     path->len  = p - pbuf;
 
