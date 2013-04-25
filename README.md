@@ -285,6 +285,7 @@ rtmp_auto_push directive.
                 # Serve HLS fragments
                 types {
                     application/vnd.apple.mpegurl m3u8;
+                    video/mp2t ts;
                 }
                 alias /tmp/app;
                 expires -1;
