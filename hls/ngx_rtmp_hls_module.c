@@ -739,7 +739,6 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_ctx_t             *ctx;
     ngx_file_t                      file;
     ssize_t                         ret;
-    size_t                          len;
     off_t                           offset;
     u_char                         *p, *last, *end, *next, *pa;
     ngx_rtmp_hls_frag_t            *f;
@@ -794,8 +793,6 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
             if (p != last && last[-1] == '\r') {
                 last--;
             }
-
-            len = (size_t) (last - p);
 
 
 #define NGX_RTMP_MSEQ           "#EXT-X-MEDIA-SEQUENCE:"
@@ -866,7 +863,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
                 ngx_log_debug6(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                                "hls: restore fragment '%*s' id=%uL, "
                                "duration=%.3f, frag=%uL, nfrags=%ui",
-                               len, p, f->id, f->duration, ctx->frag,
+                               (size_t) (last - p), p, f->id, f->duration, ctx->frag,
                                ctx->nfrags);
             }
 
