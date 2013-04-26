@@ -353,7 +353,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
          */
 
         pname = ngx_processes[n].name;
-        if (ngx_strstr(pname, "cache")) {
+        if (pname && ngx_strstr(pname, "cache")) {
             ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                            "auto_push: skip process slot=%i pid=%i "
                            "name='%s' pname='%s'",
@@ -391,7 +391,8 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
         ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                        "auto_push: connect slot=%i pid=%i socket='%s' "
                        "name='%s' pname='%s'",
-                       n, (ngx_int_t) pid, path, ctx->name, pname);
+                       n, (ngx_int_t) pid, path, ctx->name,
+                       pname ? pname : "");
 
         if (ngx_rtmp_relay_push(s, &name, &at) == NGX_OK) {
             *slot = 1;
@@ -401,7 +402,8 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                       "auto_push: connect failed: slot=%i pid=%i socket='%s'"
                       "url='%V' name='%s' pname='%s'",
-                      n, (ngx_int_t) pid, path, u, ctx->name, pname);
+                      n, (ngx_int_t) pid, path, u, ctx->name,
+                      pname ? pname : "");
 
         if (!ctx->push_evt.timer_set) {
             ngx_add_timer(&ctx->push_evt, apcf->push_reconnect);
