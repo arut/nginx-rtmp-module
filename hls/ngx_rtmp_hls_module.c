@@ -324,6 +324,214 @@ ngx_rtmp_hls_next_frag(ngx_rtmp_session_t *s)
 }
 
 
+/* 
+ * Experimental MPEG-DASH (mpd) playlist
+ *
+ * Flash player for testing:
+ * http://mediapm.edgesuite.net/will/dash/players/nab12/DashDebugPlayer.html
+ */
+
+static ngx_int_t
+ngx_rtmp_hls_write_dash_playlist(ngx_rtmp_session_t *s)
+{
+    static u_char                   buffer[1024];
+    int                             fd;
+    u_char                         *p;
+    ngx_rtmp_hls_ctx_t             *ctx;
+    ssize_t                         n;
+    ngx_rtmp_hls_app_conf_t        *hacf;
+    ngx_rtmp_hls_frag_t            *f;
+    ngx_uint_t                      i, max_frag;
+    u_char                         *p;
+    ngx_str_t                       playlist, playlist_bak;
+    static u_char                   path[NGX_MAX_PATH + 1];
+    static u_char                   path_bak[NGX_MAX_PATH + 1];
+    static ngx_str_t                empty = ngx_null_string;
+
+
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    if (ctx->playlist.len >= sizeof(path) - 1 ||
+        ctx->playlist_back.len >= sizeof(path_bak) - 1)
+    {
+        return NGX_ERROR;
+    }
+
+    /* playlist paths */
+    
+    p = ngx_memcpy(path, ctx->playlist.data, ctx->playlist.len);
+
+    p[-2] = 'm';
+    p[-2] = 'p';
+    p[-2] = 'd';
+    p[-1] = 0;
+    
+    playlist.data = path;
+    playlist.len = p - path - 1;
+
+    p = ngx_memcpy(path_bak, ctx->playlist_bak.data, ctx->playlist_bak.len);
+
+    p[-2] = 'm';
+    p[-2] = 'p';
+    p[-2] = 'd';
+    p[-1] = 0;
+    
+    playlist_bak.data = path_bak;
+    playlist_bak.len = p - path_bak - 1;
+
+    /* done playlists */
+
+    fd = ngx_open_file(playlist_bak.data, NGX_FILE_WRONLY, 
+                       NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: open failed: '%V'", &playlist_bak);
+
+        return NGX_ERROR;
+    }
+
+#define NGX_RTMP_DASH_HEADER \
+    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"\
+    "<MPD\n"\
+    "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"\
+    "  xmlns=\"urn:mpeg:dash:schema:mpd:2011\"\n"\
+    "  xsi:schemaLocation=\"urn:mpeg:dash:schema:mpd:2011"\
+                           "http://standards.iso.org/ittf/"\
+                           "PubliclyAvailableStandards/"\
+                           "MPEG-DASH_schema_files/DASH-MPD.xsd\"\n"\
+    "  type=\"dynamic\"\n"\
+    "  availabilityStartTime=\"2013-04-26T04:27:41.323821Z\"\n"\
+    "  publishTime=\"2013-04-26T14:49:50.883821Z\"\n"\
+    "  minimumUpdatePeriod=\"PT2S\"\n"\
+    "  timeShiftBufferDepth=\"PT1M\"\n"\
+    "  maxSegmentDuration=\"PT4S\"\n"\
+    "  minBufferTime=\"PT10S\"\n"\
+    "  profiles=\"urn:mpeg:dash:profile:mp2t-main:2011\">\n"\
+    "  <Period \n"\
+    "    id=\"1\"\n"\
+    "    start=\"PT0S\">\n"\
+    "    <BaseURL>dash/</BaseURL>\n"\
+    "    <AdaptationSet\n"\
+    "      mimeType=\"video/mp2t\"\n"\
+    "      minBandwidth=\"487000\"\n"\
+    "      maxBandwidth=\"2153000\"\n"\
+    "      minWidth=\"400\"\n"\
+    "      maxWidth=\"1280\"\n"\
+    "      minHeight=\"225\"\n"\
+    "      maxHeight=\"720\"\n"\
+    "      segmentAlignment=\"true\"\n"\
+    "      startWithSAP=\"2\">\n"\
+    "      <ContentComponent\n"\
+    "        contentType=\"audio\">\n"\
+    "      </ContentComponent>\n"\
+    "      <ContentComponent\n"\
+    "        contentType=\"video\">\n"\
+    "      </ContentComponent>\n"\
+    "      <SegmentTemplate"\n"\
+    "        timescale=\"1000\"\n"\
+    "        media=\"loop-$RepresentationID$-$Number$.ts\"\n"\
+    "        startNumber=\"12704\">\n"\
+    "        <SegmentTimeline>\n"\
+
+    /* first fragment */
+
+    "        <S t="37329560" d="2080" />\n"
+
+    /* other fragments */
+
+    "        <S d="2080" />\n"
+
+    /* some fragments */
+
+    "        <S d="4000" r="1" />\n"
+
+#define NGX_RTMP_DASH_FOOTER \
+    "        </SegmentTimeline>\n"\
+    "      </SegmentTemplate>\n"\
+    "      <Representation\n"\
+    "        id=\"audio=94000-video=393000\"\n"\
+    "        bandwidth=\"487000\"\n"\
+    "        codecs=\"mp4a.40.2,avc1.42C014\"\n"\
+    "        audioSamplingRate=\"44100\"\n"\
+    "        width=\"400\"\n"\
+    "        height=\"225\"\n"\
+    "        frameRate=\"25\">\n"\
+    "        <AudioChannelConfiguration\n"\
+    "          schemeIdUri=\"urn:mpeg:dash:23003:3:"\
+                            "audio_channel_configuration:2011\"\n"\
+    "          value="2">\n"\
+    "         </AudioChannelConfiguration>\n"\
+    "      </Representation>\n"\
+    "    </AdaptationSet>\n"\
+    "  </Period>\n"\
+    "</MPD>"
+
+
+    max_frag = hacf->fraglen / 1000;
+
+    for (i = 0; i < ctx->nfrags; i++) {
+        f = ngx_rtmp_hls_get_frag(s, i);
+        if (f->duration > max_frag) {
+            max_frag = f->duration + .5;
+        }
+    }
+
+    p = ngx_snprintf(buffer, sizeof(buffer), 
+                     "#EXTM3U\n"
+                     "#EXT-X-VERSION:3\n"
+                     "#EXT-X-MEDIA-SEQUENCE:%uL\n"
+                     "#EXT-X-TARGETDURATION:%ui\n",
+                     ctx->frag, max_frag);
+
+    n = write(fd, buffer, p - buffer);
+    if (n < 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: write failed: '%V'", &ctx->playlist_bak);
+        ngx_close_file(fd);
+        return NGX_ERROR;
+    }
+
+    for (i = 0; i < ctx->nfrags; i++) {
+        f = ngx_rtmp_hls_get_frag(s, i);
+
+        p = ngx_snprintf(buffer, sizeof(buffer), 
+                         "%s"
+                         "#EXTINF:%.3f,\n"
+                         "%V%s%uL.ts\n",
+                         f->discont ? "#EXT-X-DISCONTINUITY\n" : "",
+                         f->duration,
+                         hacf->nested ? &empty : &ctx->name,
+                         hacf->nested ? "" : "-", f->id);
+
+        ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: fragment frag=%uL, n=%ui/%ui, duration=%.3f, "
+                       "discont=%i",
+                       ctx->frag, i + 1, ctx->nfrags, f->duration, f->discont);
+
+        n = write(fd, buffer, p - buffer);
+        if (n < 0) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                          "hls: write failed '%V'", &ctx->playlist_bak);
+            ngx_close_file(fd);
+            return NGX_ERROR;
+        }
+    }
+
+    ngx_close_file(fd);
+
+    if (ngx_rename_file(playlist_bak.data, playlist.data)) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: rename failed: '%V'->'%V'", 
+                      &playlist_bak, &playlist);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
 static ngx_int_t
 ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 {
