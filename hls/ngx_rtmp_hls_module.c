@@ -48,6 +48,7 @@ typedef struct {
 
     uint64_t                            frag;
     uint64_t                            frag_ts;
+    uint64_t                            start_ts;
     ngx_uint_t                          nfrags;
     ngx_rtmp_hls_frag_t                *frags; /* circular 2 * winfrags + 1 */
 
@@ -312,12 +313,15 @@ ngx_rtmp_hls_next_frag(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_hls_ctx_t         *ctx;
     ngx_rtmp_hls_app_conf_t    *hacf;
+    ngx_rtmp_hls_frag_t        *f;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    f = ngx_rtmp_hls_get_frag(s, 0);
 
     if (ctx->nfrags == hacf->winfrags) {
         ctx->frag++;
+        ctx->start_ts += f->duration;
     } else {
         ctx->nfrags++;
     }
@@ -334,46 +338,42 @@ ngx_rtmp_hls_next_frag(ngx_rtmp_session_t *s)
 static ngx_int_t
 ngx_rtmp_hls_write_dash_playlist(ngx_rtmp_session_t *s)
 {
-    static u_char                   buffer[1024];
+    static u_char                   buffer[8192];
     int                             fd;
     u_char                         *p;
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
-    ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_hls_frag_t            *f;
-    ngx_uint_t                      i, max_frag;
-    u_char                         *p;
+    ngx_uint_t                      i;
     ngx_str_t                       playlist, playlist_bak;
     static u_char                   path[NGX_MAX_PATH + 1];
     static u_char                   path_bak[NGX_MAX_PATH + 1];
-    static ngx_str_t                empty = ngx_null_string;
 
 
-    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
     if (ctx->playlist.len >= sizeof(path) - 1 ||
-        ctx->playlist_back.len >= sizeof(path_bak) - 1)
+        ctx->playlist_bak.len >= sizeof(path_bak) - 1)
     {
         return NGX_ERROR;
     }
 
     /* playlist paths */
     
-    p = ngx_memcpy(path, ctx->playlist.data, ctx->playlist.len);
+    p = ngx_cpymem(path, ctx->playlist.data, ctx->playlist.len);
 
-    p[-2] = 'm';
-    p[-2] = 'p';
+    p[-4] = 'm';
+    p[-3] = 'p';
     p[-2] = 'd';
     p[-1] = 0;
     
     playlist.data = path;
     playlist.len = p - path - 1;
 
-    p = ngx_memcpy(path_bak, ctx->playlist_bak.data, ctx->playlist_bak.len);
+    p = ngx_cpymem(path_bak, ctx->playlist_bak.data, ctx->playlist_bak.len);
 
-    p[-2] = 'm';
-    p[-2] = 'p';
+    p[-4] = 'm';
+    p[-3] = 'p';
     p[-2] = 'd';
     p[-1] = 0;
     
@@ -387,7 +387,7 @@ ngx_rtmp_hls_write_dash_playlist(ngx_rtmp_session_t *s)
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: open failed: '%V'", &playlist_bak);
+                      "dash: open failed: '%V'", &playlist_bak);
 
         return NGX_ERROR;
     }
@@ -429,29 +429,23 @@ ngx_rtmp_hls_write_dash_playlist(ngx_rtmp_session_t *s)
     "      <ContentComponent\n"\
     "        contentType=\"video\">\n"\
     "      </ContentComponent>\n"\
-    "      <SegmentTemplate"\n"\
+    "      <SegmentTemplate\n"\
     "        timescale=\"1000\"\n"\
-    "        media=\"loop-$RepresentationID$-$Number$.ts\"\n"\
-    "        startNumber=\"12704\">\n"\
-    "        <SegmentTimeline>\n"\
+    "        media=\"%V-$Number$.ts\"\n"\
+    "        startNumber=\"%uL\">\n"\
+    "        <SegmentTimeline>\n"
 
-    /* first fragment */
+#define NGX_RTMP_DASH_FIRST_ENTRY \
+    "          <S t=\"%uL\" d=\"%uL\" />\n"
 
-    "        <S t="37329560" d="2080" />\n"
-
-    /* other fragments */
-
-    "        <S d="2080" />\n"
-
-    /* some fragments */
-
-    "        <S d="4000" r="1" />\n"
+#define NGX_RTMP_DASH_ENTRY \
+    "          <S d=\"%uL\" />\n"
 
 #define NGX_RTMP_DASH_FOOTER \
     "        </SegmentTimeline>\n"\
     "      </SegmentTemplate>\n"\
     "      <Representation\n"\
-    "        id=\"audio=94000-video=393000\"\n"\
+    "        id=\"\"\n"\
     "        bandwidth=\"487000\"\n"\
     "        codecs=\"mp4a.40.2,avc1.42C014\"\n"\
     "        audioSamplingRate=\"44100\"\n"\
@@ -461,34 +455,20 @@ ngx_rtmp_hls_write_dash_playlist(ngx_rtmp_session_t *s)
     "        <AudioChannelConfiguration\n"\
     "          schemeIdUri=\"urn:mpeg:dash:23003:3:"\
                             "audio_channel_configuration:2011\"\n"\
-    "          value="2">\n"\
-    "         </AudioChannelConfiguration>\n"\
+    "          value=\"2\">\n"\
+    "        </AudioChannelConfiguration>\n"\
     "      </Representation>\n"\
     "    </AdaptationSet>\n"\
     "  </Period>\n"\
     "</MPD>"
 
-
-    max_frag = hacf->fraglen / 1000;
-
-    for (i = 0; i < ctx->nfrags; i++) {
-        f = ngx_rtmp_hls_get_frag(s, i);
-        if (f->duration > max_frag) {
-            max_frag = f->duration + .5;
-        }
-    }
-
-    p = ngx_snprintf(buffer, sizeof(buffer), 
-                     "#EXTM3U\n"
-                     "#EXT-X-VERSION:3\n"
-                     "#EXT-X-MEDIA-SEQUENCE:%uL\n"
-                     "#EXT-X-TARGETDURATION:%ui\n",
-                     ctx->frag, max_frag);
+    p = ngx_snprintf(buffer, sizeof(buffer), NGX_RTMP_DASH_HEADER,
+                     &ctx->name, ctx->frag);
 
     n = write(fd, buffer, p - buffer);
     if (n < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: write failed: '%V'", &ctx->playlist_bak);
+                      "dash: write failed: '%V'", &ctx->playlist_bak);
         ngx_close_file(fd);
         return NGX_ERROR;
     }
@@ -496,34 +476,42 @@ ngx_rtmp_hls_write_dash_playlist(ngx_rtmp_session_t *s)
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
 
-        p = ngx_snprintf(buffer, sizeof(buffer), 
-                         "%s"
-                         "#EXTINF:%.3f,\n"
-                         "%V%s%uL.ts\n",
-                         f->discont ? "#EXT-X-DISCONTINUITY\n" : "",
-                         f->duration,
-                         hacf->nested ? &empty : &ctx->name,
-                         hacf->nested ? "" : "-", f->id);
+        if (i == 0) {
+            p = ngx_snprintf(buffer, sizeof(buffer), NGX_RTMP_DASH_FIRST_ENTRY,
+                             ctx->start_ts, (uint64_t) (f->duration * 1000));
+        } else {
+            p = ngx_snprintf(buffer, sizeof(buffer), NGX_RTMP_DASH_ENTRY,
+                             (uint64_t) (f->duration * 1000));
+        }
 
-        ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "hls: fragment frag=%uL, n=%ui/%ui, duration=%.3f, "
-                       "discont=%i",
-                       ctx->frag, i + 1, ctx->nfrags, f->duration, f->discont);
+        ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "dash: fragment frag=%uL, n=%ui/%ui, duration=%.3f",
+                       ctx->frag, i + 1, ctx->nfrags, f->duration);
 
         n = write(fd, buffer, p - buffer);
         if (n < 0) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                          "hls: write failed '%V'", &ctx->playlist_bak);
+                          "dash: write failed '%V'", &ctx->playlist_bak);
             ngx_close_file(fd);
             return NGX_ERROR;
         }
+    }
+
+    p = ngx_snprintf(buffer, sizeof(buffer), NGX_RTMP_DASH_FOOTER);
+
+    n = write(fd, buffer, p - buffer);
+    if (n < 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "dash: write failed: '%V'", &ctx->playlist_bak);
+        ngx_close_file(fd);
+        return NGX_ERROR;
     }
 
     ngx_close_file(fd);
 
     if (ngx_rename_file(playlist_bak.data, playlist.data)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: rename failed: '%V'->'%V'", 
+                      "dash: rename failed: '%V'->'%V'", 
                       &playlist_bak, &playlist);
         return NGX_ERROR;
     }
@@ -859,6 +847,7 @@ ngx_rtmp_hls_close_fragment(ngx_rtmp_session_t *s, ngx_int_t discont)
     ngx_rtmp_hls_next_frag(s);
 
     ngx_rtmp_hls_write_playlist(s);
+    ngx_rtmp_hls_write_dash_playlist(s);
 
     return NGX_OK;
 }
