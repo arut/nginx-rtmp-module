@@ -311,6 +311,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     ngx_pid_t                       pid;
     ngx_int_t                       npushed;
     ngx_core_conf_t                *ccf;
+    ngx_file_info_t                 fi;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                    "auto_push: reconnect");
@@ -362,6 +363,15 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
                          "unix:%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i", 
                          &apcf->socket_dir, n);
         *p = 0;
+
+        if (ngx_file_info(path + sizeof("unix:") - 1, &fi) != NGX_OK) {
+            ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "auto_push: " ngx_file_info_n " failed: "
+                           "slot=%i pid=%P socket='%s'" "url='%V' name='%s'",
+                           n, pid, path, u, ctx->name);
+            continue;
+        }
+
         u->data = path;
         u->len = p - path;
         if (ngx_parse_url(s->connection->pool, &at.url) != NGX_OK) {
