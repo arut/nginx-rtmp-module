@@ -355,7 +355,7 @@ ngx_rtmp_mp4_parse_trak(ngx_rtmp_session_t *s, u_char *pos, u_char *last)
                  ? NULL : &ctx->tracks[ctx->ntracks];
 
     if (ctx->track) {
-        ngx_memzero(ctx->track, sizeof(ctx->track));
+        ngx_memzero(ctx->track, sizeof(*ctx->track));
         ctx->track->id = ctx->ntracks;
 
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
