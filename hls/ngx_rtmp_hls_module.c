@@ -1676,6 +1676,12 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
         if (ngx_read_dir(&dir) == NGX_ERROR) {
             err = ngx_errno;
 
+            if (ngx_close_dir(&dir) == NGX_ERROR) {
+                ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
+                              "hls: cleanup " ngx_close_dir_n " \"%V\" failed",
+                              ppath);
+            }
+
             if (err == NGX_ENOMOREFILES) {
                 return nentries - nerased;
             }
