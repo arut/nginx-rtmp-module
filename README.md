@@ -71,10 +71,6 @@ cd to NGINX source directory & run this:
     make
     make install
 
-See this article about building nginx-rtmp with HLS support:
-https://github.com/arut/nginx-rtmp-module/wiki/Building-nginx-rtmp-with-HLS-support
-
-
 ### RTMP URL format
 
     rtmp://rtmp.example.com/app[/name]
