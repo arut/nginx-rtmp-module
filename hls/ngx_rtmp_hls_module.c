@@ -1282,16 +1282,22 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: audio pts=%uL", pts);
 
+    if (b->last + 7 > b->end) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: not enough buffer for audio header");
+        return NGX_OK;
+    }
+
     p = b->last;
     b->last += 5;
 
     /* copy payload */
 
-    for (; in; in = in->next) {
+    for (; in && b->last < b->end; in = in->next) {
 
         bsize = in->buf->last - in->buf->pos;
         if (b->last + bsize > b->end) {
-            break;
+            bsize = b->end - b->last;
         }
 
         b->last = ngx_cpymem(b->last, in->buf->pos, bsize);
