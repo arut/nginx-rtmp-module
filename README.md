@@ -67,9 +67,14 @@
 
 cd to NGINX source directory & run this:
 
-    ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
+    ./configure --add-module=<path-to-nginx-rtmp-module>
     make
     make install
+
+Several versions of nginx (1.3.x - 1.4.0) require http_ssl_module to be
+added as well:
+
+    ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
 
 ### RTMP URL format
 
