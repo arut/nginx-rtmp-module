@@ -67,13 +67,9 @@
 
 cd to NGINX source directory & run this:
 
-    ./configure --add-module=<path-to-nginx-rtmp-module>
+    ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
     make
     make install
-
-See this article about building nginx-rtmp with HLS support:
-https://github.com/arut/nginx-rtmp-module/wiki/Building-nginx-rtmp-with-HLS-support
-
 
 ### RTMP URL format
 
