@@ -423,7 +423,7 @@ ngx_rtmp_live_stop(ngx_rtmp_session_t *s)
     if (lacf->publish_notify) {
         status[nstatus++] = ngx_rtmp_create_status(s,
                                                "NetStream.Play.UnpublishNotify",
-                                               "status", "Start publishing");
+                                               "status", "Stop publishing");
     }
 
     ngx_rtmp_live_set_status(s, control, status, nstatus, 0);
