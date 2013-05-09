@@ -71,7 +71,7 @@ cd to NGINX source directory & run this:
     make
     make install
 
-Several versions of nginx (1.3.x - 1.4.0) require http_ssl_module to be
+Several versions of nginx (1.3.14 - 1.4.1) require http_ssl_module to be
 added as well:
 
     ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
