@@ -24,6 +24,12 @@ Fedora 17:
 - [nginx-rtmp-1.2.8-3.fc17.x86_64.rpm](https://docs.google.com/file/d/0B_bDfxNKSsxpd29panlQNnIwUkE/edit?usp=sharing)
 - [nginx-rtmp-debuginfo-1.2.8-3.fc17.x86_64.rpm](https://docs.google.com/file/d/0B_bDfxNKSsxpMWVGZDlXc0ZRMU0/edit?usp=sharing)
 
+
+You can install these packages with:
+
+	$ yum localinstall nginx-rtmp-...x86_64.rpm
+
+
 ---------------
 Source Packages
 ---------------
