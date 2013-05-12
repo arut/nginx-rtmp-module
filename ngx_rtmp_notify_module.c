@@ -84,6 +84,7 @@ typedef struct {
     u_char                                      name[NGX_RTMP_MAX_NAME];
     u_char                                      args[NGX_RTMP_MAX_ARGS];
     ngx_event_t                                 update_evt;
+    time_t                                      start;
 } ngx_rtmp_notify_ctx_t;
 
 
@@ -682,6 +683,7 @@ ngx_rtmp_notify_update_create(ngx_rtmp_session_t *s, void *arg,
 
     b = ngx_create_temp_buf(pool,
                             sizeof("&call=update") + sfx.len +
+                            sizeof("&time=") + NGX_TIME_T_LEN +
                             sizeof("&name=") + name_len * 3 +
                             1 + args_len);
     if (b == NULL) {
@@ -694,6 +696,10 @@ ngx_rtmp_notify_update_create(ngx_rtmp_session_t *s, void *arg,
     b->last = ngx_cpymem(b->last, (u_char*) "&call=update",
                          sizeof("&call=update") - 1);
     b->last = ngx_cpymem(b->last, sfx.data, sfx.len);
+
+    b->last = ngx_cpymem(b->last, (u_char *) "&time=",
+                         sizeof("&time=") - 1);
+    b->last = ngx_sprintf(b->last, "%T", ngx_cached_time->sec - ctx->start);
 
     if (name_len) {
         b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);
@@ -1131,6 +1137,8 @@ ngx_rtmp_notify_init(ngx_rtmp_session_t *s,
     if (ctx->update_evt.timer_set) {
         return;
     }
+
+    ctx->start = ngx_cached_time->sec;
 
     e = &ctx->update_evt;
 
