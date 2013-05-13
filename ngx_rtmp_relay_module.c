@@ -441,8 +441,8 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
     }
 
     if (target->url.naddrs == 0) {
-        ngx_log_error(NGX_LOG_INFO, racf->log, 0,
-                      "relay: no addresses");
+        ngx_log_error(NGX_LOG_ERR, racf->log, 0,
+                      "relay: no address");
         goto clear;
     }
 

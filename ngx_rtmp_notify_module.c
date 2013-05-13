@@ -1004,7 +1004,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         goto next;
     }
 
-    if (ngx_strncmp(name, "rtmp://", 7)) {
+    if (ngx_strncasecmp(name, (u_char *) "rtmp://", 7)) {
         *ngx_cpymem(v->name, name, rc) = 0;
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: publish redirect to '%s'", v->name);
@@ -1018,8 +1018,8 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         *ngx_cpymem(v->name, name, rc) = 0;
     }
 
-    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                  "notify: push '%s' to '%s'", v->name, name);
+    ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                  "notify: push '%s' to '%*s'", v->name, rc, name);
 
     local_name.data = v->name;
     local_name.len = ngx_strlen(v->name);
@@ -1083,7 +1083,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
         goto next;
     }
 
-    if (ngx_strncmp(name, "rtmp://", 7)) {
+    if (ngx_strncasecmp(name, (u_char *) "rtmp://", 7)) {
         *ngx_cpymem(v->name, name, rc) = 0;
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: play redirect to '%s'", v->name);
@@ -1113,11 +1113,17 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
     u->uri_part = 1;
     u->no_resolve = 1; /* want ip here */
 
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "notify: parse_url '%V'", &u->url);
+
     if (ngx_parse_url(s->connection->pool, u) != NGX_OK) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: pull failed '%V'", &local_name);
         return NGX_ERROR;
     }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "notify: naddrs=%ui", u->naddrs);
 
     ngx_rtmp_relay_pull(s, &local_name, &target);
 
