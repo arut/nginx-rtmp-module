@@ -1113,17 +1113,11 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
     u->uri_part = 1;
     u->no_resolve = 1; /* want ip here */
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "notify: parse_url '%V'", &u->url);
-
     if (ngx_parse_url(s->connection->pool, u) != NGX_OK) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: pull failed '%V'", &local_name);
         return NGX_ERROR;
     }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "notify: naddrs=%ui", u->naddrs);
 
     ngx_rtmp_relay_pull(s, &local_name, &target);
 
