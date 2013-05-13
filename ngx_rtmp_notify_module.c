@@ -1098,7 +1098,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
     }
 
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                  "notify: pull '%s' from '%s'", v->name, name);
+                  "notify: pull '%s' from '%*s'", v->name, rc, name);
 
     local_name.data = v->name;
     local_name.len = ngx_strlen(v->name);

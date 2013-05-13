@@ -342,6 +342,7 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
     ngx_rtmp_session_t             *rs;
     ngx_peer_connection_t          *pc;
     ngx_connection_t               *c;
+    ngx_addr_t                     *addr;
     ngx_pool_t                     *pool;
     ngx_int_t                       rc;
     ngx_str_t                       v, *uri;
@@ -438,18 +439,28 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
     if (pc == NULL) {
         goto clear;
     }
+
+    if (target->url.naddrs == 0) {
+        ngx_log_error(NGX_LOG_INFO, racf->log, 0,
+                      "relay: no addresses");
+        goto clear;
+    }
+
+    /* use the first address */
+    addr = target->url.addrs;
+
     /* copy log to keep shared log unchanged */
     rctx->log = *racf->log;
     pc->log = &rctx->log;
     pc->get = ngx_rtmp_relay_get_peer;
     pc->free = ngx_rtmp_relay_free_peer;
-    pc->name = &target->url.host;
-    pc->socklen = target->url.socklen;
+    pc->name = &addr->name;
+    pc->socklen = addr->socklen;
     pc->sockaddr = (struct sockaddr *)ngx_palloc(pool, pc->socklen);
     if (pc->sockaddr == NULL) {
         goto clear;
     }
-    ngx_memcpy(pc->sockaddr, &target->url.sockaddr, pc->socklen);
+    ngx_memcpy(pc->sockaddr, addr->sockaddr, pc->socklen);
 
     rc = ngx_event_connect_peer(pc);
     if (rc != NGX_OK && rc != NGX_AGAIN ) {
