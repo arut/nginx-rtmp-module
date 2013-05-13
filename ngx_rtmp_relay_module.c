@@ -446,8 +446,9 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
         goto clear;
     }
 
-    /* use the first address */
-    addr = target->url.addrs;
+    /* get address */
+    addr = &target->url.addrs[target->counter % target->url.naddrs];
+    target->counter++;
 
     /* copy log to keep shared log unchanged */
     rctx->log = *racf->log;
