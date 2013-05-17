@@ -140,6 +140,8 @@ ngx_rtmp_play_create_app_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    pacf->nbuckets = 1024;
+
     return pacf;
 }
 
@@ -155,12 +157,12 @@ ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->local_path, prev->local_path, "");
 
     if (prev->entries.nelts == 0) {
-        return NGX_CONF_OK;
+        goto done;
     }
 
     if (conf->entries.nelts == 0) {
         conf->entries = prev->entries;
-        return NGX_CONF_OK;
+        goto done;
     }
 
     ppe = ngx_array_push_n(&conf->entries, prev->entries.nelts);
@@ -170,7 +172,88 @@ ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_memcpy(ppe, prev->entries.elts, prev->entries.nelts * sizeof(void *));
 
+done:
+
+    if (conf->entries.nelts == 0) {
+        return NGX_CONF_OK;
+    }
+
+    conf->ctx = ngx_pcalloc(cf->pool, sizeof(void *) * conf->nbuckets);
+    if (conf->ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
     return NGX_CONF_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_join(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_play_ctx_t        *ctx, **pctx;
+    ngx_rtmp_play_app_conf_t   *pacf;
+    ngx_uint_t                  h;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: join");
+
+    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+    if (ctx == NULL || ctx->joined) {
+        return NGX_ERROR;
+    }
+
+    h = ngx_hash_key(ctx->name, ngx_strlen(ctx->name));
+    pctx = &pacf->ctx[h % pacf->nbuckets];
+
+    while (*pctx) {
+        if (!ngx_strncmp((*pctx)->name, ctx->name, NGX_RTMP_MAX_NAME)) {
+            break;
+        }
+        pctx = &(*pctx)->next;
+    }
+
+    ctx->next = *pctx;
+    *pctx = ctx;
+    ctx->joined = 1;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_rtmp_play_leave(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_play_ctx_t        *ctx, **pctx;
+    ngx_rtmp_play_app_conf_t   *pacf;
+    ngx_uint_t                  h;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "play: leave");
+
+    pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
+    if (ctx == NULL || !ctx->joined) {
+        return NGX_ERROR;
+    }
+
+    h = ngx_hash_key(ctx->name, ngx_strlen(ctx->name));
+    pctx = &pacf->ctx[h % pacf->nbuckets];
+
+    while (*pctx && *pctx != ctx) {
+        pctx = &(*pctx)->next;
+    }
+
+    if (*pctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    *pctx = (*pctx)->next;
+    ctx->joined = 0;
+
+    return NGX_OK;
 }
 
 
@@ -475,6 +558,8 @@ ngx_rtmp_play_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
         ngx_rtmp_play_cleanup_local_file(s);
     }
 
+    ngx_rtmp_play_leave(s);
+
 next:
     return next_close_stream(s, v);
 }
@@ -644,10 +729,13 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ngx_memzero(ctx, sizeof(*ctx));
 
+    ctx->session = s;
     ctx->aindex = ngx_rtmp_play_parse_index('a', v->args);
     ctx->vindex = ngx_rtmp_play_parse_index('v', v->args);
-
+    
     ctx->file.log = s->connection->log;
+
+    ngx_memcpy(ctx->name, v->name, NGX_RTMP_MAX_NAME);
 
     name.len = ngx_strlen(v->name);
     name.data = v->name;
@@ -810,6 +898,10 @@ ngx_rtmp_play_open(ngx_rtmp_session_t *s, double start)
                              "Start video on demand")
         != NGX_OK)
     {
+        return NGX_ERROR;
+    }
+
+    if (ngx_rtmp_play_join(s) != NGX_OK) {
         return NGX_ERROR;
     }
 
