@@ -22,7 +22,7 @@ static char * ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf,
 static ngx_int_t ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s);
 
 
-#define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
+#define NGX_RTMP_HLS_BUFSIZE            (16*1024*1024)
 #define NGX_RTMP_HLS_DIR_ACCESS         0744
 
 
