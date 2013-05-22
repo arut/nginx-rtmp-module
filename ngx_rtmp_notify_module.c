@@ -829,11 +829,10 @@ ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s,
 
     /* 
      * not enough data;
-     * it can happen in case of empty or broken reply;
-     * let the caller decide if that's an error or not
+     * it can happen in case of empty or broken reply
      */
 
-    return NGX_DONE;
+    return NGX_ERROR;
 }
 
 
