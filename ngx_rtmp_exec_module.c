@@ -72,6 +72,7 @@ typedef struct {
 
 typedef struct {
     u_char                              name[NGX_RTMP_MAX_NAME];
+    u_char                              args[NGX_RTMP_MAX_ARGS];
     ngx_array_t                         execs;
 } ngx_rtmp_exec_ctx_t;
 
@@ -173,6 +174,10 @@ static ngx_rtmp_eval_t ngx_rtmp_exec_eval[] = {
     { ngx_string("name"),
       ngx_rtmp_exec_eval_astr,
       offsetof(ngx_rtmp_exec_ctx_t, name) },
+
+    { ngx_string("args"),
+      ngx_rtmp_exec_eval_astr,
+      offsetof(ngx_rtmp_exec_ctx_t, args) },
 
     ngx_rtmp_null_eval
 };
@@ -653,6 +658,7 @@ ngx_rtmp_exec_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     }
 
     ngx_memcpy(ctx->name, v->name, NGX_RTMP_MAX_NAME);
+    ngx_memcpy(ctx->args, v->args, NGX_RTMP_MAX_ARGS);
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "exec: run %uz command(s)", ctx->execs.nelts);
