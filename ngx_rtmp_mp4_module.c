@@ -2200,6 +2200,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
     ssize_t                     n;
     size_t                      offset, page_offset, size, shift;
     uint64_t                    extended_size;
+    ngx_file_info_t             fi;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
 
@@ -2247,6 +2248,14 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
 
             size = ngx_rtmp_r64(extended_size);
             shift += sizeof(extended_size);
+
+        } else if (size == 0) {
+            if (ngx_fd_info(f->fd, &fi) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                              "mp4: " ngx_fd_info_n " failed");
+                return NGX_ERROR;
+            }
+            size = ngx_file_size(&fi) - offset;
         }
 
         if (hdr[1] == ngx_rtmp_mp4_make_tag('m','o','o','v')) {
