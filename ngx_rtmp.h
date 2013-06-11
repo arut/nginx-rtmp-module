@@ -414,7 +414,8 @@ ngx_rtmp_r32(uint32_t n)
 static ngx_inline uint64_t
 ngx_rtmp_r64(uint64_t n)
 {
-    return (uint64_t) ngx_rtmp_r32(n) << 32 | ngx_rtmp_r32(n >> 32);
+    return (uint64_t) ngx_rtmp_r32((uint32_t) n) << 32 |
+                      ngx_rtmp_r32((uint32_t) (n >> 32));
 }
 
 
