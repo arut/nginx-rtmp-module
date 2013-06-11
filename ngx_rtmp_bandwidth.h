@@ -7,6 +7,7 @@
 #define _NGX_RTMP_BANDWIDTH_H_INCLUDED_
 
 
+#include <ngx_config.h>
 #include <ngx_core.h>
 
 

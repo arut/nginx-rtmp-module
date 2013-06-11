@@ -2,6 +2,9 @@
  * Copyright (c) 2012 Roman Arutyunyan
  */
 
+
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_amf.h"
 #include "ngx_rtmp.h"
 #include <string.h>
