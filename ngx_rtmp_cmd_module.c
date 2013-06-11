@@ -2,6 +2,7 @@
  * Copyright (c) 2012 Roman Arutyunyan
  */
 
+#include <ngx_config.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_streams.h"
 

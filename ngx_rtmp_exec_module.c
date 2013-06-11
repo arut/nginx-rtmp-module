@@ -3,6 +3,7 @@
  */
 
 
+#include <ngx_config.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_eval.h"
 #include <stdlib.h>
@@ -316,7 +317,7 @@ ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
     }
 
     /* execs are always started by the first worker */
-    if (ngx_process_slot) {
+    if (ngx_pid != ngx_processes[0].pid) {
         return NGX_OK;
     }
 

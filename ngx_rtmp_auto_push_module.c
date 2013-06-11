@@ -3,6 +3,7 @@
  */
 
 
+#include <ngx_config.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_relay_module.h"
 
@@ -309,6 +310,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     u_char                         *p;
     ngx_str_t                      *u;
     ngx_pid_t                       pid;
+    ngx_int_t                       this_process_slot;
     ngx_int_t                       npushed;
     ngx_core_conf_t                *ccf;
     ngx_file_info_t                 fi;
@@ -340,8 +342,16 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     slot = ctx->slots;
     npushed = 0;
 
+    this_process_slot = 0;
+    for (n = 0; n < NGX_MAX_PROCESSES; ++n) {
+        if (ngx_processes[n].pid == ngx_pid) {
+            this_process_slot = n;
+            break;
+        }
+    }
+
     for (n = 0; n < NGX_MAX_PROCESSES; ++n, ++slot) {
-        if (n == ngx_process_slot) {
+        if (n == this_process_slot) {
             continue;
         }
 
@@ -383,7 +393,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
         }
 
         p = ngx_snprintf(flash_ver, sizeof(flash_ver) - 1, "APSH %i,%i", 
-                         (ngx_int_t) ngx_process_slot, (ngx_int_t) ngx_pid);
+                         (ngx_int_t) this_process_slot, (ngx_int_t) ngx_pid);
         at.flash_ver.data = flash_ver;
         at.flash_ver.len = p - flash_ver;
 
