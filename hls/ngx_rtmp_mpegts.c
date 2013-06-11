@@ -89,11 +89,11 @@ ngx_rtmp_mpegts_write_header(ngx_file_t *file)
 static u_char *
 ngx_rtmp_mpegts_write_pcr(u_char *p, uint64_t pcr)
 {
-    *p++ = pcr >> 25;
-    *p++ = pcr >> 17;
-    *p++ = pcr >> 9;
-    *p++ = pcr >> 1;
-    *p++ = pcr << 7 | 0x7e;
+    *p++ = (u_char) (pcr >> 25);
+    *p++ = (u_char) (pcr >> 17);
+    *p++ = (u_char) (pcr >> 9);
+    *p++ = (u_char) (pcr >> 1);
+    *p++ = (u_char) (pcr << 7 | 0x7e);
     *p++ = 0;
 
     return p;
@@ -106,15 +106,15 @@ ngx_rtmp_mpegts_write_pts(u_char *p, ngx_uint_t fb, uint64_t pts)
     ngx_uint_t val;
 
     val = fb << 4 | (((pts >> 30) & 0x07) << 1) | 1;
-    *p++ = val;
-    
+    *p++ = (u_char) val;
+
     val = (((pts >> 15) & 0x7fff) << 1) | 1;
-    *p++ = val >> 8;
-    *p++ = val;
+    *p++ = (u_char) (val >> 8);
+    *p++ = (u_char) val;
 
     val = (((pts) & 0x7fff) << 1) | 1;
-    *p++ = val >> 8;
-    *p++ = val;
+    *p++ = (u_char) (val >> 8);
+    *p++ = (u_char) val;
 
     return p;
 }
@@ -142,13 +142,13 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
         f->cc++;
 
         *p++ = 0x47;
-        *p++ = (f->pid >> 8);
+        *p++ = (u_char) (f->pid >> 8);
 
         if (first) {
             p[-1] |= 0x40;
         }
 
-        *p++ = f->pid;
+        *p++ = (u_char) f->pid;
         *p++ = 0x10 | (f->cc & 0x0f); /* payload */
 
         if (first) {
@@ -167,7 +167,7 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
             *p++ = 0x00;
             *p++ = 0x00;
             *p++ = 0x01;
-            *p++ = f->sid;
+            *p++ = (u_char) f->sid;
 
             header_size = 5;
             flags = 0x80; /* PTS */
@@ -182,11 +182,11 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
                 pes_size = 0;
             }
 
-            *p++ = (pes_size >> 8);
-            *p++ = pes_size;
+            *p++ = (u_char) (pes_size >> 8);
+            *p++ = (u_char) pes_size;
             *p++ = 0x80; /* H222 */
-            *p++ = flags;
-            *p++ = header_size;
+            *p++ = (u_char) flags;
+            *p++ = (u_char) header_size;
 
             p = ngx_rtmp_mpegts_write_pts(p, flags >> 6, f->pts + 
                                                          NGX_RTMP_HLS_DELAY);
@@ -216,7 +216,7 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
                 base = &packet[5] + packet[4];
                 p = ngx_movemem(base + stuff_size, base, p - base);
                 ngx_memset(base, 0xff, stuff_size);
-                packet[4] += stuff_size;
+                packet[4] += (u_char) stuff_size;
 
             } else {
 
@@ -226,7 +226,7 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
                 p = ngx_movemem(&packet[4] + stuff_size, &packet[4],
                                 p - &packet[4]);
 
-                packet[4] = stuff_size - 1;
+                packet[4] = (u_char) (stuff_size - 1);
                 if (stuff_size >= 2) {
                     packet[5] = 0;
                     ngx_memset(&packet[6], 0xff, stuff_size - 2);

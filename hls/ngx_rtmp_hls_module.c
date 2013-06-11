@@ -378,7 +378,7 @@ retry:
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
         if (f->duration > max_frag) {
-            max_frag = f->duration + .5;
+            max_frag = (ngx_uint_t) (f->duration + .5);
         }
     }
 
@@ -812,7 +812,8 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
 
             if (ngx_memcmp(p, NGX_RTMP_MSEQ, NGX_RTMP_MSEQ_LEN) == 0) {
 
-                ctx->frag = strtod((const char *) &p[NGX_RTMP_MSEQ_LEN], NULL);
+                ctx->frag = (uint64_t) strtod((const char *)
+                                              &p[NGX_RTMP_MSEQ_LEN], NULL);
 
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                                "hls: restore sequence frag=%uL", ctx->frag);
@@ -1328,10 +1329,11 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     p[0] = 0xff;
     p[1] = 0xf1;
-    p[2] = ((objtype - 1) << 6) | (srindex << 2) | ((chconf & 0x04) >> 2);
-    p[3] = ((chconf & 0x03) << 6) | ((size >> 11) & 0x03);
-    p[4] = (size >> 3);
-    p[5] = (size << 5) | 0x1f;
+    p[2] = (u_char) (((objtype - 1) << 6) | (srindex << 2) |
+                     ((chconf & 0x04) >> 2));
+    p[3] = (u_char) (((chconf & 0x03) << 6) | ((size >> 11) & 0x03));
+    p[4] = (u_char) (size >> 3);
+    p[5] = (u_char) ((size << 5) | 0x1f);
     p[6] = 0xfc;
 
     if (p != b->start) {
