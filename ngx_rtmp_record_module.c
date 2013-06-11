@@ -482,6 +482,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
         return NGX_OK;
     }
 
+#if !(NGX_WIN32)
     if (rracf->lock_file) {
         err = ngx_lock_fd(rctx->file.fd);
         if (err) {
@@ -489,6 +490,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
                           "record: %V lock failed", &rracf->id);
         }
     }
+#endif
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                    "record: %V opened '%V'", &rracf->id, &path);
