@@ -3,6 +3,8 @@
  */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_eval.h"
 #include <stdlib.h>
@@ -225,9 +227,11 @@ ngx_rtmp_exec_init_main_conf(ngx_conf_t *cf, void *conf)
         emcf->respawn_timeout = 5000;
     }
 
+#if !(NGX_WIN32)
     if (emcf->kill_signal == NGX_CONF_UNSET) {
         emcf->kill_signal = SIGKILL;
     }
+#endif
 
     if (ngx_array_init(&emcf->execs, cf->pool, emcf->confs.nelts,
                        sizeof(ngx_rtmp_exec_t)) != NGX_OK)
@@ -316,10 +320,11 @@ ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
     }
 
     /* execs are always started by the first worker */
-    if (ngx_process_slot) {
+#if !(NGX_WIN32)
+	if (ngx_process_slot) {
         return NGX_OK;
     }
-
+#endif
     cscf = cmcf->servers.elts;
     cctx = (*cscf)->ctx;
     emcf = cctx->main_conf[ngx_rtmp_exec_module.ctx_index];
@@ -354,6 +359,7 @@ ngx_rtmp_exec_respawn(ngx_event_t *ev)
 }
 
 
+#if !(NGX_WIN32)
 static void 
 ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 {
@@ -387,7 +393,7 @@ ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 
     ngx_add_timer(&e->respawn_evt, e->respawn_timeout);
 }
-
+#endif
 
 static ngx_int_t
 ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal)
@@ -409,7 +415,9 @@ ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal)
                    (ngx_int_t) e->pid);
 
     e->active = 0;
+#if !(NGX_WIN32)
     close(e->pipefd);
+#endif
     if (e->save_pid) {
         *e->save_pid = NGX_INVALID_PID;
     }
@@ -417,7 +425,7 @@ ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal)
     if (kill_signal == 0) {
         return NGX_OK;
     }
-
+#if !(NGX_WIN32)
     if (kill(e->pid, kill_signal) == -1) {
         ngx_log_error(NGX_LOG_INFO, e->log, ngx_errno,
                       "exec: kill failed pid=%i", (ngx_int_t) e->pid);
@@ -425,7 +433,7 @@ ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal)
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
                        "exec: killed pid=%i", (ngx_int_t) e->pid);
     }
-
+#endif
     return NGX_OK;
 }
 
@@ -765,6 +773,7 @@ ngx_rtmp_exec_kill_signal(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_OK;
     }
 
+#if !(NGX_WIN32)
 #define NGX_RMTP_EXEC_SIGNAL(name)                                          \
     if (value->len == sizeof(#name) - 1 &&                                  \
         ngx_strncasecmp(value->data, (u_char *) #name, value->len) == 0)    \
@@ -796,6 +805,8 @@ ngx_rtmp_exec_kill_signal(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     NGX_RMTP_EXEC_SIGNAL(TTOU);
 
 #undef NGX_RMTP_EXEC_SIGNAL
+
+#endif /* NGX_WIN32 */
 
     return "unknown signal";
 }

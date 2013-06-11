@@ -3,6 +3,8 @@
  */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_codec_module.h"
@@ -150,9 +152,9 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->live = NGX_CONF_UNSET;
     lacf->meta = NGX_CONF_UNSET;
     lacf->nbuckets = NGX_CONF_UNSET;
-    lacf->buflen = NGX_CONF_UNSET;
-    lacf->sync = NGX_CONF_UNSET;
-    lacf->idle_timeout = NGX_CONF_UNSET;
+    lacf->buflen = NGX_CONF_UNSET_MSEC;
+    lacf->sync = NGX_CONF_UNSET_MSEC;
+    lacf->idle_timeout = NGX_CONF_UNSET_MSEC;
     lacf->interleave = NGX_CONF_UNSET;
     lacf->wait_key = NGX_CONF_UNSET;
     lacf->wait_video = NGX_CONF_UNSET;

@@ -3,6 +3,8 @@
  */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_codec_module.h"
 #include "ngx_rtmp_streams.h"
@@ -34,7 +36,7 @@ typedef struct {
 typedef struct {
     uint32_t                            version_flags;
     uint32_t                            entry_count;
-    ngx_rtmp_mp4_chunk_entry_t          entries[0];
+    ngx_rtmp_mp4_chunk_entry_t          entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_chunks_t;
 
 
@@ -47,7 +49,7 @@ typedef struct {
 typedef struct {
     uint32_t                            version_flags;
     uint32_t                            entry_count;
-    ngx_rtmp_mp4_time_entry_t           entries[0];
+    ngx_rtmp_mp4_time_entry_t           entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_times_t;
 
 
@@ -60,14 +62,14 @@ typedef struct {
 typedef struct {
     uint32_t                            version_flags;
     uint32_t                            entry_count;
-    ngx_rtmp_mp4_delay_entry_t          entries[0];
+    ngx_rtmp_mp4_delay_entry_t          entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_delays_t;
 
 
 typedef struct {
     uint32_t                            version_flags;
     uint32_t                            entry_count;
-    uint32_t                            entries[0];
+    uint32_t                            entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_keys_t;
 
 
@@ -75,7 +77,7 @@ typedef struct {
     uint32_t                            version_flags;
     uint32_t                            sample_size;
     uint32_t                            sample_count;
-    uint32_t                            entries[0];
+    uint32_t                            entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_sizes_t;
 
 
@@ -83,21 +85,21 @@ typedef struct {
     uint32_t                            version_flags;
     uint32_t                            field_size;
     uint32_t                            sample_count;
-    uint32_t                            entries[0];
+    uint32_t                            entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_sizes2_t;
 
 
 typedef struct {
     uint32_t                            version_flags;
     uint32_t                            entry_count;
-    uint32_t                            entries[0];
+    uint32_t                            entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_offsets_t;
 
 
 typedef struct {
     uint32_t                            version_flags;
     uint32_t                            entry_count;
-    uint64_t                            entries[0];
+    uint64_t                            entries[1]; /*FIXME*/
 } ngx_rtmp_mp4_offsets64_t;
 
 #pragma pack(pop)
@@ -185,14 +187,14 @@ typedef struct {
     ((uint32_t)d << 24 | (uint32_t)c << 16 | (uint32_t)b << 8 | (uint32_t)a)
 
 
-static inline uint32_t
-ngx_rtmp_mp4_to_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
+static ngx_inline uint32_t
+ngx_rtmp_mp4_to_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint64_t ts)
 {
-    return (uint64_t) ts * 1000 / t->time_scale;
+    return (uint32_t) (ts * 1000 / t->time_scale);
 }
 
 
-static inline uint32_t
+static ngx_inline uint32_t
 ngx_rtmp_mp4_from_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
 {
     return (uint64_t) ts * t->time_scale / 1000;
@@ -537,7 +539,7 @@ ngx_rtmp_mp4_parse_video(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
         return NGX_ERROR;
     }
     
-    ctx->track->fhdr = ctx->track->codec;
+    ctx->track->fhdr = (u_char) ctx->track->codec;
 
     return NGX_OK;
 }
@@ -1350,7 +1352,7 @@ ngx_rtmp_mp4_update_offset(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
             return NGX_ERROR;
         }
 
-        cr->offset = ngx_rtmp_r32(t->offsets64->entries[chunk]);
+        cr->offset = ngx_rtmp_r64(t->offsets64->entries[chunk]);
         cr->size = 0;
 
         ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -2041,7 +2043,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
         ngx_memzero(&h, sizeof(h));
 
         h.msid = NGX_RTMP_MSID;
-        h.type = t->type;
+        h.type = (uint8_t) t->type;
         h.csid = t->csid;
 
         lh = h;
@@ -2246,7 +2248,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
                 return NGX_ERROR;
             }
 
-            size = ngx_rtmp_r64(extended_size);
+            size = (size_t) ngx_rtmp_r64(extended_size);
             shift += sizeof(extended_size);
 
         } else if (size == 0) {
@@ -2280,6 +2282,8 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
     page_offset = offset & (ngx_pagesize - 1);
     ctx->mmaped_size = page_offset + size;
 
+#if !(NGX_WIN32)
+    /*FIXME: ngx_create_file_mapping */
     ctx->mmaped = mmap(NULL, ctx->mmaped_size, PROT_READ, MAP_SHARED,
                        f->fd, offset - page_offset);
 
@@ -2290,6 +2294,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
                       offset, size);
         return NGX_ERROR;
     }
+#endif
 
     return ngx_rtmp_mp4_parse(s, (u_char *) ctx->mmaped + page_offset, 
                                  (u_char *) ctx->mmaped + page_offset + size);
@@ -2307,12 +2312,14 @@ ngx_rtmp_mp4_done(ngx_rtmp_session_t *s, ngx_file_t *f)
         return NGX_OK;
     }
 
+#if !(NGX_WIN32)
+    /*FIXME: ngx_file_mapping */
     if (munmap(ctx->mmaped, ctx->mmaped_size)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "mp4: munmap failed");
         return NGX_ERROR;
     }
-
+#endif
     ctx->mmaped = NULL;
     ctx->mmaped_size = 0;
 

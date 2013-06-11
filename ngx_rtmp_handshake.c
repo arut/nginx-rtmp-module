@@ -2,7 +2,8 @@
  * Copyright (c) 2012 Roman Arutyunyan
  */
 
-
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp.h"
 
 #include <openssl/hmac.h>
@@ -182,7 +183,7 @@ static void
 ngx_rtmp_fill_random_buffer(ngx_buf_t *b)
 {
     for (; b->last != b->end; ++b->last) {
-        *b->last = rand();
+        *b->last = (u_char) rand();
     }
 }
 

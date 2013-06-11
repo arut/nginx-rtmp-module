@@ -3,6 +3,8 @@
  */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include <ngx_rtmp.h>
 #include <ngx_rtmp_cmd_module.h>
 #include <ngx_rtmp_codec_module.h>
@@ -334,7 +336,7 @@ static ngx_int_t
 ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 {
     static u_char                   buffer[1024];
-    int                             fd;
+    ngx_fd_t                        fd;
     u_char                         *p;
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
@@ -375,7 +377,7 @@ retry:
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
         if (f->duration > max_frag) {
-            max_frag = f->duration + .5;
+            max_frag = (ngx_uint_t) (f->duration + .5);
         }
     }
 
@@ -386,7 +388,7 @@ retry:
                      "#EXT-X-TARGETDURATION:%ui\n",
                      ctx->frag, max_frag);
 
-    n = write(fd, buffer, p - buffer);
+    n = ngx_write_fd(fd, buffer, p - buffer);
     if (n < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: write failed: '%V'", &ctx->playlist_bak);
@@ -411,7 +413,7 @@ retry:
                        "discont=%i",
                        ctx->frag, i + 1, ctx->nfrags, f->duration, f->discont);
 
-        n = write(fd, buffer, p - buffer);
+        n = ngx_write_fd(fd, buffer, p - buffer);
         if (n < 0) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                           "hls: write failed '%V'", &ctx->playlist_bak);
@@ -807,7 +809,8 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
 
             if (ngx_memcmp(p, NGX_RTMP_MSEQ, NGX_RTMP_MSEQ_LEN) == 0) {
 
-                ctx->frag = strtod((const char *) &p[NGX_RTMP_MSEQ_LEN], NULL);
+                ctx->frag = (uint64_t) strtod((const char *)
+					                          &p[NGX_RTMP_MSEQ_LEN], NULL);
 
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                                "hls: restore sequence frag=%uL", ctx->frag);
@@ -1323,10 +1326,11 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     p[0] = 0xff;
     p[1] = 0xf1;
-    p[2] = ((objtype - 1) << 6) | (srindex << 2) | ((chconf & 0x04) >> 2);
-    p[3] = ((chconf & 0x03) << 6) | ((size >> 11) & 0x03);
-    p[4] = (size >> 3);
-    p[5] = (size << 5) | 0x1f;
+    p[2] = (u_char) (((objtype - 1) << 6) | (srindex << 2) |
+		             ((chconf & 0x04) >> 2));
+    p[3] = (u_char) (((chconf & 0x03) << 6) | ((size >> 11) & 0x03));
+    p[4] = (u_char) (size >> 3);
+    p[5] = (u_char) (size << 5) | 0x1f;
     p[6] = 0xfc;
 
     if (p != b->start) {
@@ -1810,17 +1814,17 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     }
 
     conf->hls = NGX_CONF_UNSET;
-    conf->fraglen = NGX_CONF_UNSET;
-    conf->max_fraglen = NGX_CONF_UNSET;
-    conf->muxdelay = NGX_CONF_UNSET;
-    conf->sync = NGX_CONF_UNSET;
-    conf->playlen = NGX_CONF_UNSET;
+    conf->fraglen = NGX_CONF_UNSET_MSEC;
+    conf->max_fraglen = NGX_CONF_UNSET_MSEC;
+    conf->muxdelay = NGX_CONF_UNSET_MSEC;
+    conf->sync = NGX_CONF_UNSET_MSEC;
+    conf->playlen = NGX_CONF_UNSET_MSEC;
     conf->continuous = NGX_CONF_UNSET;
     conf->nested = NGX_CONF_UNSET;
     conf->naming = NGX_CONF_UNSET_UINT;
     conf->slicing = NGX_CONF_UNSET_UINT;
-    conf->max_audio_delay = NGX_CONF_UNSET;
-    conf->audio_buffer_size = NGX_CONF_UNSET;
+    conf->max_audio_delay = NGX_CONF_UNSET_MSEC;
+    conf->audio_buffer_size = NGX_CONF_UNSET_SIZE;
     conf->cleanup = NGX_CONF_UNSET;
 
     return conf;

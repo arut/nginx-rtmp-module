@@ -16,6 +16,12 @@
 #include "ngx_rtmp_bandwidth.h"
 
 
+#if (NGX_WIN32)
+typedef unsigned __int8     uint8_t;
+typedef __int8              int8_t;
+#endif
+
+
 typedef struct {
     void                  **main_conf;
     void                  **srv_conf;
@@ -241,7 +247,7 @@ typedef struct {
     unsigned                out_buffer:1;
     size_t                  out_queue;
     size_t                  out_cork;
-    ngx_chain_t            *out[0];
+    ngx_chain_t            *out[1];
 } ngx_rtmp_session_t;
 
 
@@ -391,24 +397,25 @@ void * ngx_rtmp_rmemcpy(void *dst, const void* src, size_t n);
     (((u_char*)ngx_rtmp_rmemcpy(dst, src, n)) + (n))
 
 
-static inline uint16_t
+static ngx_inline uint16_t
 ngx_rtmp_r16(uint16_t n)
 {
     return (n << 8) | (n >> 8);
 }
 
 
-static inline uint32_t
+static ngx_inline uint32_t
 ngx_rtmp_r32(uint32_t n)
 {
     return (n << 24) | ((n << 8) & 0xff0000) | ((n >> 8) & 0xff00) | (n >> 24);
 }
 
 
-static inline uint64_t
+static ngx_inline uint64_t
 ngx_rtmp_r64(uint64_t n)
 {
-    return (uint64_t) ngx_rtmp_r32(n) << 32 | ngx_rtmp_r32(n >> 32);
+    return (uint64_t) ngx_rtmp_r32((uint32_t) n) << 32 |
+		              ngx_rtmp_r32((uint32_t) (n >> 32));
 }
 
 
@@ -557,14 +564,14 @@ ngx_int_t ngx_rtmp_send_sample_access(ngx_rtmp_session_t *s);
 #define NGX_RTMP_VIDEO_DISPOSABLE_FRAME     3
 
 
-static inline ngx_int_t
+static ngx_inline ngx_int_t
 ngx_rtmp_get_video_frame_type(ngx_chain_t *in)
 {
     return (in->buf->pos[0] & 0xf0) >> 4;
 }
 
 
-static inline ngx_int_t
+static ngx_inline ngx_int_t
 ngx_rtmp_is_codec_header(ngx_chain_t *in)
 {
     return in->buf->pos + 1 < in->buf->last && in->buf->pos[1] == 0;

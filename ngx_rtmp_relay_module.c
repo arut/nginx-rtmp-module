@@ -3,6 +3,8 @@
  */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_relay_module.h"
 #include "ngx_rtmp_cmd_module.h"
 
@@ -184,10 +186,10 @@ ngx_rtmp_relay_create_app_conf(ngx_conf_t *cf)
 
     racf->nbuckets = 1024;
     racf->log = &cf->cycle->new_log;
-    racf->buflen = NGX_CONF_UNSET;
+    racf->buflen = NGX_CONF_UNSET_MSEC;
     racf->session_relay = NGX_CONF_UNSET;
-    racf->push_reconnect = NGX_CONF_UNSET;
-    racf->pull_reconnect = NGX_CONF_UNSET;
+    racf->push_reconnect = NGX_CONF_UNSET_MSEC;
+    racf->pull_reconnect = NGX_CONF_UNSET_MSEC;
 
     return racf;
 }
@@ -1610,9 +1612,11 @@ ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
 
     /* only first worker does static pulling */
 
+#if !(NGX_WIN32)
     if (ngx_process_slot) {
         return NGX_OK;
     }
+#endif
 
     lst = cmcf->listen.elts;
 

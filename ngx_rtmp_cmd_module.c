@@ -2,6 +2,9 @@
  * Copyright (c) 2012 Roman Arutyunyan
  */
 
+
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_streams.h"
 
@@ -285,8 +288,8 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
         s->app.len = (p - s->app.data);
     }
 
-    s->acodecs = v->acodecs;
-    s->vcodecs = v->vcodecs;
+    s->acodecs = (uint32_t) v->acodecs;
+    s->vcodecs = (uint32_t) v->vcodecs;
 
     /* find application & set app_conf */
     cacfp = cscf->applications.elts;

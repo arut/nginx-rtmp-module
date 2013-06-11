@@ -3,6 +3,8 @@
  */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_codec_module.h"
 #include "ngx_rtmp_streams.h"
@@ -289,7 +291,7 @@ ngx_rtmp_flv_timestamp_to_offset(ngx_rtmp_session_t *s, ngx_file_t *f,
         goto rewind;
     }
 
-    ret = ngx_rtmp_flv_index_value(ngx_rtmp_flv_buffer);
+    ret = (ngx_uint_t) ngx_rtmp_flv_index_value(ngx_rtmp_flv_buffer);
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                   "flv: lookup index timestamp=%i offset=%ui", 

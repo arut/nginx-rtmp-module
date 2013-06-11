@@ -3,6 +3,8 @@
  */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_relay_module.h"
 
@@ -269,7 +271,7 @@ ngx_rtmp_auto_push_create_conf(ngx_cycle_t *cycle)
     }
 
     apcf->auto_push = NGX_CONF_UNSET;
-    apcf->push_reconnect = NGX_CONF_UNSET;
+    apcf->push_reconnect = NGX_CONF_UNSET_MSEC;
 
     return apcf;
 }
@@ -291,6 +293,7 @@ ngx_rtmp_auto_push_init_conf(ngx_cycle_t *cycle, void *conf)
 }
 
 
+#if !(NGX_WIN32)
 static void
 ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
 {
@@ -486,7 +489,6 @@ next:
     return next_publish(s, v);
 }
 
-
 static ngx_int_t
 ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s, 
     ngx_rtmp_delete_stream_t *v)
@@ -541,3 +543,4 @@ ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
 next:
     return next_delete_stream(s, v);
 }
+#endif
