@@ -76,6 +76,13 @@ added as well:
 
     ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
 
+
+### Build On Windows 
+
+  http://nginx.org/en/docs/howto_build_on_win32.html
+	
+Before "Run make",modify objs/Makefile delete -WX in CFLAGS.
+	
 ### RTMP URL format
 
     rtmp://rtmp.example.com/app[/name]
