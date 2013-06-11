@@ -1813,17 +1813,17 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     }
 
     conf->hls = NGX_CONF_UNSET;
-    conf->fraglen = NGX_CONF_UNSET;
-    conf->max_fraglen = NGX_CONF_UNSET;
-    conf->muxdelay = NGX_CONF_UNSET;
-    conf->sync = NGX_CONF_UNSET;
-    conf->playlen = NGX_CONF_UNSET;
+    conf->fraglen = NGX_CONF_UNSET_MSEC;
+    conf->max_fraglen = NGX_CONF_UNSET_MSEC;
+    conf->muxdelay = NGX_CONF_UNSET_MSEC;
+    conf->sync = NGX_CONF_UNSET_MSEC;
+    conf->playlen = NGX_CONF_UNSET_MSEC;
     conf->continuous = NGX_CONF_UNSET;
     conf->nested = NGX_CONF_UNSET;
     conf->naming = NGX_CONF_UNSET_UINT;
     conf->slicing = NGX_CONF_UNSET_UINT;
-    conf->max_audio_delay = NGX_CONF_UNSET;
-    conf->audio_buffer_size = NGX_CONF_UNSET;
+    conf->max_audio_delay = NGX_CONF_UNSET_MSEC;
+    conf->audio_buffer_size = NGX_CONF_UNSET_SIZE;
     conf->cleanup = NGX_CONF_UNSET;
 
     return conf;

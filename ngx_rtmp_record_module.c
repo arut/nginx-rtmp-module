@@ -188,14 +188,14 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    racf->max_size   = NGX_CONF_UNSET;
-    racf->max_frames = NGX_CONF_UNSET;
-    racf->interval   = NGX_CONF_UNSET;
-    racf->unique     = NGX_CONF_UNSET;
-    racf->append     = NGX_CONF_UNSET;
-    racf->lock_file  = NGX_CONF_UNSET;
-    racf->notify     = NGX_CONF_UNSET;
-    racf->url        = NGX_CONF_UNSET_PTR;
+    racf->max_size = NGX_CONF_UNSET_SIZE;
+    racf->max_frames = NGX_CONF_UNSET_SIZE;
+    racf->interval = NGX_CONF_UNSET_MSEC;
+    racf->unique = NGX_CONF_UNSET;
+    racf->append = NGX_CONF_UNSET;
+    racf->lock_file = NGX_CONF_UNSET;
+    racf->notify = NGX_CONF_UNSET;
+    racf->url = NGX_CONF_UNSET_PTR;
 
     if (ngx_array_init(&racf->rec, cf->pool, 1, sizeof(void *)) != NGX_OK) {
         return NULL;

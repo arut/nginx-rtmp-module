@@ -233,10 +233,10 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->so_keepalive = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
     conf->chunk_size = NGX_CONF_UNSET;
-    conf->ack_window = NGX_CONF_UNSET;
-    conf->max_message = NGX_CONF_UNSET;
-    conf->out_queue = NGX_CONF_UNSET;
-    conf->out_cork = NGX_CONF_UNSET;
+    conf->ack_window = NGX_CONF_UNSET_UINT;
+    conf->max_message = NGX_CONF_UNSET_SIZE;
+    conf->out_queue = NGX_CONF_UNSET_SIZE;
+    conf->out_cork = NGX_CONF_UNSET_SIZE;
     conf->play_time_fix = NGX_CONF_UNSET;
     conf->publish_time_fix = NGX_CONF_UNSET;
     conf->busy = NGX_CONF_UNSET;

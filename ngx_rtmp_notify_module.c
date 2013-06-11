@@ -236,8 +236,8 @@ ngx_rtmp_notify_create_app_conf(ngx_conf_t *cf)
         nacf->url[n] = NGX_CONF_UNSET_PTR;
     }
 
-    nacf->method = NGX_CONF_UNSET;
-    nacf->update_timeout = NGX_CONF_UNSET;
+    nacf->method = NGX_CONF_UNSET_UINT;
+    nacf->update_timeout = NGX_CONF_UNSET_MSEC;
     nacf->update_strict = NGX_CONF_UNSET;
     nacf->relay_redirect = NGX_CONF_UNSET;
 
@@ -289,7 +289,7 @@ ngx_rtmp_notify_create_srv_conf(ngx_conf_t *cf)
         nscf->url[n] = NGX_CONF_UNSET_PTR;
     }
 
-    nscf->method = NGX_CONF_UNSET;
+    nscf->method = NGX_CONF_UNSET_UINT;
 
     return nscf;
 }
