@@ -371,7 +371,7 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
     ngx_rtmp_record_ctx_t          *ctx;
     ngx_rtmp_record_app_conf_t     *rracf;
     u_char                         *p, *l;
-    ngx_tm_t                        tm;
+    struct tm                       tm;
 
     static u_char                   buf[NGX_TIME_T_LEN + 1];
     static u_char                   pbuf[NGX_MAX_PATH + 1];
