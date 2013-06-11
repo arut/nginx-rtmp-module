@@ -3,6 +3,7 @@
  */
 
 
+#include <ngx_config.h>
 #include "ngx_rtmp_codec_module.h"
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_cmd_module.h"

@@ -3,6 +3,7 @@
  */
 
 
+#include <ngx_config.h>
 #include <ngx_rtmp.h>
 #include <ngx_rtmp_cmd_module.h>
 #include <ngx_rtmp_codec_module.h>
@@ -334,7 +335,7 @@ static ngx_int_t
 ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 {
     static u_char                   buffer[1024];
-    int                             fd;
+    ngx_fd_t                        fd;
     u_char                         *p;
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
@@ -386,7 +387,7 @@ retry:
                      "#EXT-X-TARGETDURATION:%ui\n",
                      ctx->frag, max_frag);
 
-    n = write(fd, buffer, p - buffer);
+    n = ngx_write_fd(fd, buffer, p - buffer);
     if (n < 0) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: write failed: '%V'", &ctx->playlist_bak);
@@ -411,7 +412,7 @@ retry:
                        "discont=%i",
                        ctx->frag, i + 1, ctx->nfrags, f->duration, f->discont);
 
-        n = write(fd, buffer, p - buffer);
+        n = ngx_write_fd(fd, buffer, p - buffer);
         if (n < 0) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                           "hls: write failed '%V'", &ctx->playlist_bak);

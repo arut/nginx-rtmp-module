@@ -15,6 +15,11 @@
 #include "ngx_rtmp_amf.h"
 #include "ngx_rtmp_bandwidth.h"
 
+#ifdef _MSC_VER
+#define inline
+typedef unsigned __int8     uint8_t;
+typedef __int8              int8_t;
+#endif
 
 typedef struct {
     void                  **main_conf;

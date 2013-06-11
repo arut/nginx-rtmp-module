@@ -3,6 +3,7 @@
  */
 
 
+#include <ngx_config.h>
 #include "ngx_rtmp_eval.h"
 
 
@@ -103,7 +104,7 @@ ngx_int_t
 ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in, ngx_rtmp_eval_t **e,
               ngx_str_t *out)
 {
-    u_char      c, *p;;
+    u_char      c, *p;
     ngx_str_t   name;
     ngx_buf_t   b;
     ngx_uint_t  n;

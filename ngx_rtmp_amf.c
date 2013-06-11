@@ -2,6 +2,7 @@
  * Copyright (c) 2012 Roman Arutyunyan
  */
 
+#include <ngx_config.h>
 #include "ngx_rtmp_amf.h"
 #include "ngx_rtmp.h"
 #include <string.h>
@@ -173,6 +174,7 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
     size_t                  n, namelen, maxlen;
     ngx_int_t               rc;
     u_char                  buf[2];
+    char                   *name;
 
     maxlen = 0;
     for(n = 0; n < nelts; ++n) {
@@ -181,13 +183,18 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
             maxlen = namelen;
     }
 
+    name = (char *)ngx_alloc(maxlen, ctx->log);
+    if (name == NULL) {
+        return NGX_ERROR;
+    }
+
     for(;;) {
 
-        char    name[maxlen];
-
         /* read key */
-        if (ngx_rtmp_amf_get(ctx, buf, 2) != NGX_OK)
+        if (ngx_rtmp_amf_get(ctx, buf, 2) != NGX_OK) {
+            ngx_free(name);
             return NGX_ERROR;
+        }
 
         ngx_rtmp_amf_reverse_copy(&len, buf, 2);
 
@@ -199,13 +206,17 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 
         } else {
             rc = ngx_rtmp_amf_get(ctx, name, maxlen);
-            if (rc != NGX_OK)
+            if (rc != NGX_OK) {
+                ngx_free(name);
                 return NGX_ERROR;
+            }
             rc = ngx_rtmp_amf_get(ctx, 0, len - maxlen);
         }
 
-        if (rc != NGX_OK)
+        if (rc != NGX_OK) {
+            ngx_free(name);
             return NGX_ERROR;
+        }
 
         /* TODO: if we require array to be sorted on name
          * then we could be able to use binary search */
@@ -214,9 +225,13 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                     || ngx_strncmp(name, elts[n].name.data, len));
                 ++n);
 
-        if (ngx_rtmp_amf_read(ctx, n < nelts ? &elts[n] : NULL, 1) != NGX_OK)
+        if (ngx_rtmp_amf_read(ctx, n < nelts ? &elts[n] : NULL, 1) != NGX_OK) {
+            ngx_free(name);
             return NGX_ERROR;
+        }
     }
+
+    ngx_free(name);
 
     if (ngx_rtmp_amf_get(ctx, &type, 1) != NGX_OK
         || type != NGX_RTMP_AMF_END)

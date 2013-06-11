@@ -3,6 +3,7 @@
  */
 
 
+#include <ngx_config.h>
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_amf.h"
 #include "ngx_rtmp_streams.h"
@@ -72,11 +73,13 @@ ngx_rtmp_create_chunk_size(ngx_rtmp_session_t *s, uint32_t chunk_size)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "chunk_size=%uD", chunk_size);
 
-    NGX_RTMP_USER_START(s, NGX_RTMP_MSG_CHUNK_SIZE);
+    {
+        NGX_RTMP_USER_START(s, NGX_RTMP_MSG_CHUNK_SIZE);
 
-    NGX_RTMP_USER_OUT4(chunk_size);
+        NGX_RTMP_USER_OUT4(chunk_size);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -94,11 +97,13 @@ ngx_rtmp_create_abort(ngx_rtmp_session_t *s, uint32_t csid)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: abort csid=%uD", csid);
 
-    NGX_RTMP_USER_START(s, NGX_RTMP_MSG_CHUNK_SIZE);
+    {
+        NGX_RTMP_USER_START(s, NGX_RTMP_MSG_CHUNK_SIZE);
 
-    NGX_RTMP_USER_OUT4(csid);
+        NGX_RTMP_USER_OUT4(csid);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -116,11 +121,13 @@ ngx_rtmp_create_ack(ngx_rtmp_session_t *s, uint32_t seq)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: ack seq=%uD", seq);
 
-    NGX_RTMP_USER_START(s, NGX_RTMP_MSG_ACK);
+    {
+        NGX_RTMP_USER_START(s, NGX_RTMP_MSG_ACK);
 
-    NGX_RTMP_USER_OUT4(seq);
+        NGX_RTMP_USER_OUT4(seq);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -138,11 +145,13 @@ ngx_rtmp_create_ack_size(ngx_rtmp_session_t *s, uint32_t ack_size)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: ack_size=%uD", ack_size);
 
-    NGX_RTMP_USER_START(s, NGX_RTMP_MSG_ACK_SIZE);
+    {
+        NGX_RTMP_USER_START(s, NGX_RTMP_MSG_ACK_SIZE);
 
-    NGX_RTMP_USER_OUT4(ack_size);
+        NGX_RTMP_USER_OUT4(ack_size);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -162,12 +171,14 @@ ngx_rtmp_create_bandwidth(ngx_rtmp_session_t *s, uint32_t ack_size,
                    "create: bandwidth ack_size=%uD limit=%d", 
                    ack_size, (int)limit_type);
 
-    NGX_RTMP_USER_START(s, NGX_RTMP_MSG_BANDWIDTH);
+    {
+        NGX_RTMP_USER_START(s, NGX_RTMP_MSG_BANDWIDTH);
 
-    NGX_RTMP_USER_OUT4(ack_size);
-    NGX_RTMP_USER_OUT1(limit_type);
+        NGX_RTMP_USER_OUT4(ack_size);
+        NGX_RTMP_USER_OUT1(limit_type);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -188,11 +199,13 @@ ngx_rtmp_create_stream_begin(ngx_rtmp_session_t *s, uint32_t msid)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: stream_begin msid=%uD", msid);
 
-    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_STREAM_BEGIN);
+    {
+        NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_STREAM_BEGIN);
 
-    NGX_RTMP_USER_OUT4(msid);
+        NGX_RTMP_USER_OUT4(msid);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -210,11 +223,13 @@ ngx_rtmp_create_stream_eof(ngx_rtmp_session_t *s, uint32_t msid)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: stream_end msid=%uD", msid);
     
-    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_STREAM_EOF);
+    {
+        NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_STREAM_EOF);
 
-    NGX_RTMP_USER_OUT4(msid);
+        NGX_RTMP_USER_OUT4(msid);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -232,11 +247,13 @@ ngx_rtmp_create_stream_dry(ngx_rtmp_session_t *s, uint32_t msid)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: stream_dry msid=%uD", msid);
 
-    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_STREAM_DRY);
+    {
+        NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_STREAM_DRY);
 
-    NGX_RTMP_USER_OUT4(msid);
+        NGX_RTMP_USER_OUT4(msid);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -256,12 +273,14 @@ ngx_rtmp_create_set_buflen(ngx_rtmp_session_t *s, uint32_t msid,
                    "create: set_buflen msid=%uD buflen=%uD",
                    msid, buflen_msec);
 
-    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_SET_BUFLEN);
+    {
+        NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_SET_BUFLEN);
 
-    NGX_RTMP_USER_OUT4(msid);
-    NGX_RTMP_USER_OUT4(buflen_msec);
+        NGX_RTMP_USER_OUT4(msid);
+        NGX_RTMP_USER_OUT4(buflen_msec);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -280,11 +299,13 @@ ngx_rtmp_create_recorded(ngx_rtmp_session_t *s, uint32_t msid)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: recorded msid=%uD", msid);
 
-    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_RECORDED);
+    {
+        NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_RECORDED);
 
-    NGX_RTMP_USER_OUT4(msid);
+        NGX_RTMP_USER_OUT4(msid);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -302,11 +323,13 @@ ngx_rtmp_create_ping_request(ngx_rtmp_session_t *s, uint32_t timestamp)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: ping_request timestamp=%uD", timestamp);
 
-    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_PING_REQUEST);
+    {
+        NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_PING_REQUEST);
 
-    NGX_RTMP_USER_OUT4(timestamp);
+        NGX_RTMP_USER_OUT4(timestamp);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 
@@ -324,11 +347,13 @@ ngx_rtmp_create_ping_response(ngx_rtmp_session_t *s, uint32_t timestamp)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: ping_response timestamp=%uD", timestamp);
 
-    NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_PING_RESPONSE);
+    {
+        NGX_RTMP_UCTL_START(s, NGX_RTMP_MSG_USER, NGX_RTMP_USER_PING_RESPONSE);
 
-    NGX_RTMP_USER_OUT4(timestamp);
+        NGX_RTMP_USER_OUT4(timestamp);
 
-    NGX_RTMP_USER_END(s);
+        NGX_RTMP_USER_END(s);
+    }
 }
 
 

@@ -3,6 +3,7 @@
  */
 
 
+#include <ngx_config.h>
 #include "ngx_rtmp_relay_module.h"
 #include "ngx_rtmp_cmd_module.h"
 
@@ -1610,7 +1611,7 @@ ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
 
     /* only first worker does static pulling */
 
-    if (ngx_process_slot) {
+    if (ngx_pid != ngx_processes[0].pid) {
         return NGX_OK;
     }
 
