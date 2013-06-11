@@ -432,7 +432,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     for (n = 0; n < NGX_MAX_PROCESSES; ++n, ++slot) {
         pid = ngx_processes[n].pid;
 
-        if (n == ngx_process_slot || *slot == 1 ||
+        if (n == this_process_slot || *slot == 1 ||
             pid == 0 || pid == NGX_INVALID_PID)
         {
             continue;

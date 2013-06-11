@@ -227,7 +227,7 @@ ngx_rtmp_exec_init_main_conf(ngx_conf_t *cf, void *conf)
     }
 
     if (emcf->kill_signal == NGX_CONF_UNSET) {
-        emcf->kill_signal = SIGKILL;
+ //       emcf->kill_signal = SIGKILL;
     }
 
     if (ngx_array_init(&emcf->execs, cf->pool, emcf->confs.nelts,
@@ -419,13 +419,13 @@ ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal)
         return NGX_OK;
     }
 
-    if (kill(e->pid, kill_signal) == -1) {
-        ngx_log_error(NGX_LOG_INFO, e->log, ngx_errno,
-                      "exec: kill failed pid=%i", (ngx_int_t) e->pid);
-    } else {
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
-                       "exec: killed pid=%i", (ngx_int_t) e->pid);
-    }
+//    if (kill(e->pid, kill_signal) == -1) {
+//        ngx_log_error(NGX_LOG_INFO, e->log, ngx_errno,
+//                      "exec: kill failed pid=%i", (ngx_int_t) e->pid);
+//    } else {
+//        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
+//                       "exec: killed pid=%i", (ngx_int_t) e->pid);
+//    }
 
     return NGX_OK;
 }
@@ -776,25 +776,25 @@ ngx_rtmp_exec_kill_signal(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* POSIX.1-1990 signals */
 
-    NGX_RMTP_EXEC_SIGNAL(HUP);
-    NGX_RMTP_EXEC_SIGNAL(INT);
-    NGX_RMTP_EXEC_SIGNAL(QUIT);
-    NGX_RMTP_EXEC_SIGNAL(ILL);
-    NGX_RMTP_EXEC_SIGNAL(ABRT);
-    NGX_RMTP_EXEC_SIGNAL(FPE);
-    NGX_RMTP_EXEC_SIGNAL(KILL);
-    NGX_RMTP_EXEC_SIGNAL(SEGV);
-    NGX_RMTP_EXEC_SIGNAL(PIPE);
-    NGX_RMTP_EXEC_SIGNAL(ALRM);
-    NGX_RMTP_EXEC_SIGNAL(TERM);
-    NGX_RMTP_EXEC_SIGNAL(USR1);
-    NGX_RMTP_EXEC_SIGNAL(USR2);
-    NGX_RMTP_EXEC_SIGNAL(CHLD);
-    NGX_RMTP_EXEC_SIGNAL(CONT);
-    NGX_RMTP_EXEC_SIGNAL(STOP);
-    NGX_RMTP_EXEC_SIGNAL(TSTP);
-    NGX_RMTP_EXEC_SIGNAL(TTIN);
-    NGX_RMTP_EXEC_SIGNAL(TTOU);
+ //   NGX_RMTP_EXEC_SIGNAL(HUP);
+ //   NGX_RMTP_EXEC_SIGNAL(INT);
+ //   NGX_RMTP_EXEC_SIGNAL(QUIT);
+ //   NGX_RMTP_EXEC_SIGNAL(ILL);
+ //   NGX_RMTP_EXEC_SIGNAL(ABRT);
+ //   NGX_RMTP_EXEC_SIGNAL(FPE);
+ //   NGX_RMTP_EXEC_SIGNAL(KILL);
+ //   NGX_RMTP_EXEC_SIGNAL(SEGV);
+ //   NGX_RMTP_EXEC_SIGNAL(PIPE);
+ //   NGX_RMTP_EXEC_SIGNAL(ALRM);
+ //   NGX_RMTP_EXEC_SIGNAL(TERM);
+ //   NGX_RMTP_EXEC_SIGNAL(USR1);
+ //   NGX_RMTP_EXEC_SIGNAL(USR2);
+ //   NGX_RMTP_EXEC_SIGNAL(CHLD);
+ //   NGX_RMTP_EXEC_SIGNAL(CONT);
+ //   NGX_RMTP_EXEC_SIGNAL(STOP);
+ //   NGX_RMTP_EXEC_SIGNAL(TSTP);
+ //   NGX_RMTP_EXEC_SIGNAL(TTIN);
+ //   NGX_RMTP_EXEC_SIGNAL(TTOU);
 
 #undef NGX_RMTP_EXEC_SIGNAL
 
