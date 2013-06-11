@@ -9,7 +9,8 @@
 #include "ngx_rtmp.h"
 #include <string.h>
 
-static inline void*
+
+static ngx_inline void*
 ngx_rtmp_amf_reverse_copy(void *dst, void* src, size_t len)
 {
     size_t  k;

@@ -187,14 +187,14 @@ typedef struct {
     ((uint32_t)d << 24 | (uint32_t)c << 16 | (uint32_t)b << 8 | (uint32_t)a)
 
 
-static inline uint32_t
+static ngx_inline uint32_t
 ngx_rtmp_mp4_to_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
 {
     return (uint64_t) ts * 1000 / t->time_scale;
 }
 
 
-static inline uint32_t
+static ngx_inline uint32_t
 ngx_rtmp_mp4_from_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
 {
     return (uint64_t) ts * t->time_scale / 1000;
