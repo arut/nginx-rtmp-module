@@ -322,7 +322,8 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
             }
             type = type8;
             data = (elts && 
-                    ngx_rtmp_amf_is_compatible_type(elts->type & 0xff, type))
+                    ngx_rtmp_amf_is_compatible_type(
+                                 (uint8_t) (elts->type & 0xff), (uint8_t) type))
                 ? elts->data
                 : NULL;
 
@@ -457,7 +458,7 @@ ngx_rtmp_amf_write_object(ngx_rtmp_amf_ctx_t *ctx,
 
     for(n = 0; n < nelts; ++n) {
 
-        len = elts[n].name.len;
+        len = (uint16_t) elts[n].name.len;
 
         if (ngx_rtmp_amf_put(ctx, 
                     ngx_rtmp_amf_reverse_copy(buf, 
@@ -525,7 +526,7 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
 
         type = elts[n].type;
         data = elts[n].data;
-        len  = elts[n].len;
+        len  = (uint16_t) elts[n].len;
 
         if (type & NGX_RTMP_AMF_TYPELESS) {
             type &= ~NGX_RTMP_AMF_TYPELESS;
@@ -553,7 +554,7 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
 
             case NGX_RTMP_AMF_STRING:
                 if (len == 0 && data) {
-                    len = ngx_strlen((u_char*)data);
+                    len = (uint16_t) ngx_strlen((u_char*) data);
                 }
 
                 if (ngx_rtmp_amf_put(ctx, 
