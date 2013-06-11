@@ -17,10 +17,12 @@ static ngx_int_t ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle);
 static void ngx_rtmp_auto_push_exit_process(ngx_cycle_t *cycle);
 static void * ngx_rtmp_auto_push_create_conf(ngx_cycle_t *cf);
 static char * ngx_rtmp_auto_push_init_conf(ngx_cycle_t *cycle, void *conf);
+#if (NGX_HAVE_UNIX_DOMAIN)
 static ngx_int_t ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, 
-        ngx_rtmp_publish_t *v);
+       ngx_rtmp_publish_t *v);
 static ngx_int_t ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s, 
-        ngx_rtmp_delete_stream_t *v);
+       ngx_rtmp_delete_stream_t *v);
+#endif
 
 
 typedef struct ngx_rtmp_auto_push_ctx_s ngx_rtmp_auto_push_ctx_t;
@@ -293,6 +295,7 @@ ngx_rtmp_auto_push_init_conf(ngx_cycle_t *cycle, void *conf)
 }
 
 
+#if (NGX_HAVE_UNIX_DOMAIN)
 static void
 ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
 {
@@ -543,3 +546,4 @@ ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
 next:
     return next_delete_stream(s, v);
 }
+#endif /* NGX_HAVE_UNIX_DOMAIN */
