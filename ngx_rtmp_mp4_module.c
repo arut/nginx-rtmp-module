@@ -539,7 +539,7 @@ ngx_rtmp_mp4_parse_video(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
         return NGX_ERROR;
     }
     
-    ctx->track->fhdr = ctx->track->codec;
+    ctx->track->fhdr = (u_char) ctx->track->codec;
 
     return NGX_OK;
 }
@@ -1330,7 +1330,7 @@ ngx_rtmp_mp4_update_offset(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
             return NGX_ERROR;
         }
 
-        cr->offset = ngx_rtmp_r32(t->offsets->entries[chunk]);
+        cr->offset = (off_t) ngx_rtmp_r32(t->offsets->entries[chunk]);
         cr->size = 0;
 
         ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -1352,7 +1352,7 @@ ngx_rtmp_mp4_update_offset(ngx_rtmp_session_t *s, ngx_rtmp_mp4_track_t *t)
             return NGX_ERROR;
         }
 
-        cr->offset = ngx_rtmp_r32(t->offsets64->entries[chunk]);
+        cr->offset = (off_t) ngx_rtmp_r64(t->offsets64->entries[chunk]);
         cr->size = 0;
 
         ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -2043,7 +2043,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
         ngx_memzero(&h, sizeof(h));
 
         h.msid = NGX_RTMP_MSID;
-        h.type = t->type;
+        h.type = (uint8_t) t->type;
         h.csid = t->csid;
 
         lh = h;
@@ -2234,7 +2234,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
             return NGX_ERROR;
         }
 
-        size = ngx_rtmp_r32(hdr[0]);
+        size = (size_t) ngx_rtmp_r32(hdr[0]);
         shift = sizeof(hdr);
 
         if (size == 1) {
@@ -2248,7 +2248,7 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
                 return NGX_ERROR;
             }
 
-            size = ngx_rtmp_r64(extended_size);
+            size = (size_t) ngx_rtmp_r64(extended_size);
             shift += sizeof(extended_size);
 
         } else if (size == 0) {

@@ -578,7 +578,7 @@ ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
     }
 
     if (!ctx->opened) {
-        ctx->post_seek = v->offset;
+        ctx->post_seek = (ngx_uint_t) v->offset;
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "play: post seek=%ui", ctx->post_seek);
         goto next;
@@ -588,7 +588,7 @@ ngx_rtmp_play_seek(ngx_rtmp_session_t *s, ngx_rtmp_seek_t *v)
         return NGX_ERROR;
     }
 
-    ngx_rtmp_play_do_seek(s, v->offset);
+    ngx_rtmp_play_do_seek(s, (ngx_uint_t) v->offset);
 
     if (ngx_rtmp_send_status(s, "NetStream.Seek.Notify", "status", "Seeking")
         != NGX_OK)

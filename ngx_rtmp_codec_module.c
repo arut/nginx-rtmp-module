@@ -532,16 +532,16 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    ctx->width = v.width;
-    ctx->height = v.height;
-    ctx->duration = v.duration;
-    ctx->frame_rate = v.frame_rate;
-    ctx->video_data_rate = v.video_data_rate;
-    ctx->video_codec_id = v.video_codec_id_n;
-    ctx->audio_data_rate = v.audio_data_rate;
+    ctx->width = (ngx_uint_t) v.width;
+    ctx->height = (ngx_uint_t) v.height;
+    ctx->duration = (ngx_uint_t) v.duration;
+    ctx->frame_rate = (ngx_uint_t) v.frame_rate;
+    ctx->video_data_rate = (ngx_uint_t) v.video_data_rate;
+    ctx->video_codec_id = (ngx_uint_t) v.video_codec_id_n;
+    ctx->audio_data_rate = (ngx_uint_t) v.audio_data_rate;
     ctx->audio_codec_id = (v.audio_codec_id_n == -1
             ? 0 : v.audio_codec_id_n == 0
-            ? NGX_RTMP_AUDIO_UNCOMPRESSED : v.audio_codec_id_n);
+            ? NGX_RTMP_AUDIO_UNCOMPRESSED : (ngx_uint_t) v.audio_codec_id_n);
     ngx_memcpy(ctx->profile, v.profile, sizeof(v.profile));
     ngx_memcpy(ctx->level, v.level, sizeof(v.level));
 
