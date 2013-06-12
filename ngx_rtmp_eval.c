@@ -124,6 +124,7 @@ ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in, ngx_rtmp_eval_t **e,
     }
 
     b.end = b.pos + NGX_RTMP_EVAL_BUFLEN;
+    name.data = NULL;
 
     for (n = 0; n < in->len; ++n) {
         p = &in->data[n];
