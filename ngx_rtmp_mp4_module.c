@@ -275,7 +275,7 @@ ngx_rtmp_mp4_munmap(void *data, size_t size, ngx_fd_t *extra)
     }
 
     if (CloseHandle(*extra) == 0) {
-        ret = NGX_ERROR;
+        rc = NGX_ERROR;
     }
 
     return rc;
