@@ -1597,6 +1597,7 @@ ngx_rtmp_relay_push_pull(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static ngx_int_t
 ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
 {
+#if !(NGX_WIN32)
     ngx_rtmp_core_main_conf_t  *cmcf = ngx_rtmp_core_main_conf;
     ngx_rtmp_core_srv_conf_t  **pcscf, *cscf;
     ngx_rtmp_core_app_conf_t  **pcacf, *cacf;
@@ -1641,7 +1642,7 @@ ngx_rtmp_relay_init_process(ngx_cycle_t *cycle)
             }
         }
     }
-
+#endif
     return NGX_OK;
 }
 

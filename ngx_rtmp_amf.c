@@ -186,9 +186,14 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
     }
 
     for(;;) {
-
+#if !(NGX_WIN32)
         char    name[maxlen];
-
+#else
+        char    name[1024];
+        if (maxlen > sizeof(char)) {
+            return NGX_ERROR;
+        }
+#endif
         /* read key */
         if (ngx_rtmp_amf_get(ctx, buf, 2) != NGX_OK)
             return NGX_ERROR;

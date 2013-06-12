@@ -193,6 +193,7 @@ ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in, ngx_rtmp_eval_t **e,
 ngx_int_t
 ngx_rtmp_eval_streams(ngx_str_t *in)
 {
+#if !(NGX_WIN32)
     ngx_int_t   mode, create, v, close_src;
     ngx_fd_t    dst, src;
     u_char     *path;
@@ -273,6 +274,9 @@ ngx_rtmp_eval_streams(ngx_str_t *in)
     if (close_src) {
         ngx_close_file(src);
     }
-
     return NGX_OK;
+
+#else
+    return NGX_DONE;
+#endif
 }
