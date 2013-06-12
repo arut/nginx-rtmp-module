@@ -627,7 +627,7 @@ ngx_rtmp_hls_get_fragment_id(ngx_rtmp_session_t *s, uint64_t ts)
         return ts;
 
     case NGX_RTMP_HLS_NAMING_SYSTEM:
-         return ngx_current_msec;
+        return (uint64_t) ngx_cached_time->sec * 1000 + ngx_cached_time->msec;
 
     default: /* NGX_RTMP_HLS_NAMING_SEQUENTIAL */
         return ctx->frag + ctx->nfrags;
