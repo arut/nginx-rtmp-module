@@ -248,7 +248,7 @@ ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
         return NULL;
     }
 
-    data = MapViewOfFile(*extra, FILE_MAP_WRITE, 0, 0, 0);
+    data = MapViewOfFile(*extra, FILE_MAP_READ, 0, 0, 0);
 
     if (data == NULL) {
         CloseHandle(*extra);
