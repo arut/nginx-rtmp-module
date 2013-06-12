@@ -163,6 +163,7 @@ typedef struct {
 typedef struct {
     void                               *mmaped;
     size_t                              mmaped_size;
+    ngx_fd_t                            extra;
 
     unsigned                            meta_sent:1;
 
@@ -206,6 +207,88 @@ ngx_rtmp_mp4_from_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
 
 
 static u_char                           ngx_rtmp_mp4_buffer[1024*1024];
+
+
+#if (NGX_WIN32)
+static void *
+ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
+{
+    void           *data;
+    LARGE_INTEGER   size;
+
+    size.QuadPart = size;
+
+    if (SetFilePointerEx(fd, size, NULL, FILE_BEGIN) == 0) {
+        return NULL;
+    }
+
+    if (SetEndOfFile(fd) == 0) {
+        return NULL;
+    }
+
+    *extra = CreateFileMapping(fd, NULL, PAGE_READWRITE,
+                               (u_long) ((off_t) size >> 32),
+                               (u_long) ((off_t) size & 0xffffffff),
+                               NULL);
+    if (*extra == NULL) {
+        return NULL;
+    }
+
+    data = MapViewOfFile(*extra, FILE_MAP_WRITE, 0, 0, 0);
+
+    if (data == NULL) {
+        CloseHandle(*extra);
+    }
+
+    /* 
+     * non-NULL result means map view handle is open 
+     * and should be closed later
+     */
+
+    return data;
+}
+
+
+static ngx_int_t
+ngx_rtmp_mp4_munmap(void *data, size_t size, ngx_fd_t *extra)
+{
+    ngx_int_t  rc;
+
+    rc = NGX_OK;
+
+    if (UnmapViewOfFile(data) == 0) {
+        rc = NGX_ERROR;
+    }
+
+    if (CloseHandle(*extra) == 0) {
+        ret = NGX_ERROR;
+    }
+
+    return rc;
+}
+
+#else
+
+static void *
+ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
+{
+    void  *data;
+
+    data = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, offset);
+
+    /* valid address is never NULL since there's no MAP_FIXED */
+
+    return data == MAP_FAILED ? NULL : data;
+}
+
+
+static ngx_int_t
+ngx_rtmp_mp4_munmap(void *data, size_t size, ngx_fd_t *extra)
+{
+    return munmap(data, size);
+}
+
+#endif
 
 
 static ngx_int_t ngx_rtmp_mp4_parse(ngx_rtmp_session_t *s, u_char *pos,
@@ -2282,11 +2365,9 @@ ngx_rtmp_mp4_init(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_int_t aindex,
     page_offset = offset & (ngx_pagesize - 1);
     ctx->mmaped_size = page_offset + size;
 
-    ctx->mmaped = mmap(NULL, ctx->mmaped_size, PROT_READ, MAP_SHARED,
-                       f->fd, offset - page_offset);
-
-    if (ctx->mmaped == MAP_FAILED) {
-        ctx->mmaped = NULL;
+    ctx->mmaped = ngx_rtmp_mp4_mmap(f->fd, ctx->mmaped_size,
+                                    offset - page_offset, &ctx->extra);
+    if (ctx->mmaped == NULL) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "mp4: mmap failed at offset=%ui, size=%uz",
                       offset, size);
@@ -2309,7 +2390,9 @@ ngx_rtmp_mp4_done(ngx_rtmp_session_t *s, ngx_file_t *f)
         return NGX_OK;
     }
 
-    if (munmap(ctx->mmaped, ctx->mmaped_size)) {
+    if (ngx_rtmp_mp4_munmap(ctx->mmaped, ctx->mmaped_size, &ctx->extra)
+        != NGX_OK)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "mp4: munmap failed");
         return NGX_ERROR;
