@@ -188,9 +188,9 @@ typedef struct {
 
 
 static ngx_inline uint32_t
-ngx_rtmp_mp4_to_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
+ngx_rtmp_mp4_to_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint64_t ts)
 {
-    return (uint64_t) ts * 1000 / t->time_scale;
+    return (uint32_t) (ts * 1000 / t->time_scale);
 }
 
 
