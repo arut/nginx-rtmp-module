@@ -1523,6 +1523,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             switch (nal_type) {
                 case 1:
                 case 5:
+                case 6:
                     if (ngx_rtmp_hls_append_aud(s, &out) != NGX_OK) {
                         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                                       "hls: error appending AUD NAL");
