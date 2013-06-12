@@ -185,12 +185,13 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
             maxlen = namelen;
     }
 
-    for(;;) {
+    for( ;; ) {
+
 #if !(NGX_WIN32)
         char    name[maxlen];
 #else
         char    name[1024];
-        if (maxlen > sizeof(char)) {
+        if (maxlen > sizeof(name)) {
             return NGX_ERROR;
         }
 #endif
