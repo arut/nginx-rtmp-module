@@ -230,7 +230,7 @@ ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
     void           *data;
 
     *extra = CreateFileMapping(fd, NULL, PAGE_READONLY,
-                               (DWORD) (size >> 32),
+                               (DWORD) ((uint64_t) size >> 32),
                                (DWORD) (size & 0xffffffff),
                                NULL);
     if (*extra == NULL) {
@@ -238,7 +238,7 @@ ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
     }
 
     data = MapViewOfFile(*extra, FILE_MAP_READ,
-                         (DWORD) (offset >> 32),
+                         (DWORD) ((uint64_t) offset >> 32),
                          (DWORD) (offset & 0xffffffff),
                          size);
 
