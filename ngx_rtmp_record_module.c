@@ -443,6 +443,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     uint32_t                    tag_size, mlen, timestamp;
 
     rracf = rctx->conf;
+    tag_size = 0;
 
     if (rctx->file.fd != NGX_INVALID_FILE) {
         return NGX_AGAIN;
