@@ -173,6 +173,14 @@ typedef struct {
 } ngx_rtmp_stream_t;
 
 
+/* disable zero-sized array warning by msvc */
+
+#if (NGX_WIN32)
+#pragma warning(push)
+#pragma warning(disable:4200)
+#endif
+
+
 typedef struct {
     uint32_t                signature;  /* "RTMP" */ /* <-- FIXME wtf */
 
@@ -249,6 +257,11 @@ typedef struct {
     size_t                  out_cork;
     ngx_chain_t            *out[0];
 } ngx_rtmp_session_t;
+
+
+#if (NGX_WIN32)
+#pragma warning(pop)
+#endif
 
 
 /* handler result code:
