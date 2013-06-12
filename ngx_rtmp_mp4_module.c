@@ -228,11 +228,11 @@ static void *
 ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
 {
     void           *data;
-    LARGE_INTEGER   size;
+    LARGE_INTEGER   lsize;
 
-    size.QuadPart = size;
+    lsize.QuadPart = size;
 
-    if (SetFilePointerEx(fd, size, NULL, FILE_BEGIN) == 0) {
+    if (SetFilePointerEx(fd, lsize, NULL, FILE_BEGIN) == 0) {
         return NULL;
     }
 
