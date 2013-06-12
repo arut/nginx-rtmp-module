@@ -240,7 +240,7 @@ ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
         return NULL;
     }
 
-    *extra = CreateFileMapping(fd, NULL, PAGE_READWRITE,
+    *extra = CreateFileMapping(fd, NULL, PAGE_READONLY,
                                (u_long) ((off_t) size >> 32),
                                (u_long) ((off_t) size & 0xffffffff),
                                NULL);
