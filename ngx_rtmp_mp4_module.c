@@ -228,27 +228,19 @@ static void *
 ngx_rtmp_mp4_mmap(ngx_fd_t fd, size_t size, off_t offset, ngx_fd_t *extra)
 {
     void           *data;
-    LARGE_INTEGER   lsize;
-
-    lsize.QuadPart = size;
-
-    if (SetFilePointerEx(fd, lsize, NULL, FILE_BEGIN) == 0) {
-        return NULL;
-    }
-
-    if (SetEndOfFile(fd) == 0) {
-        return NULL;
-    }
 
     *extra = CreateFileMapping(fd, NULL, PAGE_READONLY,
-                               (u_long) ((off_t) size >> 32),
-                               (u_long) ((off_t) size & 0xffffffff),
+                               (DWORD) (size >> 32),
+                               (DWORD) (size & 0xffffffff),
                                NULL);
     if (*extra == NULL) {
         return NULL;
     }
 
-    data = MapViewOfFile(*extra, FILE_MAP_READ, 0, 0, 0);
+    data = MapViewOfFile(*extra, FILE_MAP_READ,
+                         (DWORD) (offset >> 32),
+                         (DWORD) (offset & 0xffffffff),
+                         size);
 
     if (data == NULL) {
         CloseHandle(*extra);
