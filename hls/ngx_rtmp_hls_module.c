@@ -428,7 +428,8 @@ retry:
     ngx_close_file(fd);
 
 #if (NGX_WIN32)
-    rc = MoveFileEx(ctx->playlist_bak.data, ctx->playlist.data,
+    rc = MoveFileEx((LPCTSTR) ctx->playlist_bak.data,
+                    (LPCTSTR) ctx->playlist.data,
                     MOVEFILE_REPLACE_EXISTING);
 #else
     rc = ngx_rename_file(ctx->playlist_bak.data, ctx->playlist.data);
