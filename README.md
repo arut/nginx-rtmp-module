@@ -80,9 +80,9 @@ added as well:
 
 Windows support is limited. These features are not supported
 
-    * execs
-    * static pulls
-    * auto_push
+* execs
+* static pulls
+* auto_push
 
 ### RTMP URL format
 
