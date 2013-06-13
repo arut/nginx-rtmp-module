@@ -341,7 +341,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
     ngx_rtmp_hls_app_conf_t        *hacf;
-    ngx_int_t                       nretry;
+    ngx_int_t                       nretry, rc;
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
     static ngx_str_t                empty = ngx_null_string;
@@ -427,7 +427,14 @@ retry:
 
     ngx_close_file(fd);
 
-    if (ngx_rename_file(ctx->playlist_bak.data, ctx->playlist.data)) {
+#if (NGX_WIN32)
+    rc = MoveFileEx(ctx->playlist_bak.data, ctx->playlist.data,
+                    MOVEFILE_REPLACE_EXISTING);
+#else
+    rc = ngx_rename_file(ctx->playlist_bak.data, ctx->playlist.data);
+#endif
+
+    if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->playlist_bak, &ctx->playlist);
