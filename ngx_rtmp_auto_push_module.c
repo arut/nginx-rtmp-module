@@ -308,7 +308,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     ngx_rtmp_relay_target_t         at;
     u_char                          path[sizeof("unix:") + NGX_MAX_PATH];
     u_char                          flash_ver[sizeof("APSH ,") +
-                                              NGX_OFF_T_LEN * 2];
+                                              NGX_INT_T_LEN * 2];
     u_char                          play_path[NGX_RTMP_MAX_NAME];
     ngx_str_t                       name;
     u_char                         *p;

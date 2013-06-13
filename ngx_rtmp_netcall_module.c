@@ -547,7 +547,7 @@ ngx_rtmp_netcall_http_format_request(ngx_int_t method, ngx_str_t *host,
     }
         
     b = ngx_create_temp_buf(pool, sizeof(rq_tmpl) + host->len +
-                                  content_type->len + NGX_OFF_T_LEN);
+                            content_type->len + NGX_SIZE_T_LEN);
     if (b == NULL) {
         return NULL;
     }
@@ -685,12 +685,9 @@ ngx_rtmp_netcall_memcache_set(ngx_rtmp_session_t *s, ngx_pool_t *pool,
         return NULL;
     }
 
-    b = ngx_create_temp_buf(pool,
-            sizeof("set ") - 1 + key->len +
-            (sizeof(" ") - 1 + NGX_OFF_T_LEN) * 3 +
-            (sizeof("\r\n") - 1) * 2 
-            + value->len
-        );
+    b = ngx_create_temp_buf(pool, sizeof("set ") - 1 + key->len +
+                            (1 + NGX_INT_T_LEN) * 3 +
+                            (sizeof("\r\n") - 1) * 2 + value->len);
 
     if (b == NULL) {
         return NULL;
@@ -699,9 +696,8 @@ ngx_rtmp_netcall_memcache_set(ngx_rtmp_session_t *s, ngx_pool_t *pool,
     cl->next = NULL;
     cl->buf = b;
 
-    b->last = ngx_sprintf(b->pos,
-            "set %V %ui %ui %ui\r\n%V\r\n",
-            key, flags, sec, (ngx_uint_t)value->len, value);
+    b->last = ngx_sprintf(b->pos, "set %V %ui %ui %ui\r\n%V\r\n",
+                          key, flags, sec, (ngx_uint_t) value->len, value);
 
     return cl;
 }

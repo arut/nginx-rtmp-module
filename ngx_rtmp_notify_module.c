@@ -583,7 +583,7 @@ ngx_rtmp_notify_play_create(ngx_rtmp_session_t *s, void *arg,
                             sizeof("&call=play") + 
                             sizeof("&name=") + name_len * 3 +
                             sizeof("&start=&duration=&reset=") +
-                            NGX_OFF_T_LEN * 3 + 1 + args_len);
+                            NGX_INT32_LEN * 3 + 1 + args_len);
     if (b == NULL) {
         return NULL;
     }

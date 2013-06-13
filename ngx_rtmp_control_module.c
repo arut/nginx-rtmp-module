@@ -392,7 +392,7 @@ ngx_rtmp_control_drop(ngx_http_request_t *r, ngx_str_t *method)
 
     /* output ndropped */
 
-    len = NGX_OFF_T_LEN;
+    len = NGX_INT_T_LEN;
 
     p = ngx_palloc(r->connection->pool, len);
     if (p == NULL) {

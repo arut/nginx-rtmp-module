@@ -158,16 +158,16 @@ ngx_rtmp_log_var_default_getdata(ngx_rtmp_session_t *s, u_char *buf,
 
 
 static size_t
-ngx_rtmp_log_var_number_getlen(ngx_rtmp_session_t *s, ngx_rtmp_log_op_t *op)
+ngx_rtmp_log_var_connection_getlen(ngx_rtmp_session_t *s, ngx_rtmp_log_op_t *op)
 {
-    return NGX_OFF_T_LEN;
+    return NGX_INT_T_LEN;
 }
 
 static u_char *
 ngx_rtmp_log_var_connection_getdata(ngx_rtmp_session_t *s, u_char *buf,
     ngx_rtmp_log_op_t *op)
 {
-    return ngx_sprintf(buf, "%O", (off_t) s->connection->number);
+    return ngx_sprintf(buf, "%ui", (ngx_uint_t) s->connection->number);
 }
 
 
@@ -192,7 +192,7 @@ static size_t
 ngx_rtmp_log_var_session_string_getlen(ngx_rtmp_session_t *s,
     ngx_rtmp_log_op_t *op)
 {
-    return ((ngx_str_t *) ((uint8_t *) s + op->offset))->len;
+    return ((ngx_str_t *) ((u_char *) s + op->offset))->len;
 }
 
 
@@ -202,7 +202,7 @@ ngx_rtmp_log_var_session_string_getdata(ngx_rtmp_session_t *s, u_char *buf,
 {
     ngx_str_t  *str;
 
-    str = (ngx_str_t *) ((uint8_t *) s + op->offset);
+    str = (ngx_str_t *) ((u_char *) s + op->offset);
 
     return ngx_cpymem(buf, str->data, str->len);
 }
@@ -303,7 +303,7 @@ ngx_rtmp_log_var_time_local_getdata(ngx_rtmp_session_t *s, u_char *buf,
     ngx_rtmp_log_op_t *op)
 {
     return ngx_cpymem(buf, ngx_cached_http_log_time.data,
-                           ngx_cached_http_log_time.len);
+                      ngx_cached_http_log_time.len);
 }
 
 
@@ -328,7 +328,7 @@ static size_t
 ngx_rtmp_log_var_session_readable_time_getlen(ngx_rtmp_session_t *s,
     ngx_rtmp_log_op_t *op)
 {
-    return NGX_OFF_T_LEN + sizeof("d 23h 59m 59s") - 1;
+    return NGX_INT_T_LEN + sizeof("d 23h 59m 59s") - 1;
 }
 
 
@@ -366,7 +366,7 @@ ngx_rtmp_log_var_session_readable_time_getdata(ngx_rtmp_session_t *s,
 
 static ngx_rtmp_log_var_t ngx_rtmp_log_vars[] = {
     { ngx_string("connection"),
-      ngx_rtmp_log_var_number_getlen,
+      ngx_rtmp_log_var_connection_getlen,
       ngx_rtmp_log_var_connection_getdata,
       0 },
 
