@@ -204,6 +204,15 @@ ngx_rtmp_stat_output(ngx_http_request_t *r, ngx_chain_t ***lll,
     if (escape) {
         b->last = (u_char *)ngx_escape_html(b->last, data, len);
     } else {
+#if (NGX_WIN32)
+        /* fix broken MSVC memcpy optimization for 4-byte data */
+
+        if (len == 4) {
+            *(uint32_t *) b->last = *(uint32_t *) data;
+            b->last += 4;
+            return;
+        }
+#endif
         b->last = ngx_cpymem(b->last, data, len);
     }
 }
