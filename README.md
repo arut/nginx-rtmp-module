@@ -60,7 +60,7 @@
 * Statistics in XML/XSL in machine- & human-
   readable form
 
-* Linux/FreeBSD/MacOS
+* Linux/FreeBSD/MacOS/Windows
 
 
 ### Build
@@ -75,6 +75,14 @@ Several versions of nginx (1.3.14 - 1.4.1) require http_ssl_module to be
 added as well:
 
     ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
+
+### Windows limitations
+
+Windows support is limited. These features are not supported
+
+    * execs
+    * static pulls
+    * auto_push
 
 ### RTMP URL format
 
