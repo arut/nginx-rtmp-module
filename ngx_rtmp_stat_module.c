@@ -239,29 +239,29 @@ static void
 ngx_rtmp_stat_bw(ngx_http_request_t *r, ngx_chain_t ***lll,
         ngx_rtmp_bandwidth_t *bw_in, ngx_rtmp_bandwidth_t *bw_out)
 {
-    u_char                          buf[NGX_OFF_T_LEN + 1];
+    u_char  buf[NGX_INT64_LEN + 1];
 
     ngx_rtmp_update_bandwidth(bw_in, 0);
     ngx_rtmp_update_bandwidth(bw_out, 0);
 
     NGX_RTMP_STAT_L("<in>");
     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                "%uz", bw_in->bytes) - buf);
+                  "%uL", bw_in->bytes) - buf);
     NGX_RTMP_STAT_L("</in>\r\n");
 
     NGX_RTMP_STAT_L("<out>");
     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                "%uz", bw_out->bytes) - buf);
+                  "%uL", bw_out->bytes) - buf);
     NGX_RTMP_STAT_L("</out>\r\n");
 
     NGX_RTMP_STAT_L("<bwin>");
     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                "%uz", bw_in->bandwidth * 8) - buf);
+                  "%uL", bw_in->bandwidth * 8) - buf);
     NGX_RTMP_STAT_L("</bwin>\r\n");
 
     NGX_RTMP_STAT_L("<bwout>");
     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
-                "%uz", bw_out->bandwidth * 8) - buf);
+                  "%uL", bw_out->bandwidth * 8) - buf);
     NGX_RTMP_STAT_L("</bwout>\r\n");
 }
 
