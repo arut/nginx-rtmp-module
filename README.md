@@ -247,7 +247,7 @@ rtmp_auto_push directive.
             # for the fragments. The directory contents is served via HTTP (see
             # http{} section in config)
             #
-            # Incoming stream must be in H264/AAC/MP3. For iPhones use baseline H264
+            # Incoming stream must be in H264/AAC. For iPhones use baseline H264
             # profile (see ffmpeg example).
             # This example creates RTMP stream from movie ready for HLS:
             #
