@@ -370,7 +370,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     ngx_int_t                       n;
     ngx_uint_t                      nclients, total_nclients;
     u_char                          buf[NGX_INT_T_LEN];
-    u_char                          bbuf[NGX_INT32_LEN * 2 + 1];
+    u_char                          bbuf[NGX_INT32_LEN];
     ngx_rtmp_stat_loc_conf_t       *slcf;
     u_char                         *cname;
 
@@ -409,9 +409,8 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                     ngx_rtmp_stat_client(r, lll, s);
 
                     NGX_RTMP_STAT_L("<dropped>");
-                    NGX_RTMP_STAT(bbuf, ngx_snprintf(bbuf, sizeof(bbuf), 
-                                  "%uD/%uD", ctx->cs[1].dropped,
-                                  ctx->cs[0].dropped) - bbuf);
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), 
+                                  "%ui", ctx->ndropped) - buf);
                     NGX_RTMP_STAT_L("</dropped>");
 
                     NGX_RTMP_STAT_L("<avsync>");
