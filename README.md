@@ -16,10 +16,7 @@
 
   https://groups.google.com/group/nginx-rtmp-ru (Russian)
 
-
-### Project page at github
-
-  Project features, examples, donation information
+### Donation page (Paypal etc)
 
   http://arut.github.com/nginx-rtmp-module/
 
@@ -61,7 +58,6 @@
   readable form
 
 * Linux/FreeBSD/MacOS/Windows
-
 
 ### Build
 
