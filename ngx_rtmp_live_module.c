@@ -761,7 +761,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     cs->timestamp = ch.timestamp;
 
     delta = ch.timestamp - lh.timestamp;
-
+/*
     if (delta >> 31) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "live: clipping non-monotonical timestamp %uD->%uD",
@@ -771,7 +771,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         ch.timestamp = lh.timestamp;
     }
-
+*/
     rpkt = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
 
     ngx_rtmp_prepare_message(s, &ch, &lh, rpkt);
