@@ -4,7 +4,7 @@
 
 ### Project blog
 
-  http://rarut.wordpress.com
+  http://nginx-rtmp.blogspot.com
 
 ### Wiki manual
 
