@@ -24,9 +24,6 @@ static char * ngx_rtmp_relay_push_pull(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 static ngx_int_t ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, 
        ngx_rtmp_publish_t *v);
-static ngx_rtmp_relay_ctx_t * ngx_rtmp_relay_create_connection(
-       ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
-       ngx_rtmp_relay_target_t *target);
 
 
 /*                _____
@@ -333,7 +330,7 @@ ngx_rtmp_relay_copy_str(ngx_pool_t *pool, ngx_str_t *dst, ngx_str_t *src)
 }
 
 
-static ngx_rtmp_relay_ctx_t *
+ngx_rtmp_relay_ctx_t *
 ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
         ngx_rtmp_relay_target_t *target)
 {
@@ -1332,7 +1329,7 @@ ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
         return;
     }
 
-    if (s->static_relay) {
+    if (s->static_relay && ctx->static_evt) {
         ngx_add_timer(ctx->static_evt, racf->pull_reconnect);
         return;
     }

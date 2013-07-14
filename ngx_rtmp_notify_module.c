@@ -7,6 +7,7 @@
 #include <ngx_core.h>
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_notify_module.h"
 #include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_record_module.h"
 #include "ngx_rtmp_relay_module.h"
@@ -786,7 +787,7 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
 }
 
 
-static ngx_int_t 
+ngx_int_t 
 ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s, 
         ngx_chain_t *in) 
 {
@@ -835,7 +836,7 @@ ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s,
 }
 
 
-static ngx_int_t 
+ngx_int_t 
 ngx_rtmp_notify_parse_http_header(ngx_rtmp_session_t *s, 
         ngx_chain_t *in, ngx_str_t *name, u_char *data, size_t len)
 {
@@ -1138,10 +1139,20 @@ ngx_rtmp_notify_update_handle(ngx_rtmp_session_t *s,
     ngx_rtmp_notify_app_conf_t *nacf;
     ngx_rtmp_notify_ctx_t      *ctx;
     ngx_int_t                   rc;
+    ngx_str_t                   local_name;
+    ngx_rtmp_relay_target_t     target;
+    ngx_url_t                  *u;
+    u_char                      name[NGX_RTMP_MAX_NAME];
+    ngx_rtmp_conf_ctx_t         cctx;
+
+
+    static ngx_str_t            location = ngx_string("location");
 
     nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
     rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
     
     if ((!nacf->update_strict && rc == NGX_ERROR) ||
          (nacf->update_strict && rc != NGX_OK))
@@ -1152,7 +1163,62 @@ ngx_rtmp_notify_update_handle(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
 
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
+    if (rc != NGX_AGAIN) {
+        goto next;
+    }
+
+    /* HTTP 3xx */
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "notify: update redirect received");
+
+    rc = ngx_rtmp_notify_parse_http_header(s, in, &location, name,
+                                           sizeof(name) - 1);
+    if (rc <= 0) {
+        goto next;
+    }
+
+    if (ngx_strncasecmp(name, (u_char *) "rtmp://", 7)) {
+        goto next;
+    }
+
+    /* static pull */
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: update redirect to '%*s'", rc, name);
+
+    local_name.data = ctx->name;
+    local_name.len = ngx_strlen(ctx->name);
+
+    ngx_memzero(&target, sizeof(target));
+
+    u = &target.url;
+    u->url.data = name + 7;
+    u->url.len = rc - 7;
+    u->default_port = 1935;
+    u->uri_part = 1;
+    u->no_resolve = 1; /* want ip here */
+
+    if (ngx_parse_url(s->connection->pool, u) != NGX_OK) {
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: pull failed '%V'", &local_name);
+        return NGX_ERROR;
+    }
+
+    cctx.app_conf = s->app_conf;
+    cctx.srv_conf = s->srv_conf;
+    cctx.main_conf = s->main_conf;
+
+    ngx_rtmp_relay_create_connection(&cctx, &local_name, &target);
+
+    /*
+     * 1. drop existing connection in ad connection publish
+     * 2. delay new connection in publish until ad connection delete_stream
+     * 3. drop ad connection in stream eof
+     * 4. prevent ad from ad
+     */
+
+next:
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "notify: schedule update %Mms",
@@ -1518,7 +1584,7 @@ ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, ngx_uint_t url_idx)
 }
 
 
-static ngx_url_t *
+ngx_url_t *
 ngx_rtmp_notify_parse_url(ngx_conf_t *cf, ngx_str_t *url)
 {
     ngx_url_t  *u;

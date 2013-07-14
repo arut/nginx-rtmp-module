@@ -38,6 +38,7 @@ typedef struct {
 
 typedef struct {
     unsigned                            opened:1;
+    unsigned                            publishing:1;
 
     ngx_file_t                          file;
 
@@ -1020,6 +1021,8 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
                    "hls: playlist='%V' playlist_bak='%V' stream_pattern='%V'",
                    &ctx->playlist, &ctx->playlist_bak, &ctx->stream);
 
+    ctx->publishing = 1;
+
     if (hacf->continuous) {
         ngx_rtmp_hls_restore_stream(s);
     }
@@ -1047,6 +1050,8 @@ ngx_rtmp_hls_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
                    "hls: delete stream");
 
     ngx_rtmp_hls_close_fragment(s, 1);
+
+    ctx->publishing = 0;
 
 next:
     return next_close_stream(s, v);
@@ -1133,11 +1138,12 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     if (ctx->opened) {
 
         f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
-        f->duration = (ts - ctx->frag_ts) / 90000.;
+        f->duration = ts > ctx->frag_ts ? (ts - ctx->frag_ts) / 90000. : 0.;
 
         if (f->duration * 1000 > hacf->max_fraglen) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "hls: max fragment length reached");
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0, "hls: ts=%uL, frag_ts=%uL", ts, ctx->frag_ts);
             boundary = 1;
         }
     }
@@ -1255,6 +1261,10 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_AAC ||
         codec_ctx->aac_header == NULL)
     {
+        return NGX_OK;
+    }
+
+    if (!ctx->publishing) {
         return NGX_OK;
     }
 
@@ -1447,6 +1457,10 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (hacf == NULL || !hacf->hls || ctx == NULL || codec_ctx == NULL ||
         codec_ctx->avc_header == NULL || h->mlen < 1)
     {
+        return NGX_OK;
+    }
+
+    if (!ctx->publishing) {
         return NGX_OK;
     }
 
