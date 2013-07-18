@@ -6,6 +6,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_event.h>
+#include <nginx.h>
 #include "ngx_rtmp.h"
 
 
@@ -685,7 +686,11 @@ ngx_rtmp_add_addrs(ngx_conf_t *cf, ngx_rtmp_port_t *mport,
 
         addrs[i].conf.ctx = addr[i].ctx;
 
-        len = ngx_sock_ntop(addr[i].sockaddr, buf, NGX_SOCKADDR_STRLEN, 1);
+        len = ngx_sock_ntop(addr[i].sockaddr,
+#if (nginx_version >= 1005003)
+                            addr[i].socklen,
+#endif
+                            buf, NGX_SOCKADDR_STRLEN, 1);
 
         p = ngx_pnalloc(cf->pool, len);
         if (p == NULL) {
@@ -730,7 +735,11 @@ ngx_rtmp_add_addrs6(ngx_conf_t *cf, ngx_rtmp_port_t *mport,
 
         addrs6[i].conf.ctx = addr[i].ctx;
 
-        len = ngx_sock_ntop(addr[i].sockaddr, buf, NGX_SOCKADDR_STRLEN, 1);
+        len = ngx_sock_ntop(addr[i].sockaddr,
+#if (nginx_version >= 1005003)
+                            addr[i].socklen,
+#endif
+                            buf, NGX_SOCKADDR_STRLEN, 1);
 
         p = ngx_pnalloc(cf->pool, len);
         if (p == NULL) {
