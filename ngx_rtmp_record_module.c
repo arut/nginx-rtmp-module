@@ -397,7 +397,7 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
     }
 
     if (ngx_strchr(rracf->suffix.data, '%')) {
-        ngx_libc_localtime(ngx_cached_time->sec, &tm);
+        ngx_libc_localtime(rctx->timestamp, &tm);
         p += strftime((char *) p, l - p, (char *) rracf->suffix.data, &tm);
     } else {
         p = ngx_cpymem(p, rracf->suffix.data, 
