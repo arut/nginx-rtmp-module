@@ -17,6 +17,8 @@ static ngx_rtmp_stream_begin_pt         next_stream_begin;
 static ngx_rtmp_stream_eof_pt           next_stream_eof;
 
 
+static char * ngx_rtmp_hls_variant(ngx_conf_t *cf, ngx_command_t *cmd,
+       void *conf);
 static ngx_int_t ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, 
@@ -37,12 +39,20 @@ typedef struct {
 
 
 typedef struct {
+    ngx_str_t                           suffix;
+    ngx_array_t                         args;
+} ngx_rtmp_hls_variant_t;
+
+
+typedef struct {
     unsigned                            opened:1;
 
     ngx_file_t                          file;
 
     ngx_str_t                           playlist;
     ngx_str_t                           playlist_bak;
+    ngx_str_t                           var_playlist;
+    ngx_str_t                           var_playlist_bak;
     ngx_str_t                           stream;
     ngx_str_t                           name;
 
@@ -59,6 +69,8 @@ typedef struct {
 
     ngx_buf_t                          *aframe;
     uint64_t                            aframe_pts;
+
+    ngx_rtmp_hls_variant_t             *var;
 } ngx_rtmp_hls_ctx_t;
 
 
@@ -85,6 +97,7 @@ typedef struct {
     ngx_msec_t                          max_audio_delay;
     size_t                              audio_buffer_size;
     ngx_flag_t                          cleanup;
+    ngx_array_t                        *variant;
 } ngx_rtmp_hls_app_conf_t;
 
 
@@ -212,6 +225,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       offsetof(ngx_rtmp_hls_app_conf_t, cleanup),
       NULL },
 
+    { ngx_string("hls_variant"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_1MORE,
+      ngx_rtmp_hls_variant,
+      NGX_RTMP_APP_CONF_OFFSET,
+      0,
+      NULL },
+
     ngx_null_command
 };
 
@@ -333,6 +353,111 @@ ngx_rtmp_hls_next_frag(ngx_rtmp_session_t *s)
 
 
 static ngx_int_t
+ngx_rtmp_hls_rename_file(u_char *src, u_char *dst)
+{
+    /* rename file with overwrite */
+
+#if (NGX_WIN32)
+    return MoveFileEx((LPCTSTR) src, (LPCTSTR) dst, MOVEFILE_REPLACE_EXISTING);
+#else
+    return ngx_rename_file(src, dst);
+#endif
+}
+
+
+static ngx_int_t
+ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
+{
+    static u_char             buffer[1024];
+
+    u_char                   *p, *last;
+    ssize_t                   rc;
+    ngx_fd_t                  fd;
+    ngx_str_t                *arg;
+    ngx_uint_t                n, k;
+    ngx_rtmp_hls_ctx_t       *ctx;
+    ngx_rtmp_hls_variant_t   *var;
+    ngx_rtmp_hls_app_conf_t  *hacf;
+
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    fd = ngx_open_file(ctx->var_playlist_bak.data, NGX_FILE_WRONLY, 
+                       NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: " ngx_open_file_n " failed: '%V'",
+                      &ctx->var_playlist_bak);
+
+        return NGX_ERROR;
+    }
+
+#define NGX_RTMP_HLS_VAR_HEADER "#EXTM3U\n#EXT-X-VERSION:3\n"
+
+    rc = ngx_write_fd(fd, NGX_RTMP_HLS_VAR_HEADER,
+                      sizeof(NGX_RTMP_HLS_VAR_HEADER) - 1);
+    if (rc < 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: " ngx_write_fd_n " failed: '%V'",
+                      &ctx->var_playlist_bak);
+        ngx_close_file(fd);
+        return NGX_ERROR;
+    }
+
+    var = hacf->variant->elts;
+    for (n = 0; n < hacf->variant->nelts; n++, var++)
+    {
+        p = buffer;
+        last = buffer + sizeof(buffer);
+
+        p = ngx_slprintf(p, last, "#EXT-X-STREAM-INF:PROGRAM-ID=1");
+
+        arg = var->args.elts;
+        for (k = 0; k < var->args.nelts; k++, arg++) {
+            p = ngx_slprintf(p, last, ",%V", arg);
+        }
+
+        if (p < last) {
+            *p++ = '\n';
+        }
+
+        p = ngx_slprintf(p, last, "%*s%V",
+                         ctx->name.len - ctx->var->suffix.len, ctx->name.data,
+                         &var->suffix);
+        if (hacf->nested) {
+            p = ngx_slprintf(p, last, "%s", "/index");
+        }
+
+        p = ngx_slprintf(p, last, "%s", ".m3u8\n");
+        
+        rc = ngx_write_fd(fd, buffer, p - buffer);
+        if (rc < 0) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                          "hls: " ngx_write_fd_n " failed '%V'",
+                          &ctx->var_playlist_bak);
+            ngx_close_file(fd);
+            return NGX_ERROR;
+        }
+    }
+
+    ngx_close_file(fd);
+
+    rc = ngx_rtmp_hls_rename_file(ctx->var_playlist_bak.data,
+                                  ctx->var_playlist.data);
+
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: rename failed: '%V'->'%V'", 
+                      &ctx->var_playlist_bak, &ctx->var_playlist);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 {
     static u_char                   buffer[1024];
@@ -427,19 +552,17 @@ retry:
 
     ngx_close_file(fd);
 
-#if (NGX_WIN32)
-    rc = MoveFileEx((LPCTSTR) ctx->playlist_bak.data,
-                    (LPCTSTR) ctx->playlist.data,
-                    MOVEFILE_REPLACE_EXISTING);
-#else
-    rc = ngx_rename_file(ctx->playlist_bak.data, ctx->playlist.data);
-#endif
+    rc = ngx_rtmp_hls_rename_file(ctx->playlist_bak.data, ctx->playlist.data);
 
     if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->playlist_bak, &ctx->playlist);
         return NGX_ERROR;
+    }
+
+    if (ctx->var) {
+        return ngx_rtmp_hls_write_variant_playlist(s);
     }
 
     return NGX_OK;
@@ -901,10 +1024,12 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     ngx_rtmp_hls_app_conf_t        *hacf;
     ngx_rtmp_hls_ctx_t             *ctx;
-    u_char                         *p;
+    u_char                         *p, *pp;
     ngx_rtmp_hls_frag_t            *f;
     ngx_buf_t                      *b;
     size_t                          len;
+    ngx_rtmp_hls_variant_t         *var;
+    ngx_uint_t                      n;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     if (hacf == NULL || !hacf->hls || hacf->path.len == 0) {
@@ -990,6 +1115,47 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ngx_memcpy(ctx->stream.data, ctx->playlist.data, ctx->stream.len - 1);
     ctx->stream.data[ctx->stream.len - 1] = (hacf->nested ? '/' : '-');
+
+    /* varint playlist path */
+
+    if (hacf->variant) {
+        var = hacf->variant->elts;
+        for (n = 0; n < hacf->variant->nelts; n++, var++) {
+            if (ctx->name.len > var->suffix.len &&
+                ngx_memcmp(var->suffix.data,
+                           ctx->name.data + ctx->name.len - var->suffix.len,
+                           var->suffix.len)
+                == 0)
+            {
+                ctx->var = var;
+
+                len = (size_t) (p - ctx->playlist.data);
+
+                ctx->var_playlist.len = len - var->suffix.len + sizeof(".m3u8")
+                                        - 1;
+                ctx->var_playlist.data = ngx_palloc(s->connection->pool,
+                                                    ctx->var_playlist.len + 1);
+
+                pp = ngx_cpymem(ctx->var_playlist.data, ctx->playlist.data,
+                               len - var->suffix.len);
+                pp = ngx_cpymem(pp, ".m3u8", sizeof(".m3u8") - 1);
+                *pp = 0;
+
+                ctx->var_playlist_bak.len = ctx->var_playlist.len +
+                                            sizeof(".bak") - 1;
+                ctx->var_playlist_bak.data = ngx_palloc(s->connection->pool,
+                                                 ctx->var_playlist_bak.len + 1);
+                
+                pp = ngx_cpymem(ctx->var_playlist_bak.data,
+                                ctx->var_playlist.data,
+                                ctx->var_playlist.len);
+                pp = ngx_cpymem(pp, ".bak", sizeof(".bak") - 1);
+                *pp = 0;
+
+                break;
+            }
+        }
+    }
     
 
     /* playlist path */
@@ -1812,6 +1978,58 @@ ngx_rtmp_hls_cleanup(void *data)
     ngx_rtmp_hls_cleanup_dir(&cleanup->path, cleanup->playlen);
 
     return cleanup->playlen / 500;
+}
+
+
+static char *
+ngx_rtmp_hls_variant(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_rtmp_hls_app_conf_t  *hacf = conf;
+
+    ngx_str_t                *value, *arg;
+    ngx_uint_t                n;
+    ngx_rtmp_hls_variant_t   *var;
+
+    value = cf->args->elts;
+
+    if (hacf->variant == NULL) {
+        hacf->variant = ngx_array_create(cf->pool, 1,
+                                         sizeof(ngx_rtmp_hls_variant_t));
+        if (hacf->variant == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    var = ngx_array_push(hacf->variant);
+    if (var == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_memzero(var, sizeof(ngx_rtmp_hls_variant_t));
+
+    var->suffix = value[1];
+
+    if (cf->args->nelts == 2) {
+        return NGX_CONF_OK;
+    }
+
+    if (ngx_array_init(&var->args, cf->pool, cf->args->nelts - 2,
+                       sizeof(ngx_str_t))
+        != NGX_OK)
+    {
+        return NGX_CONF_ERROR;
+    }
+
+    arg = ngx_array_push_n(&var->args, cf->args->nelts - 2);
+    if (arg == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    for (n = 2; n < cf->args->nelts; n++) {
+        *arg++ = value[n];
+    }
+
+    return NGX_CONF_OK;
 }
 
 
