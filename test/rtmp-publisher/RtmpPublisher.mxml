@@ -4,14 +4,13 @@
 			   xmlns:mx="library://ns.adobe.com/flex/mx"
 			   minWidth="500" minHeight="350" creationComplete="init()">
 
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-
 	<fx:Script>
 		<![CDATA[
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import spark.skins.spark.PanelSkin;
+
 			private var streamer:String;
 			private var file:String;
 			private var camera:Camera;
@@ -20,48 +19,19 @@
 			private var stream:NetStream;
 			private var h264Settings:H264VideoStreamSettings;
 
-			private function toggleFeedListener(event:MouseEvent):void {
-				if(toggleFeed.label == 'Start Feed') {
-					toggleFeed.label = 'Stop Feed';
-					stream.publish(file, 'live');
-					videoDisplay.attachCamera(camera);
-					toggleVideo.enabled = true;
-					toggleAudio.enabled = true;
+			private function publishButtonListener(event:MouseEvent):void {
+				if(publishButton.label == 'Publish') {
+					publishButton.label = 'Stop';
+					connection = new NetConnection();
+					connection.connect(streamer);
+					connection.addEventListener(NetStatusEvent.NET_STATUS, netStatusHander);
 				} else {
-					toggleFeed.label = 'Start Feed';
+					publishButton.label = 'Publish';
 					stream.close();
-					videoDisplay.attachCamera(null);
-					toggleVideo.enabled = false;
-					toggleAudio.enabled = false;
+					connection.close();
+					stream = null;
+					connection = null;
 				}
-			}
-
-			private function toggleVideoListener(event:MouseEvent):void {
-				if(toggleVideo.label == 'Start Video') {
-					toggleVideo.label = 'Stop Video';
-					videoDisplay.attachCamera(camera);
-					stream.attachCamera(camera);
-				} else {
-					toggleVideo.label = 'Start Video';
-					videoDisplay.attachCamera(null);
-					stream.attachCamera(null);
-				}
-			}
-
-			private function toggleAudioListener(event:MouseEvent):void {
-				if(toggleAudio.label == 'Start Audio') {
-					toggleAudio.label = 'Stop Audio';
-					stream.attachAudio(microphone);
-				} else {
-					toggleAudio.label = 'Start Audio';
-					stream.attachAudio(null);
-				}
-			}
-
-			private function initListeners():void {
-				toggleFeed.addEventListener(MouseEvent.CLICK, toggleFeedListener);
-				toggleVideo.addEventListener(MouseEvent.CLICK, toggleVideoListener);
-				toggleAudio.addEventListener(MouseEvent.CLICK, toggleAudioListener);
 			}
 
 			private function netStatusHander(event:NetStatusEvent):void {
@@ -71,47 +41,43 @@
 						stream.attachCamera(camera);
 						stream.attachAudio(microphone);
 						h264Settings = new H264VideoStreamSettings();
-						h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_1_2);
+						h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_3_1);
 						stream.videoStreamSettings = h264Settings;
+						stream.publish(file, 'live');
 						break;
 				}
 			}
 
 			private function init():void {
 				streamer = FlexGlobals.topLevelApplication.parameters.streamer;
+				if(streamer == null) {
+					Alert.show('Missing flashvars: streamer');
+					return;
+				}
+
 				file = FlexGlobals.topLevelApplication.parameters.file;
 				if(file == null) {
 					Alert.show('Missing flashvars: file');
 					return;
 				}
-				if(streamer == null) {
-					Alert.show('Missing flashvars: streamer');
-					return;
-				}
-				initListeners();
+
+				publishButton.addEventListener(MouseEvent.CLICK, publishButtonListener);
 
 				camera = Camera.getCamera();
+				camera.setMode(640, 480, 30);
+				camera.setQuality(131072, 70);
+
+				videoDisplay.attachCamera(camera);
+
 				microphone = Microphone.getMicrophone();
 				microphone.setSilenceLevel(0);
 				microphone.codec = "Speex";
 				microphone.encodeQuality = 6;
-				camera.setMode(704, 576, 25);
-				camera.setQuality(131072, 70);
-				connection = new NetConnection();
-				connection.connect(streamer);
-				connection.addEventListener(NetStatusEvent.NET_STATUS, netStatusHander);
-
 			}
 		]]>
 	</fx:Script>
-	<s:Panel x="0" y="0" width="100%" height="100%" title="RTMP Publisher">
-		<mx:VideoDisplay width="100%" height="100%" id="videoDisplay">
-		</mx:VideoDisplay>
-		<s:controlBarContent>
-			<s:Button label="Start Feed" id="toggleFeed"></s:Button>
-			<s:Spacer width="100%" height="100%"/>
-			<s:Button label="Stop Video" id="toggleVideo" enabled="false"></s:Button>
-			<s:Button label="Stop Audio" id="toggleAudio" enabled="false"></s:Button>
-		</s:controlBarContent>
-	</s:Panel>
+	<s:BorderContainer x="0" y="0" width="100%" height="100%">
+		<mx:VideoDisplay width="100%" height="100%" id="videoDisplay"></mx:VideoDisplay>
+		<s:Button label="Publish" id="publishButton" horizontalCenter="0" verticalCenter="220"></s:Button>
+	</s:BorderContainer>
 </s:Application>
