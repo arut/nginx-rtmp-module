@@ -8,7 +8,10 @@
             streamer: 'rtmp://localhost/myapp',
             file:'mystream'
         };
-        swfobject.embedSWF("RtmpPlayer.swf", "rtmp-publisher", "500", "400", "9.0.0", null, flashVars);
+        var params = {};
+        params.allowfullscreen = "true";
+        var attributes = {};
+        swfobject.embedSWF("RtmpPlayer.swf", "rtmp-publisher", "640", "480", "9.0.0", null, flashVars, params, attributes);
     </script>
 </head>
 <body>
