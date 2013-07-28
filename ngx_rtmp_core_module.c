@@ -599,7 +599,11 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 ls->bind = 1;
 
             } else {
-                len = ngx_sock_ntop(sa, buf, NGX_SOCKADDR_STRLEN, 1);
+                len = ngx_sock_ntop(sa,
+#if (nginx_version >= 1005003)
+                                    ls->socklen,
+#endif
+                                    buf, NGX_SOCKADDR_STRLEN, 1);
 
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                    "ipv6only is not supported "
