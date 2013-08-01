@@ -615,6 +615,11 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
         ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status", "Stop live");
     }
 
+    if (ctx->publishing) {
+        ngx_rtmp_send_status(s, "NetStream.Unpublish.Success",
+                             "status", "Stop publishing");
+    }
+
 next:
     return next_close_stream(s, v);
 }
