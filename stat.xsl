@@ -15,6 +15,9 @@
             <a href="http://nginx.com">NGINX</a>&#160;<xsl:value-of select="/rtmp/version"/>,
             pid <xsl:value-of select="/rtmp/pid"/>,
             built <xsl:value-of select="/rtmp/built"/>&#160;<xsl:value-of select="/rtmp/compiler"/>
+            <script type="text/javascript">
+                setTimeout(function () { location.reload(true); }, 30000);
+            </script>
         </body>
     </html>
 </xsl:template>
