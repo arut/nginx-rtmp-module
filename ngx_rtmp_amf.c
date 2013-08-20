@@ -13,15 +13,11 @@
 static ngx_inline void*
 ngx_rtmp_amf_reverse_copy(void *dst, void* src, size_t len)
 {
-    size_t  k;
-
     if (dst == NULL || src == NULL) {
         return NULL;
     }
 
-    for(k = 0; k < len; ++k) {
-        ((u_char*)dst)[k] = ((u_char*)src)[len - 1 - k];
-    }
+    ngx_rtmp_rmemcpy(dst, src, len);
 
     return dst;
 }

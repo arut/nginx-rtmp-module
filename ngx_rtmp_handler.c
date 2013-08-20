@@ -199,7 +199,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
     ngx_rtmp_stream_t          *st, *st0;
     ngx_chain_t                *in, *head;
     ngx_buf_t                  *b;
-    u_char                     *p, *pp, *old_pos;
+    u_char                     *p, *old_pos;
     size_t                      size, fsize, old_size;
     uint8_t                     fmt, ext;
     uint32_t                    csid, timestamp;
@@ -300,14 +300,14 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 if (b->last - p < 1)
                     continue;
                 csid = 64;
-                csid += *(uint8_t*)p++;
+                csid += *p++;
 
             } else if (csid == 1) {
                 if (b->last - p < 2)
                     continue;
                 csid = 64;
-                csid += *(uint8_t*)p++;
-                csid += (uint32_t)256 * (*(uint8_t*)p++);
+                csid += *p++;
+                csid += ((uint32_t) *p++ << 8);
             }
 
             ngx_log_debug2(NGX_LOG_DEBUG_RTMP, c->log, 0,
@@ -347,40 +347,39 @@ ngx_rtmp_recv(ngx_event_t *rev)
             if (fmt <= 2 ) {
                 if (b->last - p < 3)
                     continue;
-                /* timestamp: 
-                 *  big-endian 3b -> little-endian 4b */
-                pp = (u_char*)&timestamp;
-                pp[2] = *p++;
-                pp[1] = *p++;
-                pp[0] = *p++;
-                pp[3] = 0;
+
+                /* timestamp: big-endian 3 bytes */
+
+                timestamp = 0;
+                timestamp |= ((uint32_t) *p++ << 16);
+                timestamp |= ((uint32_t) *p++ << 8);
+                timestamp |= *p++;
 
                 ext = (timestamp == 0x00ffffff);
 
                 if (fmt <= 1) {
                     if (b->last - p < 4)
                         continue;
-                    /* size:
-                     *  big-endian 3b -> little-endian 4b 
-                     * type:
-                     *  1b -> 1b*/
-                    pp = (u_char*)&h->mlen;
-                    pp[2] = *p++;
-                    pp[1] = *p++;
-                    pp[0] = *p++;
-                    pp[3] = 0;
-                    h->type = *(uint8_t*)p++;
+
+                    /* size: big-endian 3 bytes */
+
+                    h->mlen = 0;
+                    h->mlen |= ((uint32_t) *p++ << 16);
+                    h->mlen |= ((uint32_t) *p++ << 8);
+                    h->mlen |= *p++;
+
+                    h->type = *p++;
 
                     if (fmt == 0) {
                         if (b->last - p < 4)
                             continue;
-                        /* stream:
-                         *  little-endian 4b -> little-endian 4b */
-                        pp = (u_char*)&h->msid;
-                        pp[0] = *p++;
-                        pp[1] = *p++;
-                        pp[2] = *p++;
-                        pp[3] = *p++;
+
+                        /* stream: little-endian e bytes */
+
+                        h->msid = *p++;
+                        h->msid |= ((uint32_t) *p++ << 8);
+                        h->msid |= ((uint32_t) *p++ << 16);
+                        h->msid |= ((uint32_t) *p++ << 24);
                     }
                 }
             }
@@ -389,11 +388,14 @@ ngx_rtmp_recv(ngx_event_t *rev)
             if (ext) {
                 if (b->last - p < 4)
                     continue;
-                pp = (u_char*)&timestamp;
-                pp[3] = *p++;
-                pp[2] = *p++;
-                pp[1] = *p++;
-                pp[0] = *p++;
+
+                /* timestamp: big-endian 4 bytes */
+
+                timestamp = 0;
+                timestamp |= ((uint32_t) *p++ << 24);
+                timestamp |= ((uint32_t) *p++ << 16);
+                timestamp |= ((uint32_t) *p++ << 8);
+                timestamp |= *p++;
             }
 
             if (st->len == 0) {
@@ -559,7 +561,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_header_t *lh, ngx_chain_t *out)
 {
     ngx_chain_t                *l;
-    u_char                     *p, *pp;
+    u_char                     *p;
     ngx_int_t                   hsize, thsize, nbufs;
     uint32_t                    mlen, timestamp, ext_timestamp;
     static uint8_t              hdrsize[] = { 12, 8, 4, 1 };
@@ -652,33 +654,35 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* message header */
     if (fmt <= 2) {
-        pp = (u_char*)&timestamp;
-        *p++ = pp[2];
-        *p++ = pp[1];
-        *p++ = pp[0];
+
+        *p++ = (u_char) (timestamp >> 16);
+        *p++ = (u_char) (timestamp >> 8);
+        *p++ = (u_char) timestamp;
+
         if (fmt <= 1) {
-            pp = (u_char*)&mlen;
-            *p++ = pp[2];
-            *p++ = pp[1];
-            *p++ = pp[0];
+
+            *p++ = (u_char) (mlen >> 16);
+            *p++ = (u_char) (mlen >> 8);
+            *p++ = (u_char) mlen;
+
             *p++ = h->type;
+
             if (fmt == 0) {
-                pp = (u_char*)&h->msid;
-                *p++ = pp[0];
-                *p++ = pp[1];
-                *p++ = pp[2];
-                *p++ = pp[3];
+                *p++ = (u_char) h->msid;
+                *p++ = (u_char) (h->msid >> 8);
+                *p++ = (u_char) (h->msid >> 16);
+                *p++ = (u_char) (h->msid >> 24);
             }
         }
     }
 
     /* extended header */
     if (ext_timestamp) {
-        pp = (u_char*)&ext_timestamp;
-        *p++ = pp[3];
-        *p++ = pp[2];
-        *p++ = pp[1];
-        *p++ = pp[0];
+
+        *p++ = (u_char) (ext_timestamp >> 24);
+        *p++ = (u_char) (ext_timestamp >> 16);
+        *p++ = (u_char) (ext_timestamp >> 8);
+        *p++ = (u_char) ext_timestamp;
 
         /* This CONTRADICTS the standard 
          * but that's the way flash client

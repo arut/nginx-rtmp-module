@@ -445,7 +445,7 @@ ngx_rtmp_flv_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
     ngx_rtmp_rmemcpy(&size, ngx_rtmp_flv_header + 1, 3);
     ngx_rtmp_rmemcpy(&h.timestamp, ngx_rtmp_flv_header + 4, 3);
 
-    ((u_char *) &h.timestamp)[3] = ngx_rtmp_flv_header[7];
+    h.timestamp |= ((uint32_t) ngx_rtmp_flv_header[7] << 24);
 
     ctx->offset += (sizeof(ngx_rtmp_flv_header) + size + 4);
 
