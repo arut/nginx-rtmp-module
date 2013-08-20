@@ -33,13 +33,13 @@
     *(__b->last++) = (u_char)(utype);
 
 #define NGX_RTMP_USER_OUT1(v)                                               \
-    *(__b->last++) = ((u_char*)&v)[0];
+    *(__b->last++) = (u_char) v;
 
 #define NGX_RTMP_USER_OUT4(v)                                               \
-    *(__b->last++) = ((u_char*)&v)[3];                                      \
-    *(__b->last++) = ((u_char*)&v)[2];                                      \
-    *(__b->last++) = ((u_char*)&v)[1];                                      \
-    *(__b->last++) = ((u_char*)&v)[0];
+    *(__b->last++) = (u_char) (v >> 24);                                    \
+    *(__b->last++) = (u_char) (v >> 16);                                    \
+    *(__b->last++) = (u_char) (v >> 8);                                     \
+    *(__b->last++) = (u_char) v;
 
 #define NGX_RTMP_USER_END(s)                                                \
     ngx_rtmp_prepare_message(s, &__h, NULL, __l);                           \
