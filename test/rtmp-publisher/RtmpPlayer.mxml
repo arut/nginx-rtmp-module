@@ -22,7 +22,7 @@
 				} else {
 					playButton.label = 'Play';
 					videoDisplay.source = "";
-					videoDisplay.close();
+					//videoDisplay.close();
 				}
 			}
 
@@ -60,7 +60,7 @@
 	    ]]>
 	  </fx:Script>
 	<s:BorderContainer x="0" y="0" width="100%" height="100%">
-		<mx:VideoDisplay bufferTime="1" width="100%" height="100%" id="videoDisplay"></mx:VideoDisplay>
+		<s:VideoDisplay width="100%" height="100%" id="videoDisplay"></s:VideoDisplay>
 		<s:Button label="Play" id="playButton" horizontalCenter="0" bottom="10"></s:Button>
 		<s:Button label="[ ]" id="fullscreenButton" right="10" bottom="10"></s:Button>
 	</s:BorderContainer>
