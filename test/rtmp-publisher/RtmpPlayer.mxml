@@ -42,6 +42,8 @@
 			}
 
 			private function init():void {
+				videoDisplay.mx_internal::videoPlayer.bufferTime = 1;
+
 				streamer = FlexGlobals.topLevelApplication.parameters.streamer;
 				if(streamer == null) {
 					Alert.show('Missing flashvars: streamer');
