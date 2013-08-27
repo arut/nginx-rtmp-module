@@ -98,6 +98,7 @@ typedef struct {
     size_t                              audio_buffer_size;
     ngx_flag_t                          cleanup;
     ngx_array_t                        *variant;
+    ngx_str_t                           base_url;
 } ngx_rtmp_hls_app_conf_t;
 
 
@@ -230,6 +231,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       ngx_rtmp_hls_variant,
       NGX_RTMP_APP_CONF_OFFSET,
       0,
+      NULL },
+
+    { ngx_string("hls_base_url"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, base_url),
       NULL },
 
     ngx_null_command
@@ -422,7 +430,8 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
             *p++ = '\n';
         }
 
-        p = ngx_slprintf(p, last, "%*s%V",
+        p = ngx_slprintf(p, last, "%V%*s%V",
+                         &hacf->base_url,
                          ctx->name.len - ctx->var->suffix.len, ctx->name.data,
                          &var->suffix);
         if (hacf->nested) {
@@ -529,9 +538,10 @@ retry:
         p = ngx_snprintf(buffer, sizeof(buffer), 
                          "%s"
                          "#EXTINF:%.3f,\n"
-                         "%V%s%uL.ts\n",
+                         "%V%V%s%uL.ts\n",
                          f->discont ? "#EXT-X-DISCONTINUITY\n" : "",
                          f->duration,
+                         &hacf->base_url,
                          hacf->nested ? &empty : &ctx->name,
                          hacf->nested ? "" : "-", f->id);
 
@@ -2087,6 +2097,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_size_value(conf->audio_buffer_size, prev->audio_buffer_size,
                               NGX_RTMP_HLS_BUFSIZE);
     ngx_conf_merge_value(conf->cleanup, prev->cleanup, 1);
+    ngx_conf_merge_str_value(conf->base_url, prev->base_url, "");
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
