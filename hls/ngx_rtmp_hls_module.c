@@ -478,7 +478,8 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_int_t                       nretry, rc;
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
-    static ngx_str_t                empty = ngx_null_string;
+    ngx_str_t                       name_part;
+    const char                     *sep;
 
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
@@ -532,6 +533,13 @@ retry:
         return NGX_ERROR;
     }
 
+    sep = hacf->nested ? (hacf->base_url.len ? "/" : "") : "-";
+
+    name_part.len = 0;
+    if (!hacf->nested || hacf->base_url.len) {
+        name_part = ctx->name;
+    }
+
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
 
@@ -540,10 +548,7 @@ retry:
                          "#EXTINF:%.3f,\n"
                          "%V%V%s%uL.ts\n",
                          f->discont ? "#EXT-X-DISCONTINUITY\n" : "",
-                         f->duration,
-                         &hacf->base_url,
-                         hacf->nested ? &empty : &ctx->name,
-                         hacf->nested ? "" : "-", f->id);
+                         f->duration, &hacf->base_url, &name_part, sep, f->id);
 
         ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: fragment frag=%uL, n=%ui/%ui, duration=%.3f, "
