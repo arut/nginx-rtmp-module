@@ -331,7 +331,7 @@ ngx_rtmp_stat_client(ngx_http_request_t *r, ngx_chain_t ***lll,
     NGX_RTMP_STAT_L("</id>");
 
     NGX_RTMP_STAT_L("<address>");
-    NGX_RTMP_STAT_S(&s->connection->addr_text);
+    NGX_RTMP_STAT_ES(&s->connection->addr_text);
     NGX_RTMP_STAT_L("</address>");
 
     NGX_RTMP_STAT_L("<time>");
