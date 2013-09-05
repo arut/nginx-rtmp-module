@@ -171,7 +171,9 @@ ngx_rtmp_cmd_connect_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     len = ngx_strlen(v.app);
-    if (len && v.app[len - 1] == '/') {
+    if (len > 10 && !ngx_memcmp(v.app + len - 10, "/_definst_", 10)) {
+        v.app[len - 10] = 0;
+    } else if (len && v.app[len - 1] == '/') {
         v.app[len - 1] = 0;
     }
 
