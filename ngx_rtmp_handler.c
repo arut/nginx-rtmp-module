@@ -371,6 +371,11 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     pp[3] = 0;
                     h->type = *(uint8_t*)p++;
 
+                    /* Consider ext timestamp as payload (Wirecast) */
+                    if (ext && cscf->publish_time_fix2) {
+                        h->mlen -= 4;
+                    }
+
                     if (fmt == 0) {
                         if (b->last - p < 4)
                             continue;
