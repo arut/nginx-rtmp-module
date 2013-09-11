@@ -417,7 +417,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     (int)fmt, ngx_rtmp_message_type(h->type), (int)h->type,
                     h->timestamp, st->dtime, h->mlen, st->len, h->msid);
 
-            if (st->ext && cscf->publish_time_fix2) {
+            if (ext && cscf->publish_time_fix2) {
                 /* Consider ext timestamp as payload (Wirecast) */
                 st->len += 4;
             }
