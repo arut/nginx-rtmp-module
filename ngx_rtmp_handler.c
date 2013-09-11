@@ -371,11 +371,6 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     pp[3] = 0;
                     h->type = *(uint8_t*)p++;
 
-                    /* Consider ext timestamp as payload (Wirecast) */
-                    if (ext && cscf->publish_time_fix2) {
-                        h->mlen -= 4;
-                    }
-
                     if (fmt == 0) {
                         if (b->last - p < 4)
                             continue;
@@ -421,6 +416,11 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     "time=%uD+%uD mlen=%D len=%D msid=%D",
                     (int)fmt, ngx_rtmp_message_type(h->type), (int)h->type,
                     h->timestamp, st->dtime, h->mlen, st->len, h->msid);
+
+            if (st->ext && cscf->publish_time_fix2) {
+                /* Consider ext timestamp as payload (Wirecast) */
+                st->len += 4;
+            }
 
             /* header done */
             b->pos = p;
