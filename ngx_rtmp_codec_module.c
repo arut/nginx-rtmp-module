@@ -10,7 +10,45 @@
 #include "ngx_rtmp_cmd_module.h"
 
 
+#define NGX_RTMP_CODEC_META_OFF     0
+#define NGX_RTMP_CODEC_META_ON      1
+#define NGX_RTMP_CODEC_META_COPY    2
+
+
+static void * ngx_rtmp_codec_create_app_conf(ngx_conf_t *cf);
+static char * ngx_rtmp_codec_merge_app_conf(ngx_conf_t *cf, 
+       void *parent, void *child);
 static ngx_int_t ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf);
+static ngx_int_t ngx_rtmp_codec_reconstruct_meta(ngx_rtmp_session_t *s);
+static ngx_int_t ngx_rtmp_codec_copy_meta(ngx_rtmp_session_t *s,
+       ngx_rtmp_header_t *h, ngx_chain_t *in);
+static ngx_int_t ngx_rtmp_codec_prepare_meta(ngx_rtmp_session_t *s);
+
+
+typedef struct {
+    ngx_uint_t                      meta;
+} ngx_rtmp_codec_app_conf_t;
+
+
+static ngx_conf_enum_t ngx_rtmp_codec_meta_slots[] = {
+    { ngx_string("off"),            NGX_RTMP_CODEC_META_OFF  },
+    { ngx_string("on"),             NGX_RTMP_CODEC_META_ON   },
+    { ngx_string("copy"),           NGX_RTMP_CODEC_META_COPY },
+    { ngx_null_string,              0 }
+}; 
+
+
+static ngx_command_t  ngx_rtmp_codec_commands[] = {
+
+    { ngx_string("meta"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_codec_app_conf_t, meta),
+      &ngx_rtmp_codec_meta_slots },
+
+      ngx_null_command
+};
 
 
 static ngx_rtmp_module_t  ngx_rtmp_codec_module_ctx = {
@@ -20,15 +58,15 @@ static ngx_rtmp_module_t  ngx_rtmp_codec_module_ctx = {
     NULL,                                   /* init main configuration */
     NULL,                                   /* create server configuration */
     NULL,                                   /* merge server configuration */
-    NULL,                                   /* create app configuration */
-    NULL                                    /* merge app configuration */
+    ngx_rtmp_codec_create_app_conf,         /* create app configuration */
+    ngx_rtmp_codec_merge_app_conf           /* merge app configuration */
 };
 
 
 ngx_module_t  ngx_rtmp_codec_module = {
     NGX_MODULE_V1,
     &ngx_rtmp_codec_module_ctx,             /* module context */
-    NULL,                                   /* module directives */
+    ngx_rtmp_codec_commands,                /* module directives */
     NGX_RTMP_MODULE,                        /* module type */
     NULL,                                   /* init master */
     NULL,                                   /* init module */
@@ -276,12 +314,11 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
 
 static ngx_int_t
-ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
+ngx_rtmp_codec_reconstruct_meta(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_codec_ctx_t           *ctx;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_int_t                       rc;
-    ngx_rtmp_header_t               h;
 
     static struct {
         double                      width;
@@ -395,6 +432,58 @@ ngx_rtmp_codec_update_meta(ngx_rtmp_session_t *s)
         return NGX_ERROR;
     }
 
+    return ngx_rtmp_codec_prepare_meta(s);
+}
+
+
+static ngx_int_t 
+ngx_rtmp_codec_copy_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+        ngx_chain_t *in)
+{
+    ngx_int_t                  rc;
+    ngx_rtmp_codec_ctx_t      *ctx;
+    ngx_rtmp_core_srv_conf_t  *cscf;
+
+    static ngx_rtmp_amf_elt_t       out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING, 
+          ngx_null_string,
+          "onMetaData", 0 },
+    };
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
+    if (ctx->meta) {
+        ngx_rtmp_free_shared_chain(cscf, ctx->meta);
+        ctx->meta = NULL;
+    }
+
+    rc = ngx_rtmp_append_amf(s, &ctx->meta, NULL, out_elts, 
+                             sizeof(out_elts) / sizeof(out_elts[0]));
+    if (rc != NGX_OK || ctx->meta == NULL) {
+        return NGX_ERROR;
+    }
+
+    ctx->meta = ngx_rtmp_append_shared_bufs(cscf, ctx->meta, in);
+
+    if (ctx->meta == NULL) {
+        return NGX_ERROR;
+    }
+
+    return ngx_rtmp_codec_prepare_meta(s);
+}
+
+
+static ngx_int_t
+ngx_rtmp_codec_prepare_meta(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_header_t      h;
+    ngx_rtmp_codec_ctx_t  *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+
     ngx_memzero(&h, sizeof(h));
     h.csid = NGX_RTMP_CSID_AMF;
     h.msid = NGX_RTMP_MSID;
@@ -411,6 +500,7 @@ static ngx_int_t
 ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *in)
 {
+    ngx_rtmp_codec_app_conf_t      *cacf;
     ngx_rtmp_codec_ctx_t           *ctx;
     ngx_uint_t                      skip;
 
@@ -509,6 +599,8 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
           in_inf, sizeof(in_inf) },
     };
 
+    cacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_codec_module);
+
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
     if (ctx == NULL) {
         ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_codec_ctx_t));
@@ -555,9 +647,44 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             ngx_rtmp_get_audio_codec_name(ctx->audio_codec_id), 
             ctx->audio_codec_id);
 
-    ngx_rtmp_codec_update_meta(s);
+    switch (cacf->meta) {
+        case NGX_RTMP_CODEC_META_ON:
+            return ngx_rtmp_codec_reconstruct_meta(s);
+        case NGX_RTMP_CODEC_META_COPY:
+            return ngx_rtmp_codec_copy_meta(s, h, in);
+    }
+
+    /* NGX_RTMP_CODEC_META_OFF */
 
     return NGX_OK;
+}
+
+
+static void *
+ngx_rtmp_codec_create_app_conf(ngx_conf_t *cf)
+{
+    ngx_rtmp_codec_app_conf_t  *cacf;
+
+    cacf = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_codec_app_conf_t));
+    if (cacf == NULL) {
+        return NULL;
+    }
+
+    cacf->meta = NGX_CONF_UNSET_UINT;
+
+    return cacf;
+}
+
+
+static char *
+ngx_rtmp_codec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
+{
+    ngx_rtmp_codec_app_conf_t *prev = parent;
+    ngx_rtmp_codec_app_conf_t *conf = child;
+
+    ngx_conf_merge_uint_value(conf->meta, prev->meta, NGX_RTMP_CODEC_META_ON);
+
+    return NGX_CONF_OK;
 }
 
 

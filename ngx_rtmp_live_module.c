@@ -37,13 +37,6 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, live),
       NULL },
 
-    { ngx_string("meta"),
-      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_flag_slot,
-      NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_live_app_conf_t, meta),
-      NULL },
-
     { ngx_string("stream_buckets"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -150,7 +143,6 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     }
 
     lacf->live = NGX_CONF_UNSET;
-    lacf->meta = NGX_CONF_UNSET;
     lacf->nbuckets = NGX_CONF_UNSET;
     lacf->buflen = NGX_CONF_UNSET_MSEC;
     lacf->sync = NGX_CONF_UNSET_MSEC;
@@ -172,7 +164,6 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_rtmp_live_app_conf_t *conf = child;
 
     ngx_conf_merge_value(conf->live, prev->live, 0);
-    ngx_conf_merge_value(conf->meta, prev->meta, 1);
     ngx_conf_merge_value(conf->nbuckets, prev->nbuckets, 1024);
     ngx_conf_merge_msec_value(conf->buflen, prev->buflen, 0);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 300);
@@ -814,7 +805,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
         }
 
-        if (lacf->meta && codec_ctx->meta) {
+        if (codec_ctx->meta) {
             meta = codec_ctx->meta;
             meta_version = codec_ctx->meta_version;
         }
