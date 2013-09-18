@@ -440,16 +440,8 @@ static ngx_int_t
 ngx_rtmp_codec_copy_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
         ngx_chain_t *in)
 {
-    ngx_int_t                  rc;
     ngx_rtmp_codec_ctx_t      *ctx;
     ngx_rtmp_core_srv_conf_t  *cscf;
-
-    static ngx_rtmp_amf_elt_t       out_elts[] = {
-
-        { NGX_RTMP_AMF_STRING, 
-          ngx_null_string,
-          "onMetaData", 0 },
-    };
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
 
@@ -457,16 +449,9 @@ ngx_rtmp_codec_copy_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     if (ctx->meta) {
         ngx_rtmp_free_shared_chain(cscf, ctx->meta);
-        ctx->meta = NULL;
     }
 
-    rc = ngx_rtmp_append_amf(s, &ctx->meta, NULL, out_elts, 
-                             sizeof(out_elts) / sizeof(out_elts[0]));
-    if (rc != NGX_OK || ctx->meta == NULL) {
-        return NGX_ERROR;
-    }
-
-    ctx->meta = ngx_rtmp_append_shared_bufs(cscf, ctx->meta, in);
+    ctx->meta = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
 
     if (ctx->meta == NULL) {
         return NGX_ERROR;
