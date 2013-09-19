@@ -541,6 +541,8 @@ next:
             h.timestamp > end_timestamp ? h.timestamp - end_timestamp : 0,
             h.timestamp, end_timestamp, (ngx_int_t) buflen);
 
+    s->current_time = h.timestamp;
+
     /* too much data sent; schedule timeout */
     if (h.timestamp > end_timestamp) {
         return h.timestamp - end_timestamp;

@@ -189,6 +189,7 @@
                     <th>Page URL</th>
                     <th>SWF URL</th>
                     <th>Dropped</th>
+                    <th>Timestamp</th>
                     <th>A-V</th>
                     <th>Time</th>
                 </tr>
@@ -288,6 +289,7 @@
         </td>
         <td><xsl:value-of select="swfurl"/></td>
         <td><xsl:value-of select="dropped"/></td>
+        <td><xsl:value-of select="timestamp"/></td>
         <td><xsl:value-of select="avsync"/></td>
         <td>
             <xsl:call-template name="showtime">

@@ -421,6 +421,11 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                     }
                     NGX_RTMP_STAT_L("</avsync>");
 
+                    NGX_RTMP_STAT_L("<timestamp>");
+                    NGX_RTMP_STAT(bbuf, ngx_snprintf(bbuf, sizeof(bbuf), 
+                                  "%D", s->current_time) - bbuf);
+                    NGX_RTMP_STAT_L("</timestamp>");
+
                     if (ctx->publishing) {
                         NGX_RTMP_STAT_L("<publishing/>");
                     }
@@ -507,6 +512,7 @@ ngx_rtmp_stat_play(ngx_http_request_t *r, ngx_chain_t ***lll,
     ngx_rtmp_session_t             *s;
     ngx_uint_t                      n, nclients, total_nclients;
     u_char                          buf[NGX_INT_T_LEN];
+    u_char                          bbuf[NGX_INT32_LEN];
     ngx_rtmp_stat_loc_conf_t       *slcf;
 
     if (pacf->entries.nelts == 0) {
@@ -540,6 +546,11 @@ ngx_rtmp_stat_play(ngx_http_request_t *r, ngx_chain_t ***lll,
                     NGX_RTMP_STAT_L("<client>");
 
                     ngx_rtmp_stat_client(r, lll, s);
+
+                    NGX_RTMP_STAT_L("<timestamp>");
+                    NGX_RTMP_STAT(bbuf, ngx_snprintf(bbuf, sizeof(bbuf), 
+                                  "%D", s->current_time) - bbuf);
+                    NGX_RTMP_STAT_L("</timestamp>");
 
                     NGX_RTMP_STAT_L("</client>\r\n");
                 }
