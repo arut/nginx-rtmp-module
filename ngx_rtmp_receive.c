@@ -406,22 +406,24 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
     cmcf = ngx_rtmp_get_module_main_conf(s, ngx_rtmp_core_module);
 
     /* read AMF func name & transaction id */
-    ngx_memzero(&act, sizeof(act));
-    act.link = in;
-    act.log = s->connection->log;
-    memset(func, 0, sizeof(func));
+    do {
+        ngx_memzero(&act, sizeof(act));
+        act.link = in;
+        act.log = s->connection->log;
+        memset(func, 0, sizeof(func));
 
-    if (ngx_rtmp_amf_read(&act, elts,
-                sizeof(elts) / sizeof(elts[0])) != NGX_OK)
-    {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                "AMF cmd failed");
-        return NGX_ERROR;
-    }
+        if (ngx_rtmp_amf_read(&act, elts,
+                    sizeof(elts) / sizeof(elts[0])) != NGX_OK)
+        {
+            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                    "AMF cmd failed");
+            return NGX_ERROR;
+        }
 
-    /* skip name */
-    in = act.link;
-    in->buf->pos += act.offset;
+        /* skip name */
+        in = act.link;
+        in->buf->pos += act.offset;
+    } while (!ngx_strcmp(func, "@setDataFrame"));
 
     len = ngx_strlen(func);
 

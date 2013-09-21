@@ -732,7 +732,6 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 {
     ngx_rtmp_codec_app_conf_t      *cacf;
     ngx_rtmp_codec_ctx_t           *ctx;
-    ngx_uint_t                      skip;
 
     static struct {
         double                      width;
@@ -843,11 +842,8 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
      * 0 is a valid value for uncompressed audio */
     v.audio_codec_id_n = -1;
 
-    /* FFmpeg sends a string in front of actal metadata; ignore it */
-    skip = !(in->buf->last > in->buf->pos
-            && *in->buf->pos == NGX_RTMP_AMF_STRING);
-    if (ngx_rtmp_receive_amf(s, in, in_elts + skip,
-                sizeof(in_elts) / sizeof(in_elts[0]) - skip))
+        if (ngx_rtmp_receive_amf(s, in, in_elts,
+                sizeof(in_elts) / sizeof(in_elts[0])))
     {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "codec: error parsing data frame");
@@ -937,13 +933,6 @@ ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf)
     *h = ngx_rtmp_codec_disconnect;
 
     /* register metadata handler */
-    ch = ngx_array_push(&cmcf->amf);
-    if (ch == NULL) {
-        return NGX_ERROR;
-    }
-    ngx_str_set(&ch->name, "@setDataFrame");
-    ch->handler = ngx_rtmp_codec_meta_data;
-
     ch = ngx_array_push(&cmcf->amf);
     if (ch == NULL) {
         return NGX_ERROR;
