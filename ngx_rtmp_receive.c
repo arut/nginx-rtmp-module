@@ -394,7 +394,7 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
     }
 
     if ((h->type == NGX_RTMP_MSG_AMF3_SHARED ||
-         h->type == NGX_RTMP_MSG_AMF3_META ||
+         h->type == NGX_RTMP_MSG_AMF3_NOTIFY ||
          h->type == NGX_RTMP_MSG_AMF3_CMD)
          && in->buf->last > in->buf->pos)
     {

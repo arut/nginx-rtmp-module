@@ -716,7 +716,7 @@ ngx_rtmp_codec_prepare_meta(ngx_rtmp_session_t *s, uint32_t timestamp)
     ngx_memzero(&h, sizeof(h));
     h.csid = NGX_RTMP_CSID_AMF;
     h.msid = NGX_RTMP_MSID;
-    h.type = NGX_RTMP_MSG_AMF_META;
+    h.type = NGX_RTMP_MSG_AMF_NOTIFY;
     h.timestamp = timestamp;
     ngx_rtmp_prepare_message(s, &h, NULL, ctx->meta);
 

@@ -2052,7 +2052,7 @@ ngx_rtmp_mp4_send_meta(ngx_rtmp_session_t *s)
 
     h.csid = NGX_RTMP_CSID_AMF;
     h.msid = NGX_RTMP_MSID;
-    h.type = NGX_RTMP_MSG_AMF_META;
+    h.type = NGX_RTMP_MSG_AMF_NOTIFY;
 
     ngx_rtmp_prepare_message(s, &h, NULL, out);
     rc = ngx_rtmp_send_message(s, out, 0);
