@@ -298,6 +298,7 @@ typedef struct {
     ngx_hash_t              amf_hash;
     ngx_array_t             amf_arrays;
     ngx_array_t             amf;
+    ngx_rtmp_handler_pt     amf_default;
 } ngx_rtmp_core_main_conf_t;
 
 
@@ -456,7 +457,8 @@ ngx_int_t ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-
+ngx_int_t ngx_rtmp_amf_notify_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 /* Shared output buffers */
 

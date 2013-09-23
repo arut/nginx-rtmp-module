@@ -836,6 +836,9 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_codec_module);
     }
 
+    if (cacf->meta == NGX_RTMP_CODEC_META_COPY)
+        return ngx_rtmp_codec_copy_meta(s, h, in);
+
     ngx_memzero(&v, sizeof(v));
 
     /* use -1 as a sign of unchanged data;
@@ -913,7 +916,6 @@ ngx_rtmp_codec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     return NGX_CONF_OK;
 }
 
-
 static ngx_int_t
 ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf)
 {
@@ -940,6 +942,13 @@ ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf)
     ngx_str_set(&ch->name, "onMetaData");
     ch->handler = ngx_rtmp_codec_meta_data;
 
+    /* Strip @setDataFrame and feed it back */
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "@setDataFrame");
+    ch->handler = ngx_rtmp_amf_message_handler;
 
     return NGX_OK;
 }
