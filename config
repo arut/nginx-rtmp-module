@@ -79,6 +79,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_log_module.c        \
                 $ngx_addon_dir/ngx_rtmp_limit_module.c      \
                 $ngx_addon_dir/hls/ngx_rtmp_hls_module.c    \
+                $ngx_addon_dir/hls/ngx_rtmp_dash_module.c    \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.c        \
                 $ngx_addon_dir/hls/ngx_rtmp_mp4.c           \
                 "
