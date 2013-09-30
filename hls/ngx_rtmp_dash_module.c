@@ -230,7 +230,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 
     f = ngx_rtmp_dash_get_frag(s, hacf->winfrags/2);
 
-    audio_dur = f->id > 0 ? (uint32_t)(codec_ctx->sample_rate*((f->video_latest_pres_time/f->id)/1000)) : 
+    audio_dur = f->id > 0 ? (uint32_t)(codec_ctx->sample_rate*((float)(f->video_latest_pres_time/f->id)/1000.0)) : 
                             (uint32_t)(codec_ctx->sample_rate*(hacf->fraglen/1000));
 
     p = ngx_snprintf(buffer, sizeof(buffer), NGX_RTMP_DASH_MANIFEST_HEADER,
