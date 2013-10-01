@@ -370,7 +370,6 @@ ngx_rtmp_amf_notify_handler(ngx_rtmp_session_t *s,
     ngx_rtmp_amf_ctx_t          act;
     ngx_rtmp_core_main_conf_t  *cmcf;
     ngx_array_t                *ch;
-    ngx_chain_t                *p;
     ngx_rtmp_handler_pt        *ph;
     size_t                      len, n;
 
@@ -445,6 +444,7 @@ ngx_rtmp_amf_notify_handler(ngx_rtmp_session_t *s,
             case NGX_DONE:
                 return NGX_OK;
         }
+
     }
 
     return NGX_OK;

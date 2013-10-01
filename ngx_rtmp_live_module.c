@@ -1120,13 +1120,17 @@ ngx_rtmp_amf_forward(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_chain_t                    *rpkt;
     ngx_rtmp_session_t             *ss;
+    ngx_rtmp_live_chunk_stream_t   *cs;
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+
     if (ctx == NULL || ctx->stream == NULL) {
         return NGX_OK;
     }
+
+    cs = &ctx->cs[0];
 
     rpkt = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
 
@@ -1135,11 +1139,11 @@ ngx_rtmp_amf_forward(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
         if (pctx == ctx || pctx->paused)
             continue;
-
         ss = pctx->session;
+        cs = &pctx->cs[0];
 
-        ngx_rtmp_send_message(ss, rpkt, 0);
-//        ngx_rtmp_finalize_session(ss);
+        if (cs->active)
+            ngx_rtmp_send_message(ss, rpkt, 0);
     }
 
     ngx_rtmp_free_shared_chain(cscf, rpkt);
