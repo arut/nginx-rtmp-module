@@ -21,7 +21,8 @@ typedef struct {
 } ngx_rtmp_mpegts_frame_t;
 
 
-ngx_int_t ngx_rtmp_mpegts_write_header(ngx_file_t *file);
+ngx_int_t ngx_rtmp_mpegts_write_header(ngx_file_t *file, 
+          ngx_uint_t *audio_codec_id);
 ngx_int_t ngx_rtmp_mpegts_write_frame(ngx_file_t *file,
           ngx_rtmp_mpegts_frame_t *f, ngx_buf_t *b);
 

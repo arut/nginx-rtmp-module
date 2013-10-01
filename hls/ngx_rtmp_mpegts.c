@@ -6,7 +6,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include "ngx_rtmp_mpegts.h"
-
+#include "ngx_rtmp_codec_module.h"
 
 static u_char ngx_rtmp_mpegts_header[] = {
 
@@ -45,11 +45,9 @@ static u_char ngx_rtmp_mpegts_header[] = {
     0xe1, 0x00,
     0xf0, 0x00,
     0x1b, 0xe1, 0x00, 0xf0, 0x00, /* h264 */
-    0x0f, 0xe1, 0x01, 0xf0, 0x00, /* aac */
-    /*0x03, 0xe1, 0x01, 0xf0, 0x00,*/ /* mp3 */
-    /* CRC */
-    0x2f, 0x44, 0xb9, 0x9b, /* crc for aac */
-    /*0x4e, 0x59, 0x3d, 0x1e,*/ /* crc for mp3 */
+    0x00, 0x00, 0x00, 0x00, 0x00, /* audio placeholder */
+    0x00, 0x00, 0x00, 0x00, /* audio crc placeholder */
+
     /* stuffing 157 bytes */
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -69,15 +67,36 @@ static u_char ngx_rtmp_mpegts_header[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
+static u_char ngx_rtmp_mpegts_header_mp3[] = {
+    0x03, 0xe1, 0x01, 0xf0, 0x00, /* mp3 */
+    /* CRC */
+    0xd7, 0x86, 0x44, 0x5c, /* crc for mp3 */
+};
+
+static u_char ngx_rtmp_mpegts_header_aac[] = {
+    0x0f, 0xe1, 0x01, 0xf0, 0x00, /* aac */
+    /* CRC */
+    0x2f, 0x44, 0xb9, 0x9b, /* crc for aac */
+};
 
 /* 700 ms PCR delay */
 #define NGX_RTMP_HLS_DELAY  63000
 
 
 ngx_int_t
-ngx_rtmp_mpegts_write_header(ngx_file_t *file)
+ngx_rtmp_mpegts_write_header(ngx_file_t *file, ngx_uint_t *audio_codec_id)
 {
     ssize_t rc;
+
+    if (*audio_codec_id == NGX_RTMP_AUDIO_AAC) {
+        ngx_memcpy(ngx_rtmp_mpegts_header+210, ngx_rtmp_mpegts_header_aac, 
+                                        sizeof(ngx_rtmp_mpegts_header_aac));
+    }
+    //if (*audio_codec_id == NGX_RTMP_AUDIO_MP3) {
+    else {
+        ngx_memcpy(ngx_rtmp_mpegts_header+210, ngx_rtmp_mpegts_header_mp3, 
+                                        sizeof(ngx_rtmp_mpegts_header_mp3));
+    }
 
     rc = ngx_write_file(file, ngx_rtmp_mpegts_header,
                         sizeof(ngx_rtmp_mpegts_header), 0);
