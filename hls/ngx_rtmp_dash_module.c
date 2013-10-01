@@ -209,19 +209,19 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 
 #define NGX_RTMP_DASH_MANIFEST_HEADER \
     "<?xml version=\"1.0\"?>\n"\
-    "<MPD type=\"dynamic\" xmlns=\"urn:mpeg:dash:schema:mpd:2011\" minimumUpdatePeriod=\"PT30M0S\" availabilityStartTime=\"%V\" minBufferTime=\"PT3S\" mediaPresentationDuration=\"PT24H0M0.00S\" profiles=\"urn:mpeg:dash:profile:isoff-live:2011\">\n"\
-    " <Period id=\"dash\" duration=\"PT24H0M0.00S\">\n"
+    "<MPD type=\"dynamic\" xmlns=\"urn:mpeg:dash:schema:mpd:2011\" minimumUpdatePeriod=\"PT30M0S\" availabilityStartTime=\"%V\" minBufferTime=\"PT3S\" mediaPresentationDuration=\"PT0H0M0.00S\" profiles=\"urn:mpeg:dash:profile:isoff-live:2011\">\n"\
+    " <Period start=\"PT0S\" id=\"dash\" duration=\"PT0H0M0.00S\">\n"
 #define NGX_RTMP_DASH_MANIFEST_VIDEO \
     "  <AdaptationSet segmentAlignment=\"true\" maxWidth=\"%uL\" maxHeight=\"%uL\" maxFrameRate=\"%uL\">\n"\
     "   <Representation id=\"video\" mimeType=\"video/mp4\" codecs=\"avc1.42c028\" width=\"%uL\" height=\"%uL\" frameRate=\"%uL\" sar=\"1:1\" startWithSAP=\"1\" bandwidth=\"%uL\">\n"\
-    "     <SegmentTemplate timescale=\"1000\" duration=\"%uL\" media=\"%V-$Number$.m4v\" startNumber=\"0\" initialization=\"%V-init-video.dash\"/>\n"\
+    "     <SegmentTemplate presentationTimeOffset=\"%uL\" timescale=\"1000\" duration=\"%uL\" media=\"%V-$Number$.m4v\" startNumber=\"0\" initialization=\"%V-init-video.dash\"/>\n"\
     "   </Representation>\n"\
     "  </AdaptationSet>\n"
 #define NGX_RTMP_DASH_MANIFEST_AUDIO \
     "  <AdaptationSet segmentAlignment=\"true\">\n"\
     "   <AudioChannelConfiguration schemeIdUri=\"urn:mpeg:dash:23003:3:audio_channel_configuration:2011\" value=\"1\"/>\n"\
     "   <Representation id=\"audio\" mimeType=\"audio/mp4\" codecs=\"mp4a.40.2\" audioSamplingRate=\"%uL\" startWithSAP=\"1\" bandwidth=\"130685\">\n"\
-    "     <SegmentTemplate timescale=\"%uL\" duration=\"%uL\" media=\"%V-$Number$.m4a\" startNumber=\"0\" initialization=\"%V-init-audio.dash\"/>\n"\
+    "     <SegmentTemplate presentationTimeOffset=\"%uL\" timescale=\"%uL\" duration=\"%uL\" media=\"%V-$Number$.m4a\" startNumber=\"0\" initialization=\"%V-init-audio.dash\"/>\n"\
     "   </Representation>\n"\
     "  </AdaptationSet>\n"
 #define NGX_RTMP_DASH_MANIFEST_FOOTER \
@@ -246,6 +246,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                                                      codec_ctx->height,
                                                      codec_ctx->frame_rate, 
                                                      (uint32_t)(live_ctx->stream->bw_in.bandwidth*8), 
+                                                     f->video_earliest_pres_time,
                                                      f->id > 0 ? (uint32_t)(f->video_latest_pres_time/f->id) : hacf->fraglen, 
                                                      &ctx->name, 
                                                      &ctx->name);
@@ -255,6 +256,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     if (ctx->audio) {
         p = ngx_snprintf(buffer, sizeof(buffer), NGX_RTMP_DASH_MANIFEST_AUDIO, 
                                                       codec_ctx->sample_rate, 
+                                                      (uint32_t)(f->audio_earliest_pres_time*((float)codec_ctx->sample_rate/1000.0)),
                                                       codec_ctx->sample_rate,
                                                       audio_dur, 
                                                       &ctx->name, 
