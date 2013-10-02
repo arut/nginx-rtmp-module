@@ -1467,7 +1467,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         b->pos = b->last = b->start;
     }
 
-    size = codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 ? h->mlen - 2 : h->mlen - 2 + 7;
+    size = codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 ? h->mlen - 1 : h->mlen - 2 + 7;
     pts = (uint64_t) h->timestamp * 90;
 
     if (b->start + size > b->end) {
@@ -1499,6 +1499,13 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             return NGX_OK;
         }
         b->last += 5;
+    }
+    else {
+        /* For some reason the pointer is already incremented past the rest
+           of the RTMP frame header.  I'm not sure where in the code this is
+           being done.  Regardless, there's an extra byte that needs to be skipped
+           for MP3. */
+        in->buf->pos += 1;
     }
 
     /* copy payload */
