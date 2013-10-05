@@ -93,6 +93,7 @@ typedef struct {
     ngx_str_t                           path;
     ngx_uint_t                          naming;
     ngx_uint_t                          slicing;
+    ngx_uint_t                          type;
     ngx_path_t                         *slot;
     ngx_msec_t                          max_audio_delay;
     size_t                              audio_buffer_size;
@@ -111,6 +112,10 @@ typedef struct {
 #define NGX_RTMP_HLS_SLICING_ALIGNED    2
 
 
+#define NGX_RTMP_HLS_TYPE_LIVE          1
+#define NGX_RTMP_HLS_TYPE_EVENT         2
+
+
 static ngx_conf_enum_t                  ngx_rtmp_hls_naming_slots[] = {
     { ngx_string("sequential"),         NGX_RTMP_HLS_NAMING_SEQUENTIAL },
     { ngx_string("timestamp"),          NGX_RTMP_HLS_NAMING_TIMESTAMP  },
@@ -122,6 +127,13 @@ static ngx_conf_enum_t                  ngx_rtmp_hls_naming_slots[] = {
 static ngx_conf_enum_t                  ngx_rtmp_hls_slicing_slots[] = {
     { ngx_string("plain"),              NGX_RTMP_HLS_SLICING_PLAIN },
     { ngx_string("aligned"),            NGX_RTMP_HLS_SLICING_ALIGNED  },
+    { ngx_null_string,                  0 }
+}; 
+
+
+static ngx_conf_enum_t                  ngx_rtmp_hls_type_slots[] = {
+    { ngx_string("live"),               NGX_RTMP_HLS_TYPE_LIVE  },
+    { ngx_string("event"),              NGX_RTMP_HLS_TYPE_EVENT },
     { ngx_null_string,                  0 }
 }; 
 
@@ -204,6 +216,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, slicing),
       &ngx_rtmp_hls_slicing_slots },
+
+    { ngx_string("hls_type"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, type),
+      &ngx_rtmp_hls_type_slots },
 
     { ngx_string("hls_max_audio_delay"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
@@ -521,8 +540,11 @@ retry:
                      "#EXTM3U\n"
                      "#EXT-X-VERSION:3\n"
                      "#EXT-X-MEDIA-SEQUENCE:%uL\n"
-                     "#EXT-X-TARGETDURATION:%ui\n",
-                     ctx->frag, max_frag);
+                     "#EXT-X-TARGETDURATION:%ui\n"
+                     "%s",
+                     ctx->frag, max_frag,
+                     hacf->type == NGX_RTMP_HLS_TYPE_EVENT ?
+                     "#EXT-X-PLAYLIST-TYPE: EVENT\n" : "");
 
     n = ngx_write_fd(fd, buffer, p - buffer);
     if (n < 0) {
@@ -2068,6 +2090,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->nested = NGX_CONF_UNSET;
     conf->naming = NGX_CONF_UNSET_UINT;
     conf->slicing = NGX_CONF_UNSET_UINT;
+    conf->type = NGX_CONF_UNSET_UINT;
     conf->max_audio_delay = NGX_CONF_UNSET_MSEC;
     conf->audio_buffer_size = NGX_CONF_UNSET_SIZE;
     conf->cleanup = NGX_CONF_UNSET;
@@ -2097,6 +2120,8 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
                               NGX_RTMP_HLS_NAMING_SEQUENTIAL);
     ngx_conf_merge_uint_value(conf->slicing, prev->slicing,
                               NGX_RTMP_HLS_SLICING_PLAIN);
+    ngx_conf_merge_uint_value(conf->type, prev->type,
+                              NGX_RTMP_HLS_TYPE_LIVE);
     ngx_conf_merge_msec_value(conf->max_audio_delay, prev->max_audio_delay,
                               300);
     ngx_conf_merge_size_value(conf->audio_buffer_size, prev->audio_buffer_size,
@@ -2110,7 +2135,9 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     /* schedule cleanup */
 
-    if (conf->path.len == 0 || !conf->cleanup) {
+    if (conf->path.len == 0 || !conf->cleanup ||
+        conf->type == NGX_RTMP_HLS_TYPE_EVENT)
+    {
         return NGX_CONF_OK;
     }
 
