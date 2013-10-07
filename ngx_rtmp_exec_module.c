@@ -724,7 +724,7 @@ ngx_rtmp_exec_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
             ngx_rtmp_exec_kill(e, e->kill_signal);
         }
 
-        ppctx = &eacf->pull[ngx_hash_key(pctx->name.data, pctx->name.len) &
+        ppctx = &eacf->pull[ngx_hash_key(pctx->name.data, pctx->name.len) %
                             eacf->nbuckets];
 
         for (; *ppctx; ppctx = &(*ppctx)->next) {
@@ -828,7 +828,7 @@ ngx_rtmp_exec_init_pull_ctx(ngx_rtmp_session_t *s,
 
     len = ngx_strlen(name);
 
-    ppctx = &eacf->pull[ngx_hash_key(name, len) & eacf->nbuckets];
+    ppctx = &eacf->pull[ngx_hash_key(name, len) % eacf->nbuckets];
 
     for (; *ppctx; ppctx = &(*ppctx)->next) {
         pctx = *ppctx;
