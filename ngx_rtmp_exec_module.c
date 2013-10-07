@@ -750,8 +750,8 @@ ngx_rtmp_exec_init_ctx(ngx_rtmp_session_t *s, u_char name[NGX_RTMP_MAX_NAME],
 {
     ngx_uint_t                  n;
     ngx_rtmp_exec_t            *e;
-    ngx_rtmp_exec_conf_t       *ec;
     ngx_rtmp_exec_ctx_t        *ctx;
+    ngx_rtmp_exec_conf_t       *ec;
     ngx_rtmp_exec_app_conf_t   *eacf;
     ngx_rtmp_exec_main_conf_t  *emcf;
     
