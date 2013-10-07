@@ -136,10 +136,11 @@ ngx_module_t  ngx_rtmp_enotify_module = {
 
 
 static void
-ngx_rtmp_enotify_eval_astr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
-                           ngx_str_t *ret)
+ngx_rtmp_enotify_eval_astr(void *sctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
 {
-    ngx_rtmp_enotify_ctx_t     *ctx;
+    ngx_rtmp_session_t  *s = sctx;
+
+    ngx_rtmp_enotify_ctx_t  *ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_enotify_module);
     if (ctx == NULL) {
@@ -153,10 +154,11 @@ ngx_rtmp_enotify_eval_astr(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
 
 
 static void
-ngx_rtmp_enotify_eval_str(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
-                          ngx_str_t *ret)
+ngx_rtmp_enotify_eval_str(void *sctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
 {
-    ngx_rtmp_enotify_ctx_t     *ctx;
+    ngx_rtmp_session_t  *s = sctx;
+
+    ngx_rtmp_enotify_ctx_t  *ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_enotify_module);
     if (ctx == NULL) {
@@ -283,7 +285,8 @@ ngx_rtmp_enotify_exec(ngx_rtmp_session_t *s, ngx_rtmp_enotify_conf_t *ec)
 
             for (n = 0; n < ec->args.nelts; ++n, ++arg_in) {
 
-                ngx_rtmp_eval(s, arg_in, ngx_rtmp_enotify_eval_p, &a);
+                ngx_rtmp_eval(s, arg_in, ngx_rtmp_enotify_eval_p, &a,
+                              s->connection->log);
 
                 if (ngx_rtmp_eval_streams(&a) != NGX_DONE) {
                     continue;
