@@ -373,7 +373,8 @@ static ngx_rtmp_mp4_box_t                       ngx_rtmp_mp4_boxes[] = {
     { ngx_rtmp_mp4_make_tag('e','s','d','s'),   ngx_rtmp_mp4_parse_esds   }, 
     { ngx_rtmp_mp4_make_tag('.','m','p','3'),   ngx_rtmp_mp4_parse_mp3    }, 
     { ngx_rtmp_mp4_make_tag('n','m','o','s'),   ngx_rtmp_mp4_parse_nmos   }, 
-    { ngx_rtmp_mp4_make_tag('s','p','e','x'),   ngx_rtmp_mp4_parse_spex   }
+    { ngx_rtmp_mp4_make_tag('s','p','e','x'),   ngx_rtmp_mp4_parse_spex   },
+    { ngx_rtmp_mp4_make_tag('w','a','v','e'),   ngx_rtmp_mp4_parse        }
 };
 
 
@@ -640,6 +641,7 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
 {
     ngx_rtmp_mp4_ctx_t         *ctx;
     u_char                     *p;
+    ngx_uint_t                  version;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_mp4_module);
 
@@ -653,7 +655,11 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
         return NGX_ERROR;
     }
 
-    pos += 16;
+    pos += 8;
+
+    version = ngx_rtmp_r16(*(uint16_t *) pos);
+
+    pos += 8;
 
     ctx->nchannels = ngx_rtmp_r16(*(uint16_t *) pos);
 
@@ -696,10 +702,24 @@ ngx_rtmp_mp4_parse_audio(ngx_rtmp_session_t *s, u_char *pos, u_char *last,
             break;
     }
 
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "mp4: audio settings codec=%i, nchannels==%ui, "
+    ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "mp4: audio settings version=%ui, codec=%i, nchannels==%ui, "
                    "sample_size=%ui, sample_rate=%ui",
-                   codec, ctx->nchannels, ctx->sample_size, ctx->sample_rate);
+                   version, codec, ctx->nchannels, ctx->sample_size,
+                   ctx->sample_rate);
+
+    switch (version) {
+        case 1:
+            pos += 16;
+            break;
+
+        case 2:
+            pos += 36;
+    }
+
+    if (pos > last) {
+        return NGX_ERROR;
+    }
 
     if (ngx_rtmp_mp4_parse(s, pos, last) != NGX_OK) {
         return NGX_ERROR;
