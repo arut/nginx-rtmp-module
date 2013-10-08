@@ -13,14 +13,14 @@ ngx_rtmp_mp4_field_64(ngx_buf_t *b, uint64_t n)
 {
     u_char         bytes[8];
 
-    bytes[0] = (n >> 56) & 0xFF;
-    bytes[1] = (n >> 48) & 0xFF;
-    bytes[2] = (n >> 40) & 0xFF;
-    bytes[3] = (n >> 32) & 0xFF;
-    bytes[4] = (n >> 24) & 0xFF;
-    bytes[5] = (n >> 16) & 0xFF;
-    bytes[6] = (n >> 8) & 0xFF;
-    bytes[7] = n & 0xFF;
+    bytes[0] = ((uint64_t)n >> 56) & 0xFF;
+    bytes[1] = ((uint64_t)n >> 48) & 0xFF;
+    bytes[2] = ((uint64_t)n >> 40) & 0xFF;
+    bytes[3] = ((uint64_t)n >> 32) & 0xFF;
+    bytes[4] = ((uint64_t)n >> 24) & 0xFF;
+    bytes[5] = ((uint64_t)n >> 16) & 0xFF;
+    bytes[6] = ((uint64_t)n >> 8) & 0xFF;
+    bytes[7] = (uint64_t)n & 0xFF;
 
     b->last = ngx_cpymem(b->last, bytes, sizeof(bytes));
 
@@ -28,14 +28,14 @@ ngx_rtmp_mp4_field_64(ngx_buf_t *b, uint64_t n)
 }
 
 ngx_int_t
-ngx_rtmp_mp4_field_32(ngx_buf_t *b, unsigned long n)
+ngx_rtmp_mp4_field_32(ngx_buf_t *b, uint32_t n)
 {
     u_char         bytes[4];
 
-    bytes[0] = (n >> 24) & 0xFF;
-    bytes[1] = (n >> 16) & 0xFF;
-    bytes[2] = (n >> 8) & 0xFF;
-    bytes[3] = n & 0xFF;
+    bytes[0] = ((uint32_t)n >> 24) & 0xFF;
+    bytes[1] = ((uint32_t)n >> 16) & 0xFF;
+    bytes[2] = ((uint32_t)n >> 8) & 0xFF;
+    bytes[3] = (uint32_t)n & 0xFF;
 
     b->last = ngx_cpymem(b->last, bytes, sizeof(bytes));
 
@@ -43,13 +43,13 @@ ngx_rtmp_mp4_field_32(ngx_buf_t *b, unsigned long n)
 }
 
 ngx_int_t
-ngx_rtmp_mp4_field_24(ngx_buf_t *b, unsigned long n)
+ngx_rtmp_mp4_field_24(ngx_buf_t *b, uint32_t n)
 {
     u_char         bytes[3];
 
-    bytes[0] = (n >> 16) & 0xFF;
-    bytes[1] = (n >> 8) & 0xFF;
-    bytes[2] = n & 0xFF;
+    bytes[0] = ((uint32_t)n >> 16) & 0xFF;
+    bytes[1] = ((uint32_t)n >> 8) & 0xFF;
+    bytes[2] = (uint32_t)n & 0xFF;
 
     b->last = ngx_cpymem(b->last, bytes, sizeof(bytes));
 
@@ -57,12 +57,12 @@ ngx_rtmp_mp4_field_24(ngx_buf_t *b, unsigned long n)
 }
 
 ngx_int_t
-ngx_rtmp_mp4_field_16(ngx_buf_t *b, unsigned long n)
+ngx_rtmp_mp4_field_16(ngx_buf_t *b, uint32_t n)
 {
     u_char         bytes[2];
 
-    bytes[0] = (n >> 8) & 0xFF;
-    bytes[1] = n & 0xFF;
+    bytes[0] = ((uint32_t)n >> 8) & 0xFF;
+    bytes[1] = (uint32_t)n & 0xFF;
 
     b->last = ngx_cpymem(b->last, bytes, sizeof(bytes));
 
