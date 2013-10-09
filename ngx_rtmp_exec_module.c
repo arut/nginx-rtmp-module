@@ -473,9 +473,9 @@ ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 
     e = dummy_conn->data;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, e->log, 0,
-                   "exec: child %ui exited; %s", (ngx_int_t) e->pid,
-                   e->respawn_timeout == NGX_CONF_UNSET_MSEC ? "respawning" :
+    ngx_log_error(NGX_LOG_INFO, e->log, 0,
+                  "exec: child %ui exited; %s", (ngx_int_t) e->pid,
+                  e->respawn_timeout == NGX_CONF_UNSET_MSEC ? "respawning" :
                                                                "ignoring");
 
     ngx_rtmp_exec_kill(e, 0);
@@ -515,9 +515,8 @@ ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal)
         return NGX_OK;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
-                   "exec: terminating child %ui", 
-                   (ngx_int_t) e->pid);
+    ngx_log_error(NGX_LOG_INFO, e->log, 0,
+                  "exec: terminating child %ui", (ngx_int_t) e->pid);
 
     e->active = 0;
     close(e->pipefd);
@@ -555,8 +554,8 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
 
     ec = e->conf;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
-                   "exec: starting child '%V'", &ec->cmd);
+    ngx_log_error(NGX_LOG_INFO, e->log, 0,
+                  "exec: starting child '%V'", &ec->cmd);
 
     if (e->active) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
