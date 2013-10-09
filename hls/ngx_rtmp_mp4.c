@@ -507,7 +507,8 @@ ngx_rtmp_mp4_write_video(ngx_rtmp_session_t *s, ngx_buf_t *b,
 
 
 ngx_int_t
-ngx_rtmp_mp4_write_esds(ngx_rtmp_session_t *s, ngx_buf_t *b) 
+ngx_rtmp_mp4_write_esds(ngx_rtmp_session_t *s, ngx_buf_t *b,
+                        ngx_rtmp_mp4_metadata_t metadata) 
 {
 
     u_char                         *pos;
@@ -528,7 +529,7 @@ ngx_rtmp_mp4_write_esds(ngx_rtmp_session_t *s, ngx_buf_t *b)
         aac_header_offset = 0;
     }
     else {
-        decoder_info = (aac->buf->last-aac->buf->pos)-2;
+        decoder_info = (aac->buf->last-aac->buf->pos);
         aac_header_offset = 2;
     }
     pos = b->last;
@@ -540,17 +541,18 @@ ngx_rtmp_mp4_write_esds(ngx_rtmp_session_t *s, ngx_buf_t *b)
 
     ngx_rtmp_mp4_field_32(b, 0); /* version */
     /* length of the rest of the box */
-    ngx_rtmp_mp4_put_descr(b, 0x03, 23+decoder_info); 
+    ngx_rtmp_mp4_put_descr(b, 0x03, 21+decoder_info); 
     ngx_rtmp_mp4_field_16(b, 1); /* track id */ 
     ngx_rtmp_mp4_field_8(b, 0x00); /* flags */
     /* length of the rest of the box */
-    ngx_rtmp_mp4_put_descr(b, 0x04, 15+decoder_info); 
-    ngx_rtmp_mp4_field_8(b, 0x40); /* codec id */
+    ngx_rtmp_mp4_put_descr(b, 0x04, 13+decoder_info); 
+    ngx_rtmp_mp4_field_8(b, metadata.audio_codec == NGX_RTMP_AUDIO_AAC ? 0x40 :
+                            0x6B); /* codec id */
     ngx_rtmp_mp4_field_8(b, 0x15); /* audio stream */
     ngx_rtmp_mp4_field_24(b, 0); /* buffersize? */
-    /* bitrate TODO: should probably set it dynamically*/
+    /* Next two fields are bitrate. */
     ngx_rtmp_mp4_field_32(b, 0x0001F151); 
-    ngx_rtmp_mp4_field_32(b, 0x0001F14D); /* I really dont know */
+    ngx_rtmp_mp4_field_32(b, 0x0001F14D); 
 
     if (aac) {
         ngx_rtmp_mp4_put_descr(b, 0x05, decoder_info);
@@ -592,7 +594,7 @@ ngx_rtmp_mp4_write_audio(ngx_rtmp_session_t *s, ngx_buf_t *b,
     ngx_rtmp_mp4_field_16(b, metadata.sample_rate); /* sample rate */
     ngx_rtmp_mp4_field_16(b, 0); /* reserved */
 
-    ngx_rtmp_mp4_write_esds(s, b);
+    ngx_rtmp_mp4_write_esds(s, b, metadata);
 
     ngx_rtmp_mp4_field_32(b, 8); /* size */
     ngx_rtmp_mp4_field_32(b, 0); /* null tag */
@@ -825,7 +827,7 @@ ngx_rtmp_mp4_write_mvex(ngx_buf_t *b, ngx_rtmp_mp4_metadata_t metadata)
                      metadata.frame_rate : NGX_RTMP_MP4_TIMESCALE;
     }
     else {
-        sample_dur = 1024;
+        sample_dur = metadata.audio_codec == NGX_RTMP_AUDIO_AAC ? 1024 : 1152;
     }
 
     pos = b->last;
