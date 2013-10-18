@@ -1057,7 +1057,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
     if (!rctx->initialized) {
 
         rctx->initialized = 1;
-        rctx->epoch = h->timestamp + rctx->time_shift;
+        rctx->epoch = h->timestamp - rctx->time_shift;
 
         if (rctx->file.offset == 0 &&
             ngx_rtmp_record_write_header(&rctx->file) != NGX_OK)
