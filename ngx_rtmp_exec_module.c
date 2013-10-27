@@ -281,7 +281,7 @@ ngx_module_t  ngx_rtmp_exec_module = {
 
 
 static void
-ngx_rtmp_exec_eval_ctx_str(void *sctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
+ngx_rtmp_exec_eval_ctx_cstr(void *sctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
 {
     ngx_rtmp_session_t  *s = sctx;
 
@@ -299,6 +299,23 @@ ngx_rtmp_exec_eval_ctx_str(void *sctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
 
 
 static void
+ngx_rtmp_exec_eval_ctx_str(void *sctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
+{
+    ngx_rtmp_session_t  *s = sctx;
+
+    ngx_rtmp_exec_ctx_t  *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_exec_module);
+    if (ctx == NULL) {
+        ret->len = 0;
+        return;
+    }
+
+    *ret = * (ngx_str_t *) ((u_char *) ctx + e->offset);
+}
+
+
+static void
 ngx_rtmp_exec_eval_pctx_str(void *ctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
 {
     *ret = *(ngx_str_t *) ((u_char *) ctx + e->offset);
@@ -308,11 +325,11 @@ ngx_rtmp_exec_eval_pctx_str(void *ctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
 static ngx_rtmp_eval_t ngx_rtmp_exec_push_specific_eval[] = {
 
     { ngx_string("name"),
-      ngx_rtmp_exec_eval_ctx_str,
+      ngx_rtmp_exec_eval_ctx_cstr,
       offsetof(ngx_rtmp_exec_ctx_t, name) },
 
     { ngx_string("args"),
-      ngx_rtmp_exec_eval_ctx_str,
+      ngx_rtmp_exec_eval_ctx_cstr,
       offsetof(ngx_rtmp_exec_ctx_t, args) },
 
     ngx_rtmp_null_eval
@@ -349,11 +366,11 @@ static ngx_rtmp_eval_t * ngx_rtmp_exec_pull_eval[] = {
 static ngx_rtmp_eval_t ngx_rtmp_exec_event_specific_eval[] = {
 
     { ngx_string("name"),
-      ngx_rtmp_exec_eval_ctx_str,
+      ngx_rtmp_exec_eval_ctx_cstr,
       offsetof(ngx_rtmp_exec_ctx_t, name) },
 
     { ngx_string("args"),
-      ngx_rtmp_exec_eval_ctx_str,
+      ngx_rtmp_exec_eval_ctx_cstr,
       offsetof(ngx_rtmp_exec_ctx_t, args) },
 
     { ngx_string("path"),
@@ -1291,6 +1308,9 @@ ngx_rtmp_exec_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
 
     ngx_rtmp_exec_unmanaged(s, &eacf->conf[NGX_RTMP_EXEC_RECORD_DONE],
                             "record_done");
+
+    ngx_str_null(&v->recorder);
+    ngx_str_null(&v->path);
 
 next:
     return next_record_done(s, v);
