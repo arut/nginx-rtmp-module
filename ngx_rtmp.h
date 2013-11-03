@@ -221,6 +221,7 @@ typedef struct {
     ngx_msec_t              epoch;
     ngx_msec_t              peer_epoch;
     ngx_msec_t              base_time;
+    uint32_t                current_time;
 
     /* ping */
     ngx_event_t             ping_evt;

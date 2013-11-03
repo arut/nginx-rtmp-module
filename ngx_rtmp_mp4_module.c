@@ -2271,6 +2271,8 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
             return NGX_AGAIN;
         }
 
+        s->current_time = timestamp;
+
         if (ngx_rtmp_mp4_next(s, t) != NGX_OK) {
             continue;
         }

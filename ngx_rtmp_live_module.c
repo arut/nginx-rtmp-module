@@ -718,6 +718,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                    "live: %s packet timestamp=%uD",
                    type_s, h->timestamp);
 
+    s->current_time = h->timestamp;
+
     peers = 0;
     apkt = NULL;
     aapkt = NULL;
@@ -917,6 +919,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                 cs->timestamp = lh.timestamp;
                 cs->active = 1;
+                ss->current_time = cs->timestamp;
 
             } else {
 
@@ -938,6 +941,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                 cs->timestamp = ch.timestamp;
                 cs->active = 1;
+                ss->current_time = cs->timestamp;
 
                 ++peers;
 
@@ -971,6 +975,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         cs->timestamp += delta;
         ++peers;
+        ss->current_time = cs->timestamp;
     }
 
     if (rpkt) {
