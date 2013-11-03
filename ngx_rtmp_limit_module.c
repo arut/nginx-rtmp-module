@@ -1,5 +1,6 @@
+
 /*
- * Copyright (c) 2013 Roman Arutyunyan
+ * Copyright (C) Roman Arutyunyan
  */
 
 
