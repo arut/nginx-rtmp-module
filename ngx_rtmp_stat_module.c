@@ -7,7 +7,9 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <nginx.h>
 #include "ngx_rtmp.h"
+#include "ngx_rtmp_version.h"
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_codec_module.h"
@@ -651,7 +653,11 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
     NGX_RTMP_STAT_L("<rtmp>\r\n");
 
 #ifdef NGINX_VERSION
-    NGX_RTMP_STAT_L("<version>" NGINX_VERSION "</version>\r\n");
+    NGX_RTMP_STAT_L("<nginx_version>" NGINX_VERSION "</nginx_version>\r\n");
+#endif
+
+#ifdef NGINX_RTMP_VERSION
+    NGX_RTMP_STAT_L("<nginx_rtmp_version>" NGINX_RTMP_VERSION "</nginx_rtmp_version>\r\n");
 #endif
 
 #ifdef NGX_COMPILER
