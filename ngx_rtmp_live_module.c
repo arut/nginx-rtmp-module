@@ -752,7 +752,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         lh.timestamp = cs->timestamp;
     }
 
-    clh = ch;
+    clh = lh;
     clh.type = (h->type == NGX_RTMP_MSG_AUDIO ? NGX_RTMP_MSG_VIDEO :
                                                 NGX_RTMP_MSG_AUDIO);
 
