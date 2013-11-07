@@ -94,6 +94,13 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, play_restart),
       NULL },
 
+    { ngx_string("idle_streams"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, idle_streams),
+      NULL },
+
     { ngx_string("drop_idle_publisher"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_rtmp_live_set_msec_slot,
@@ -153,6 +160,7 @@ ngx_rtmp_live_create_app_conf(ngx_conf_t *cf)
     lacf->wait_video = NGX_CONF_UNSET;
     lacf->publish_notify = NGX_CONF_UNSET;
     lacf->play_restart = NGX_CONF_UNSET;
+    lacf->idle_streams = NGX_CONF_UNSET;
 
     return lacf;
 }
@@ -174,6 +182,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->wait_video, prev->wait_video, 0);
     ngx_conf_merge_value(conf->publish_notify, prev->publish_notify, 0);
     ngx_conf_merge_value(conf->play_restart, prev->play_restart, 0);
+    ngx_conf_merge_value(conf->idle_streams, prev->idle_streams, 1);
 
     conf->pool = ngx_create_pool(4096, &cf->cycle->new_log);
     if (conf->pool == NULL) {
@@ -505,8 +514,19 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
                    "live: join '%s'", name);
 
-    stream = ngx_rtmp_live_get_stream(s, name, 1);
-    if (stream == NULL) {
+    stream = ngx_rtmp_live_get_stream(s, name, publisher || lacf->idle_streams);
+
+    if (stream == NULL ||
+        !(publisher || (*stream)->publishing || lacf->idle_streams))
+    {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "live: stream not found");
+
+        ngx_rtmp_send_status(s, "NetStream.Play.StreamNotFound", "error",
+                             "No such stream");
+
+        ngx_rtmp_finalize_session(s);
+
         return;
     }
 
@@ -546,7 +566,8 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
 static ngx_int_t
 ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 {
-    ngx_rtmp_live_ctx_t            *ctx, **cctx;
+    ngx_rtmp_session_t             *ss;
+    ngx_rtmp_live_ctx_t            *ctx, **cctx, *pctx;
     ngx_rtmp_live_stream_t        **stream;
     ngx_rtmp_live_app_conf_t       *lacf;
 
@@ -587,6 +608,17 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     if (ctx->publishing) {
         ngx_rtmp_send_status(s, "NetStream.Unpublish.Success",
                              "status", "Stop publishing");
+    }
+
+    if (!lacf->idle_streams) {
+        for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
+            if (pctx->publishing == 0) {
+                ss = pctx->session;
+                ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0, 
+                               "live: no publisher");
+                ngx_rtmp_finalize_session(ss);
+            }
+        }
     }
 
     if (ctx->stream->ctx) {
