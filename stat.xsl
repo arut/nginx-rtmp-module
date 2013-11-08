@@ -284,7 +284,15 @@
         </xsl:attribute>
         <td><xsl:value-of select="id"/></td>
         <td><xsl:call-template name="clientstate"/></td>
-        <td><xsl:value-of select="address"/></td>
+        <td>
+            <a target="_blank">
+                <xsl:attribute name="href">
+                    http://apps.db.ripe.net/search/query.html&#63;searchtext=<xsl:value-of select="address"/>
+                </xsl:attribute>
+                <xsl:attribute name="title">whois</xsl:attribute>
+                <xsl:value-of select="address"/>
+            </a>
+        </td>
         <td><xsl:value-of select="flashver"/></td>
         <td>
             <a target="_blank">
