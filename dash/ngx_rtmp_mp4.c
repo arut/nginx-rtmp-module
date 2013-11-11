@@ -1014,7 +1014,7 @@ ngx_rtmp_mp4_write_trun(ngx_buf_t *b, uint32_t sample_count,
         ngx_rtmp_mp4_field_32(b, 0); /* first sample flags */
     }
 
-    for (i = 1; i <= sample_count; i++) {
+    for (i = 0; i < sample_count; i++) {
         ngx_rtmp_mp4_field_32(b, sample_sizes[i]); 
     }
 
