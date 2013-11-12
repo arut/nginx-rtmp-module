@@ -31,6 +31,7 @@ typedef struct {
     ngx_uint_t                          opened;
     ngx_uint_t                          mdat_size;
     ngx_uint_t                          sample_count;
+    ngx_uint_t                          sample_mask;
     ngx_fd_t                            fd;
     char                                type;
     uint32_t                            earliest_pres_time;
@@ -170,7 +171,6 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     ngx_fd_t                   fd;
     ngx_str_t                  playlist, playlist_bak;
     ngx_rtmp_dash_ctx_t       *ctx;
-    ngx_rtmp_live_ctx_t       *live_ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
     ngx_rtmp_dash_app_conf_t  *dacf;
 
@@ -179,11 +179,8 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
-    live_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
 
-    if (dacf == NULL || ctx == NULL || codec_ctx == NULL || 
-        live_ctx == NULL || live_ctx->stream == NULL)
-    {
+    if (dacf == NULL || ctx == NULL || codec_ctx == NULL) {
         return NGX_ERROR;
     }
 
@@ -228,9 +225,9 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "          frameRate=\"%ui\"\n"                                            \
     "          sar=\"1:1\"\n"                                                  \
     "          startWithSAP=\"1\"\n"                                           \
-    "          bandwidth=\"%ui\">\n"                                           \
+    "          bandwidth=\"0\">\n"                                             \
     "        <SegmentTemplate\n"                                               \
-    "            presentationTimeOffset=\"%ui\"\n"                             \
+    "            presentationTimeOffset=\"0\"\n"                               \
     "            timescale=\"1000\"\n"                                         \
     "            duration=\"%ui\"\n"                                           \
     "            media=\"%V-$Number$.m4v\"\n"                                  \
@@ -253,10 +250,10 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "          codecs=\"mp4a.%s\"\n"                                           \
     "          audioSamplingRate=\"%ui\"\n"                                    \
     "          startWithSAP=\"1\"\n"                                           \
-    "          bandwidth=\"130685\">\n"                                        \
+    "          bandwidth=\"0\">\n"                                             \
     "        <SegmentTemplate\n"                                               \
-    "            presentationTimeOffset=\"%ui\"\n"                             \
-    "            timescale=\"%ui\"\n"                                          \
+    "            presentationTimeOffset=\"0\"\n"                               \
+    "            timescale=\"1000\"\n"                                         \
     "            duration=\"%ui\"\n"                                           \
     "            media=\"%V-$Number$.m4a\"\n"                                  \
     "            startNumber=\"0\"\n"                                          \
@@ -281,8 +278,6 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          codec_ctx->width, 
                          codec_ctx->height,
                          codec_ctx->frame_rate, 
-                         (ngx_uint_t) (live_ctx->stream->bw_in.bandwidth * 8), 
-                         (ngx_uint_t) 0,//ctx->video.earliest_pres_time,
                          (ngx_uint_t) dacf->fraglen,
                          &ctx->name,
                          &ctx->name);
@@ -294,11 +289,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ?
                          "40.2" : "6b",
                          codec_ctx->sample_rate,
-                         (ngx_uint_t) (ctx->audio.earliest_pres_time * 
-                                       (float) codec_ctx->sample_rate / 1000),
-                         codec_ctx->sample_rate,
-                         (ngx_uint_t) (dacf->fraglen * codec_ctx->sample_rate
-                                       / 1000),
+                         (ngx_uint_t) dacf->fraglen,
                          &ctx->name, 
                          &ctx->name);
         n = ngx_write_fd(fd, buffer, p - buffer);
@@ -372,6 +363,7 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     metadata.audio = 0;
     metadata.video = 1;
 
+    /*TODO: buffer control*/
     ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT, &metadata); 
     ngx_rtmp_mp4_write_moov(s, &b, &metadata);
 
@@ -401,6 +393,7 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     metadata.video = 0;
     metadata.audio = 1;
 
+    /*TODO: buffer control*/
     ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT, &metadata); 
     ngx_rtmp_mp4_write_moov(s, &b, &metadata);
 
@@ -417,8 +410,7 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
 
 
 static void
-ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t,
-    ngx_uint_t sample_rate)
+ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
 {
     u_char               *pos, *pos1;
     size_t                left;
@@ -451,13 +443,12 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t,
                    "dash: fragment earliest pts: %uD", t->earliest_pres_time);
 
     ngx_rtmp_mp4_write_moof(&b, t->earliest_pres_time, t->sample_count,
-                            t->samples, t->id, sample_rate);
+                            t->samples, t->sample_mask, t->id);
     pos1 = b.last;
     b.last = pos;
 
-    ngx_rtmp_mp4_write_sidx(s, &b, t->mdat_size + 8 + (pos1 - (pos + 44)),
-                            t->earliest_pres_time, t->latest_pres_time,
-                            sample_rate);
+    ngx_rtmp_mp4_write_sidx(&b, t->mdat_size + 8 + (pos1 - (pos + 44)),
+                            t->earliest_pres_time, t->latest_pres_time);
     b.last = pos1;
     ngx_rtmp_mp4_write_mdat(&b, t->mdat_size + 8);
 
@@ -518,21 +509,19 @@ done:
 static ngx_int_t 
 ngx_rtmp_dash_close_fragments(ngx_rtmp_session_t *s)
 {
-    ngx_rtmp_dash_ctx_t   *ctx;
-    ngx_rtmp_codec_ctx_t  *codec_ctx;
+    ngx_rtmp_dash_ctx_t  *ctx;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "dash: close fragments");
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
-    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
 
     if (!ctx->opened) {
         return NGX_OK;
     }
 
-    ngx_rtmp_dash_close_fragment(s, &ctx->video, 0);
-    ngx_rtmp_dash_close_fragment(s, &ctx->audio, codec_ctx->sample_rate);
+    ngx_rtmp_dash_close_fragment(s, &ctx->video);
+    ngx_rtmp_dash_close_fragment(s, &ctx->audio);
 
     ngx_rtmp_dash_write_playlist(s);
 
@@ -573,6 +562,16 @@ ngx_rtmp_dash_open_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t,
     t->latest_pres_time = 0;
     t->mdat_size = 0; 
     t->opened = 1;
+
+    if (type == 'v') {
+        t->sample_mask = NGX_RTMP_MP4_SAMPLE_SIZE|
+                         NGX_RTMP_MP4_SAMPLE_DURATION|
+                         NGX_RTMP_MP4_SAMPLE_DELAY|
+                         NGX_RTMP_MP4_SAMPLE_KEY;
+    } else {
+        t->sample_mask = NGX_RTMP_MP4_SAMPLE_SIZE|
+                         NGX_RTMP_MP4_SAMPLE_DURATION;
+    }
 
     return NGX_OK;
 }
@@ -774,7 +773,7 @@ ngx_rtmp_dash_update_fragments(ngx_rtmp_session_t *s, ngx_int_t boundary,
 
 static ngx_int_t
 ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
-    ngx_rtmp_dash_track_t *t, ngx_int_t boundary, uint32_t timestamp)
+    ngx_rtmp_dash_track_t *t, ngx_int_t key, uint32_t timestamp)
 {
     u_char               *p;
     size_t                size, bsize;
@@ -798,22 +797,17 @@ ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
         size += bsize;
     }
 
-    t->latest_pres_time = timestamp;
-
-    if (t->sample_count > 0) {
-        t->samples[t->sample_count - 1].duration = timestamp -
-                                      t->samples[t->sample_count - 1].timestamp;
-    }
-
     if (!ctx->opened) {
         ngx_rtmp_dash_open_fragments(s);
     }
 
-    ngx_rtmp_dash_update_fragments(s, boundary, timestamp);
+    ngx_rtmp_dash_update_fragments(s, key, timestamp);
 
     if (t->sample_count == 0) {
         t->earliest_pres_time = timestamp;
     }
+
+    t->latest_pres_time = timestamp;
 
     if (t->sample_count < NGX_RTMP_DASH_MAX_SAMPLES) {
 
@@ -827,7 +821,12 @@ ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
         t->samples[t->sample_count].size = (uint32_t) size;
         t->samples[t->sample_count].duration = 0;
         t->samples[t->sample_count].timestamp = timestamp;
-        t->samples[t->sample_count].key = (boundary ? 1 : 0);
+        t->samples[t->sample_count].key = (key ? 1 : 0);
+
+        if (t->sample_count > 0) {
+            t->samples[t->sample_count - 1].duration = timestamp -
+                                      t->samples[t->sample_count - 1].timestamp;
+        }
 
         t->sample_count++;
         t->mdat_size += (ngx_uint_t) size;
