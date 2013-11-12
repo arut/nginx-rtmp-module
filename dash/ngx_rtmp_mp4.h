@@ -10,6 +10,15 @@
 
 
 typedef struct {
+    uint32_t    size;
+    uint32_t    duration;
+    uint32_t    delay;
+    uint32_t    timestamp;
+    unsigned    key:1;
+} ngx_rtmp_mp4_sample_t;
+
+
+typedef struct {
     ngx_uint_t  width;
     ngx_uint_t  height;
     ngx_uint_t  audio;
@@ -31,7 +40,7 @@ ngx_int_t ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b, int type,
 ngx_int_t ngx_rtmp_mp4_write_moov(ngx_rtmp_session_t *s, ngx_buf_t *b, 
     ngx_rtmp_mp4_metadata_t *metadata);
 ngx_int_t ngx_rtmp_mp4_write_moof(ngx_buf_t *b, ngx_uint_t earliest_pres_time, 
-    uint32_t sample_count, uint32_t sample_sizes[128], uint32_t index,
+    uint32_t sample_count, ngx_rtmp_mp4_sample_t *samples, uint32_t index,
     ngx_uint_t sample_rate);
 ngx_int_t ngx_rtmp_mp4_write_sidx(ngx_rtmp_session_t *s, ngx_buf_t *b,
     ngx_uint_t reference_size, ngx_uint_t earliest_pres_time, 

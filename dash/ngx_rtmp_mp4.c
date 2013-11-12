@@ -877,14 +877,14 @@ ngx_rtmp_mp4_write_mvex(ngx_buf_t *b, ngx_rtmp_mp4_metadata_t *metadata)
     b->last = ngx_cpymem(b->last, "mvex", sizeof("mvex")-1);
 
     /* just write the trex and mehd in here too */
-
+#if 0
     ngx_rtmp_mp4_field_32(b, 16);
 
     b->last = ngx_cpymem(b->last, "mehd", sizeof("mehd")-1);
 
     ngx_rtmp_mp4_field_32(b, 0); /* version & flags */
     ngx_rtmp_mp4_field_32(b, 0x000D8D2A); /* frag duration */
-
+#endif
     ngx_rtmp_mp4_field_32(b, 0x20);
 
     b->last = ngx_cpymem(b->last, "trex", sizeof("trex")-1);
@@ -984,38 +984,29 @@ ngx_rtmp_mp4_write_tfdt(ngx_buf_t *b, ngx_uint_t earliest_pres_time,
 
 static ngx_int_t
 ngx_rtmp_mp4_write_trun(ngx_buf_t *b, uint32_t sample_count, 
-    uint32_t sample_sizes[128], u_char *moof_pos, ngx_uint_t sample_rate) 
+    ngx_rtmp_mp4_sample_t *samples, u_char *moof_pos)
 {
-    u_char               *pos;
-    uint32_t             i, offset;
+    u_char    *pos;
+    uint32_t   i, offset;
 
     pos = b->last;
 
-    if (sample_rate > 0) {
-        /* moof stuff + trun stuff + sample entries + mdat header */
-        offset = (pos-moof_pos) + 20 + (sample_count*4) + 8;  
-    }
-    else {
-        /* moof stuff + trun stuff + sample entries + mdat header */
-        offset = (pos-moof_pos) + 24 + (sample_count*4) + 8;  
-    }
-    
+    offset = (pos - moof_pos) + 20 + (sample_count * 4 * 4) + 8;  
 
     /* box size placeholder */
     ngx_rtmp_mp4_field_32(b, 0);
 
-    b->last = ngx_cpymem(b->last, "trun", sizeof("trun")-1);
+    b->last = ngx_cpymem(b->last, "trun", sizeof("trun") - 1);
 
-    /* version and flags */
-    ngx_rtmp_mp4_field_32(b, sample_rate > 0 ? 0x00000201 : 0x00000205); 
-    ngx_rtmp_mp4_field_32(b, sample_count); /* sample count */
-    ngx_rtmp_mp4_field_32(b, offset); /* data offset */
-    if (sample_rate == 0) {
-        ngx_rtmp_mp4_field_32(b, 0); /* first sample flags */
-    }
+    ngx_rtmp_mp4_field_32(b, 0x00000f01); 
+    ngx_rtmp_mp4_field_32(b, sample_count);
+    ngx_rtmp_mp4_field_32(b, offset);
 
     for (i = 0; i < sample_count; i++) {
-        ngx_rtmp_mp4_field_32(b, sample_sizes[i]); 
+        ngx_rtmp_mp4_field_32(b, samples[i].duration); 
+        ngx_rtmp_mp4_field_32(b, samples[i].size); 
+        ngx_rtmp_mp4_field_32(b, samples[i].key ? 0x00000000 : 0x00010000);
+        ngx_rtmp_mp4_field_32(b, samples[i].delay); 
     }
 
     ngx_rtmp_mp4_update_box_size(b, pos);
@@ -1026,7 +1017,7 @@ ngx_rtmp_mp4_write_trun(ngx_buf_t *b, uint32_t sample_count,
 
 static ngx_int_t
 ngx_rtmp_mp4_write_traf(ngx_buf_t *b, ngx_uint_t earliest_pres_time, 
-    uint32_t sample_count, uint32_t sample_sizes[128], u_char *moof_pos,
+    uint32_t sample_count, ngx_rtmp_mp4_sample_t *samples, u_char *moof_pos,
     ngx_uint_t sample_rate)
 {
     u_char         *pos;
@@ -1040,8 +1031,7 @@ ngx_rtmp_mp4_write_traf(ngx_buf_t *b, ngx_uint_t earliest_pres_time,
 
     ngx_rtmp_mp4_write_tfhd(b, sample_rate);
     ngx_rtmp_mp4_write_tfdt(b, earliest_pres_time, sample_rate);
-    ngx_rtmp_mp4_write_trun(b, sample_count, sample_sizes, moof_pos, 
-                            sample_rate);
+    ngx_rtmp_mp4_write_trun(b, sample_count, samples, moof_pos);
 
     ngx_rtmp_mp4_update_box_size(b, pos);
 
@@ -1123,7 +1113,7 @@ ngx_rtmp_mp4_write_sidx(ngx_rtmp_session_t *s, ngx_buf_t *b,
 
 ngx_int_t
 ngx_rtmp_mp4_write_moof(ngx_buf_t *b, ngx_uint_t earliest_pres_time, 
-    uint32_t sample_count, uint32_t sample_sizes[128], uint32_t index,
+    uint32_t sample_count, ngx_rtmp_mp4_sample_t *samples, uint32_t index,
     ngx_uint_t sample_rate) 
 {
     u_char         *pos;
@@ -1136,7 +1126,7 @@ ngx_rtmp_mp4_write_moof(ngx_buf_t *b, ngx_uint_t earliest_pres_time,
     b->last = ngx_cpymem(b->last, "moof", sizeof("moof")-1);
 
     ngx_rtmp_mp4_write_mfhd(b, index);
-    ngx_rtmp_mp4_write_traf(b, earliest_pres_time, sample_count, sample_sizes,
+    ngx_rtmp_mp4_write_traf(b, earliest_pres_time, sample_count, samples,
                             pos, sample_rate);
 
     ngx_rtmp_mp4_update_box_size(b, pos);
