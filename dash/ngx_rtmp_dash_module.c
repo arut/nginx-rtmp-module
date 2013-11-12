@@ -505,8 +505,9 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
         return;
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "dash: close fragment id=%ui, type=%c", t->id, t->type);
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "dash: close fragment id=%ui, type=%c, pts=%uD",
+                   t->id, t->type, t->earliest_pres_time);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
 
@@ -518,9 +519,6 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
 
     pos = b.last;
     b.last += 44; /* leave room for sidx */
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "dash: fragment earliest pts: %uD", t->earliest_pres_time);
 
     ngx_rtmp_mp4_write_moof(&b, t->earliest_pres_time, t->sample_count,
                             t->samples, t->sample_mask, t->id);
@@ -593,14 +591,13 @@ ngx_rtmp_dash_close_fragments(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_dash_ctx_t  *ctx;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "dash: close fragments");
-
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
-
     if (!ctx->opened) {
         return NGX_OK;
     }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "dash: close fragments");
 
     ngx_rtmp_dash_close_fragment(s, &ctx->video);
     ngx_rtmp_dash_close_fragment(s, &ctx->audio);
@@ -625,6 +622,9 @@ ngx_rtmp_dash_open_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t,
     if (t->opened) {
         return NGX_OK;
     }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "dash: open fragment id=%ui, type='%c'", id, type);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
 
@@ -675,15 +675,9 @@ ngx_rtmp_dash_open_fragments(ngx_rtmp_session_t *s)
         return NGX_OK;
     }
 
-    if (ctx->has_video) {
-        ngx_rtmp_dash_open_fragment(s, &ctx->video, ctx->id, 'v');
-    }
+    ngx_rtmp_dash_open_fragment(s, &ctx->video, ctx->id, 'v');
 
-    if (ctx->has_audio) {
-        ngx_rtmp_dash_open_fragment(s, &ctx->audio, ctx->id, 'a');
-    }
-
-    //ctx->id++;
+    ngx_rtmp_dash_open_fragment(s, &ctx->audio, ctx->id, 'a');
 
     ctx->opened = 1;
 

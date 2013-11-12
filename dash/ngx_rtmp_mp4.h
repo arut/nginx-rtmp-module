@@ -16,28 +16,28 @@
 
 
 typedef struct {
-    uint32_t    size;
-    uint32_t    duration;
-    uint32_t    delay;
-    uint32_t    timestamp;
-    unsigned    key:1;
+    uint32_t        size;
+    uint32_t        duration;
+    uint32_t        delay;
+    uint32_t        timestamp;
+    unsigned        key:1;
 } ngx_rtmp_mp4_sample_t;
 
 
 typedef struct {
-    ngx_uint_t  width;
-    ngx_uint_t  height;
-    ngx_uint_t  audio;
-    ngx_uint_t  video;
-    ngx_uint_t  sample_rate;
-    ngx_uint_t  frame_rate;
-    ngx_uint_t  audio_codec;
+    ngx_uint_t      width;
+    ngx_uint_t      height;
+    ngx_uint_t      audio;
+    ngx_uint_t      video;
+    ngx_uint_t      sample_rate;
+    ngx_uint_t      frame_rate;
+    ngx_uint_t      audio_codec;
 } ngx_rtmp_mp4_metadata_t;
 
 
 enum {
     NGX_RTMP_MP4_FILETYPE_INIT = 0,
-    NGX_RTMP_MP4_FILETYPE_SEG = 1
+    NGX_RTMP_MP4_FILETYPE_SEG
 };
 
 

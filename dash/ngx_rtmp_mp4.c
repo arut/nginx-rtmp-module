@@ -496,7 +496,7 @@ ngx_rtmp_mp4_write_avcc(ngx_rtmp_session_t *s, ngx_buf_t *b,
 
     pos = ngx_rtmp_mp4_start_box(b, "avcC");
 
-    /* assume config fits ont chunk (highly probable) */
+    /* assume config fits one chunk (highly probable) */
 
     /* check for start code */
     for (p = in->buf->pos; p <= in->buf->last; p++) {
