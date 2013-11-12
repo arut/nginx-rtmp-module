@@ -248,7 +248,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "    xmlns=\"urn:mpeg:dash:schema:mpd:2011\"\n"                            \
     "    availabilityStartTime=\"%V\"\n"                                       \
     "    minimumUpdatePeriod=\"PT%uiS\"\n"                                     \
-    "    minBufferTime=\"PT1S\"\n"                                             \
+    "    minBufferTime=\"PT%uiS\"\n"                                           \
     "    timeShiftBufferDepth=\"PT0H0M0.00S\"\n"                               \
     "    profiles=\"urn:mpeg:dash:profile:isoff-live:2011\">\n"                \
     "  <Period start=\"PT0S\" id=\"dash\">\n"
@@ -328,7 +328,10 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     last = buffer + sizeof(buffer);
 
     p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_HEADER,
-                     &ctx->start_time, (ngx_uint_t) (dacf->fraglen / 1000));
+                     &ctx->start_time,
+                     (ngx_uint_t) (dacf->fraglen / 1000),
+                     (ngx_uint_t) (dacf->fraglen / 500));
+
     n = ngx_write_fd(fd, buffer, p - buffer);
 
     if (ctx->has_video) {
