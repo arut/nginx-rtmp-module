@@ -208,6 +208,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 {
     u_char                    *p, *last;
     ssize_t                    n;
+    uint32_t                   time_offset;
     ngx_fd_t                   fd;
     ngx_str_t                  playlist, playlist_bak;
     ngx_uint_t                 i;
@@ -270,7 +271,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "          startWithSAP=\"1\"\n"                                           \
     "          bandwidth=\"0\">\n"                                             \
     "        <SegmentTemplate\n"                                               \
-    "            presentationTimeOffset=\"0\"\n"                               \
+    "            presentationTimeOffset=\"%uD\"\n"                             \
     "            timescale=\"1000\"\n"                                         \
     "            media=\"%V-$Time$.m4v\"\n"                                    \
     "            initialization=\"%V-init.m4v\">\n"                            \
@@ -303,7 +304,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "          startWithSAP=\"1\"\n"                                           \
     "          bandwidth=\"0\">\n"                                             \
     "        <SegmentTemplate\n"                                               \
-    "            presentationTimeOffset=\"0\"\n"                               \
+    "            presentationTimeOffset=\"%uD\"\n"                             \
     "            timescale=\"1000\"\n"                                         \
     "            media=\"%V-$Time$.m4a\"\n"                                    \
     "            initialization=\"%V-init.m4a\">\n"                            \
@@ -321,6 +322,9 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "  </Period>\n"                                                            \
     "</MPD>\n"
 
+    f = ngx_rtmp_dash_get_frag(s, 0);
+    time_offset = f->timestamp;
+
     last = buffer + sizeof(buffer);
 
     p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_HEADER,
@@ -335,6 +339,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          codec_ctx->width, 
                          codec_ctx->height,
                          codec_ctx->frame_rate, 
+                         time_offset,
                          &ctx->name,
                          &ctx->name);
 
@@ -354,6 +359,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ?
                          "40.2" : "6b",
                          codec_ctx->sample_rate,
+                         time_offset,
                          &ctx->name, 
                          &ctx->name);
 
