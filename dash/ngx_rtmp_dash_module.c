@@ -27,6 +27,12 @@ static ngx_int_t ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s);
 
 
 typedef struct {
+    uint32_t                            timestamp;
+    uint32_t                            duration;
+} ngx_rtmp_dash_frag_t;
+
+
+typedef struct {
     ngx_uint_t                          id;
     ngx_uint_t                          opened;
     ngx_uint_t                          mdat_size;
@@ -46,6 +52,10 @@ typedef struct {
     ngx_str_t                           name;
     ngx_str_t                           stream;
     ngx_str_t                           start_time;
+
+    ngx_uint_t                          nfrags;
+    ngx_uint_t                          frag;
+    ngx_rtmp_dash_frag_t               *frags; /* circular 2 * winfrags + 1 */
 
     unsigned                            opened:1;
     unsigned                            has_video:1;
@@ -150,6 +160,36 @@ ngx_module_t  ngx_rtmp_dash_module = {
 };
 
 
+static ngx_rtmp_dash_frag_t *
+ngx_rtmp_dash_get_frag(ngx_rtmp_session_t *s, ngx_int_t n)
+{
+    ngx_rtmp_dash_ctx_t       *ctx;
+    ngx_rtmp_dash_app_conf_t  *dacf;
+
+    dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
+
+    return &ctx->frags[(ctx->frag + n) % (dacf->winfrags * 2 + 1)];
+}
+
+
+static void
+ngx_rtmp_dash_next_frag(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_dash_ctx_t       *ctx;
+    ngx_rtmp_dash_app_conf_t  *dacf;
+
+    dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
+
+    if (ctx->nfrags == dacf->winfrags) {
+        ctx->frag++;
+    } else {
+        ctx->nfrags++;
+    }
+}
+
+
 static ngx_int_t
 ngx_rtmp_dash_rename_file(u_char *src, u_char *dst)
 {
@@ -173,6 +213,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     ngx_uint_t                 i;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
+    ngx_rtmp_dash_frag_t      *f;
     ngx_rtmp_dash_app_conf_t  *dacf;
 
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
@@ -297,10 +338,10 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          &ctx->name,
                          &ctx->name);
 
-        for (i = 0; i <= ctx->id; i++) {
+        for (i = 0; i < ctx->nfrags; i++) {
+            f = ngx_rtmp_dash_get_frag(s, i);
             p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_TIME,
-                             (uint32_t) dacf->fraglen * i,
-                             (uint32_t) dacf->fraglen);
+                             f->timestamp, f->duration);
         }
         
         p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_VIDEO_FOOTER);
@@ -316,10 +357,10 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          &ctx->name, 
                          &ctx->name);
 
-        for (i = 0; i <= ctx->id; i++) {
+        for (i = 0; i < ctx->nfrags; i++) {
+            f = ngx_rtmp_dash_get_frag(s, i);
             p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_TIME,
-                             (uint32_t) dacf->fraglen * i,
-                             (uint32_t) dacf->fraglen);
+                             f->timestamp, f->duration);
         }
 
         p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_AUDIO_FOOTER);
@@ -450,7 +491,7 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
     ngx_fd_t                   fd;
     ngx_buf_t                  b;
     ngx_rtmp_dash_ctx_t       *ctx;
-    ngx_rtmp_dash_app_conf_t  *dacf;
+    ngx_rtmp_dash_frag_t      *f;
 
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
 
@@ -461,7 +502,6 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "dash: close fragment id=%ui, type=%c", t->id, t->type);
 
-    dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
 
     b.start = buffer;
@@ -488,8 +528,10 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
 
     /* move the data down to make room for the headers */
 
+    f = ngx_rtmp_dash_get_frag(s, ctx->nfrags);
+
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "%uD.m4%c",
-                 (uint32_t) (t->id * dacf->fraglen), t->type) = 0;
+                 f->timestamp, t->type) = 0;
 
     fd = ngx_open_file(ctx->stream.data, NGX_FILE_RDWR,
                        NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
@@ -556,6 +598,8 @@ ngx_rtmp_dash_close_fragments(ngx_rtmp_session_t *s)
 
     ngx_rtmp_dash_close_fragment(s, &ctx->video);
     ngx_rtmp_dash_close_fragment(s, &ctx->audio);
+
+    ngx_rtmp_dash_next_frag(s);
 
     ngx_rtmp_dash_write_playlist(s);
 
@@ -647,6 +691,7 @@ ngx_rtmp_dash_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     u_char                    *p;
     size_t                     len;
     ngx_rtmp_dash_ctx_t       *ctx;
+    ngx_rtmp_dash_frag_t      *f;
     ngx_rtmp_dash_app_conf_t  *dacf;
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
@@ -670,6 +715,23 @@ ngx_rtmp_dash_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         }
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_dash_module);
 
+    } else {
+        if (ctx->opened) {
+            goto next;
+        }
+
+        f = ctx->frags;
+        ngx_memzero(ctx, sizeof(ngx_rtmp_dash_ctx_t));
+        ctx->frags = f;
+    }
+
+    if (ctx->frags == NULL) {
+        ctx->frags = ngx_pcalloc(s->connection->pool,
+                                 sizeof(ngx_rtmp_dash_frag_t) *
+                                 (dacf->winfrags * 2 + 1));
+        if (ctx->frags == NULL) {
+            return NGX_ERROR;
+        }
     }
 
     ctx->id = 0;
@@ -773,14 +835,14 @@ ngx_rtmp_dash_update_fragments(ngx_rtmp_session_t *s, ngx_int_t boundary,
 {
     ngx_int_t                  hit;
     ngx_rtmp_dash_ctx_t       *ctx;
+    ngx_rtmp_dash_frag_t      *f;
     ngx_rtmp_dash_app_conf_t  *dacf;
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
+    f = ngx_rtmp_dash_get_frag(s, ctx->nfrags);
 
-    /*TODO: non-zero initial timestamp */
-
-    hit = (timestamp >= (ctx->id + 1) * dacf->fraglen);
+    hit = (timestamp >= f->timestamp + dacf->fraglen);
 
     if (ctx->has_video && !hit) {
         boundary = 0;
@@ -798,9 +860,18 @@ ngx_rtmp_dash_update_fragments(ngx_rtmp_session_t *s, ngx_int_t boundary,
         boundary = 1;
     }
 
+    if (!ctx->opened) {
+        boundary = 1;
+    }
+
+    f->duration = (timestamp - f->timestamp);
+
     if (boundary) { 
         ngx_rtmp_dash_close_fragments(s);
         ngx_rtmp_dash_open_fragments(s);
+
+        f = ngx_rtmp_dash_get_frag(s, ctx->nfrags);
+        f->timestamp = timestamp;
     }
 }
 
@@ -809,13 +880,10 @@ static ngx_int_t
 ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
     ngx_rtmp_dash_track_t *t, ngx_int_t key, uint32_t timestamp)
 {
-    u_char               *p;
-    size_t                size, bsize;
-    ngx_rtmp_dash_ctx_t  *ctx;
+    u_char         *p;
+    size_t          size, bsize;
 
     static u_char   buffer[NGX_RTMP_DASH_BUFSIZE];
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
 
     p = buffer;
     size = 0;
@@ -829,10 +897,6 @@ ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
 
         p = ngx_cpymem(p, in->buf->pos, bsize);
         size += bsize;
-    }
-
-    if (!ctx->opened) {
-        ngx_rtmp_dash_open_fragments(s);
     }
 
     ngx_rtmp_dash_update_fragments(s, key, timestamp);
