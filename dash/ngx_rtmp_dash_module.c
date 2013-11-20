@@ -1138,10 +1138,21 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
             continue;
         }
 
-       if (name.len >= 4 && name.data[name.len - 4] == '.' &&
-                            name.data[name.len - 3] == 'm' &&
-                            name.data[name.len - 2] == '4' &&
-                            name.data[name.len - 1] == 'v')
+        if (name.len >= 9 && name.data[name.len - 9] == '-' &&
+                             name.data[name.len - 8] == 'i' &&
+                             name.data[name.len - 7] == 'n' &&
+                             name.data[name.len - 6] == 'i' &&
+                             name.data[name.len - 5] == 't' &&
+                             name.data[name.len - 4] == '.' &&
+                             name.data[name.len - 3] == 'm' &&
+                             name.data[name.len - 2] == '4')
+        {
+            continue;
+
+        } else if (name.len >= 4 && name.data[name.len - 4] == '.' &&
+                                    name.data[name.len - 3] == 'm' &&
+                                    name.data[name.len - 2] == '4' &&
+                                    name.data[name.len - 1] == 'v')
         {
             max_age = playlen / 500;
 
