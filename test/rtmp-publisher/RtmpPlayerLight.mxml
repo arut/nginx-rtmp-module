@@ -10,9 +10,14 @@
 			import mx.core.FlexGlobals;
 			import flash.display.StageDisplayState;
 			import mx.managers.SystemManager;
+            import org.osmf.events.MediaPlayerStateChangeEvent;
+            import org.osmf.events.TimeEvent;
+            import org.osmf.media.MediaPlayerState;
 
 			private var streamer:String;
 			private var file:String;
+            private var videoEventsDisabled:Boolean;
+            private var previousVideoTime:Number;
 
 			private function fullscreenListener(event:MouseEvent):void {
 				try {
@@ -28,6 +33,44 @@
 					Alert.show('Fullsceen error: ' + err);
 				}
 			}
+
+            private function resetVideo():void {           
+                videoEventsDisabled = true;
+
+                try {
+                    videoDisplay.source = "";
+                } catch (any:*) {}
+
+                setTimeout(resetVideoSource, 5000);
+            }
+
+            private function resetVideoSource():void {
+                videoEventsDisabled = false;
+                previousVideoTime = NaN;
+                videoDisplay.source = streamer + "/" + file;
+            }
+
+            protected function stateChangeListener(event:MediaPlayerStateChangeEvent):void {
+                if (videoEventsDisabled) {
+                    return;
+                }
+
+                if (event.state == MediaPlayerState.PLAYBACK_ERROR) {
+                    resetVideo();
+                }
+            }
+
+            protected function timeChangeListener(event:TimeEvent):void {
+                if (videoEventsDisabled) {
+                    return;
+                }
+
+                if (isNaN(event.time) && !isNaN(previousVideoTime)) {
+                    resetVideo();
+                } else {
+                    previousVideoTime = event.time;
+                }
+            }
 
 			private function init():void {
 				videoDisplay.mx_internal::videoPlayer.bufferTime = 1;
@@ -45,8 +88,10 @@
 				}
 
                 videoDisplay.addEventListener(MouseEvent.DOUBLE_CLICK, fullscreenListener);
-			    videoDisplay.source = streamer + "/" + file;
-				videoDisplay.play();
+                videoDisplay.addEventListener("MediaPlayerStateChange", stateChangeListener);
+                videoDisplay.addEventListener("currentTimeChange", timeChangeListener);
+
+                resetVideoSource();
 			}
 	    ]]>
 	  </fx:Script>
