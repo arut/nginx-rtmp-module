@@ -51,7 +51,7 @@ typedef struct {
     ngx_str_t                           playlist_bak;
     ngx_str_t                           name;
     ngx_str_t                           stream;
-    ngx_str_t                           start_time;
+    ngx_time_t                          start_time;
 
     ngx_uint_t                          nfrags;
     ngx_uint_t                          frag;
@@ -208,7 +208,6 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 {
     u_char                    *p, *last;
     ssize_t                    n;
-    uint32_t                   dur;
     ngx_fd_t                   fd;
     ngx_tm_t                   tm;
     ngx_str_t                  playlist, playlist_bak;
@@ -327,28 +326,29 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "  </Period>\n"                                                            \
     "</MPD>\n"
 
-    dur = ngx_rtmp_dash_get_frag(s, ctx->nfrags)->timestamp -
-          ngx_rtmp_dash_get_frag(s, 0)->timestamp;
-
-    ngx_localtime(ngx_cached_time->sec, &tm);
+    ngx_localtime(ctx->start_time.sec +
+                  ngx_rtmp_dash_get_frag(s, 0)->timestamp / 1000, &tm);
     
     *ngx_sprintf(start_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
                  tm.ngx_tm_year, tm.ngx_tm_mon,
                  tm.ngx_tm_mday, tm.ngx_tm_hour,
                  tm.ngx_tm_min, tm.ngx_tm_sec,
-                 ngx_cached_time->gmtoff < 0 ? '-' : '+',
-                 ngx_abs(ngx_cached_time->gmtoff / 60),
-                 ngx_abs(ngx_cached_time->gmtoff % 60)) = 0;
+                 ctx->start_time.gmtoff < 0 ? '-' : '+',
+                 ngx_abs(ctx->start_time.gmtoff / 60),
+                 ngx_abs(ctx->start_time.gmtoff % 60)) = 0;
 
-    ngx_localtime(ngx_cached_time->sec + dur / 1000, &tm);
+    ngx_localtime(ctx->start_time.sec +
+                  (ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->timestamp +
+                   ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->duration) / 1000,
+                  &tm);
     
-    *ngx_sprintf(start_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
+    *ngx_sprintf(end_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
                  tm.ngx_tm_year, tm.ngx_tm_mon,
                  tm.ngx_tm_mday, tm.ngx_tm_hour,
                  tm.ngx_tm_min, tm.ngx_tm_sec,
-                 ngx_cached_time->gmtoff < 0 ? '-' : '+',
-                 ngx_abs(ngx_cached_time->gmtoff / 60),
-                 ngx_abs(ngx_cached_time->gmtoff % 60)) = 0;
+                 ctx->start_time.gmtoff < 0 ? '-' : '+',
+                 ngx_abs(ctx->start_time.gmtoff / 60),
+                 ngx_abs(ctx->start_time.gmtoff % 60)) = 0;
 
     last = buffer + sizeof(buffer);
 
@@ -820,12 +820,7 @@ ngx_rtmp_dash_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
                    "dash: playlist='%V' playlist_bak='%V' stream_pattern='%V'",
                    &ctx->playlist, &ctx->playlist_bak, &ctx->stream);
 
-    /* start time for mpd */
-    ctx->start_time.data = ngx_palloc(s->connection->pool,
-                                      ngx_cached_http_log_iso8601.len);
-    ngx_memcpy(ctx->start_time.data, ngx_cached_http_log_iso8601.data,
-               ngx_cached_http_log_iso8601.len);
-    ctx->start_time.len = ngx_cached_http_log_iso8601.len;
+    ctx->start_time = *ngx_cached_time;
 
 next:
     return next_publish(s, v);
