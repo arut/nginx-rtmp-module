@@ -253,7 +253,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "    minimumUpdatePeriod=\"PT%uiS\"\n"                                     \
     "    minBufferTime=\"PT%uiS\"\n"                                           \
     "    timeShiftBufferDepth=\"PT0H0M0.00S\"\n"                               \
-    "    suggestedPresentationDelay=\"0\"\n"                                   \
+    "    suggestedPresentationDelay=\"PT%uiS\"\n"                              \
     "    profiles=\"urn:mpeg:dash:profile:isoff-live:2011\">\n"                \
     "  <Period start=\"PT0S\" id=\"dash\">\n"
 
@@ -356,7 +356,8 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                      start_time,
                      end_time,
                      (ngx_uint_t) (dacf->fraglen / 1000),
-                     (ngx_uint_t) (dacf->fraglen / 1000));
+                     (ngx_uint_t) (dacf->fraglen / 1000),
+                     (ngx_uint_t) (dacf->fraglen / 500));
 
     n = ngx_write_fd(fd, buffer, p - buffer);
 
