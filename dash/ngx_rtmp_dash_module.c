@@ -273,7 +273,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "          frameRate=\"%ui\"\n"                                            \
     "          sar=\"1:1\"\n"                                                  \
     "          startWithSAP=\"1\"\n"                                           \
-    "          bandwidth=\"0\">\n"                                             \
+    "          bandwidth=\"%ui\">\n"                                           \
     "        <SegmentTemplate\n"                                               \
     "            presentationTimeOffset=\"0\"\n"                               \
     "            timescale=\"1000\"\n"                                         \
@@ -306,7 +306,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "          codecs=\"mp4a.%s\"\n"                                           \
     "          audioSamplingRate=\"%ui\"\n"                                    \
     "          startWithSAP=\"1\"\n"                                           \
-    "          bandwidth=\"0\">\n"                                             \
+    "          bandwidth=\"%ui\">\n"                                           \
     "        <SegmentTemplate\n"                                               \
     "            presentationTimeOffset=\"0\"\n"                               \
     "            timescale=\"1000\"\n"                                         \
@@ -365,10 +365,11 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
         p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_VIDEO,
                          codec_ctx->width, 
                          codec_ctx->height,
-                         codec_ctx->frame_rate, 
+                         codec_ctx->frame_rate,
                          codec_ctx->width, 
                          codec_ctx->height,
-                         codec_ctx->frame_rate, 
+                         codec_ctx->frame_rate,
+                         (ngx_uint_t) (codec_ctx->video_data_rate * 1000), 
                          &ctx->name,
                          &ctx->name);
 
@@ -388,6 +389,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ?
                          "40.2" : "6b",
                          codec_ctx->sample_rate,
+                         (ngx_uint_t) (codec_ctx->audio_data_rate * 1000),
                          &ctx->name, 
                          &ctx->name);
 
