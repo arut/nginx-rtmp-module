@@ -264,7 +264,10 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "    minBufferTime=\"PT%uiS\"\n"                                           \
     "    timeShiftBufferDepth=\"PT0H0M0.00S\"\n"                               \
     "    suggestedPresentationDelay=\"PT%uiS\"\n"                              \
-    "    profiles=\"urn:mpeg:dash:profile:isoff-live:2011\">\n"                \
+    "    profiles=\"urn:hbbtv:dash:profile:isoff-live:2012,"                   \
+                   "urn:mpeg:dash:profile:isoff-live:2011\"\n"                 \
+    "    xmlns:xsi=\"http://www.w3.org/2011/XMLSchema-instance\"\n"            \
+    "    xsi:schemaLocation=\"urn:mpeg:DASH:schema:MPD:2011 DASH-MPD.xsd\">\n" \
     "  <Period start=\"PT0S\" id=\"dash\">\n"
 
 
