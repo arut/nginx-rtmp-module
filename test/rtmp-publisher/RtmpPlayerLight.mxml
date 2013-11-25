@@ -10,14 +10,14 @@
 			import mx.core.FlexGlobals;
 			import flash.display.StageDisplayState;
 			import mx.managers.SystemManager;
-            import org.osmf.events.MediaPlayerStateChangeEvent;
-            import org.osmf.events.TimeEvent;
-            import org.osmf.media.MediaPlayerState;
+			import org.osmf.events.MediaPlayerStateChangeEvent;
+			import org.osmf.events.TimeEvent;
+			import org.osmf.media.MediaPlayerState;
 
 			private var streamer:String;
 			private var file:String;
-            private var videoEventsDisabled:Boolean;
-            private var previousVideoTime:Number;
+			private var videoEventsDisabled:Boolean;
+			private var previousVideoTime:Number;
 
 			private function fullscreenListener(event:MouseEvent):void {
 				try {
@@ -34,43 +34,43 @@
 				}
 			}
 
-            private function resetVideo():void {           
-                videoEventsDisabled = true;
+			private function resetVideo():void {           
+				videoEventsDisabled = true;
 
-                try {
-                    videoDisplay.source = "";
-                } catch (any:*) {}
+				try {
+					videoDisplay.source = "";
+				} catch (any:*) {}
 
-                setTimeout(resetVideoSource, 5000);
-            }
+				setTimeout(resetVideoSource, 5000);
+			}
 
-            private function resetVideoSource():void {
-                videoEventsDisabled = false;
-                previousVideoTime = NaN;
-                videoDisplay.source = streamer + "/" + file;
-            }
+			private function resetVideoSource():void {
+				videoEventsDisabled = false;
+				previousVideoTime = NaN;
+				videoDisplay.source = streamer + "/" + file;
+			}
 
-            protected function stateChangeListener(event:MediaPlayerStateChangeEvent):void {
-                if (videoEventsDisabled) {
-                    return;
-                }
+			protected function stateChangeListener(event:MediaPlayerStateChangeEvent):void {
+				if (videoEventsDisabled) {
+					return;
+				}
 
-                if (event.state == MediaPlayerState.PLAYBACK_ERROR) {
-                    resetVideo();
-                }
-            }
+				if (event.state == MediaPlayerState.PLAYBACK_ERROR) {
+					resetVideo();
+				}
+			}
 
-            protected function timeChangeListener(event:TimeEvent):void {
-                if (videoEventsDisabled) {
-                    return;
-                }
+			protected function timeChangeListener(event:TimeEvent):void {
+				if (videoEventsDisabled) {
+					return;
+				}
 
-                if (isNaN(event.time) && !isNaN(previousVideoTime)) {
-                    resetVideo();
-                } else {
-                    previousVideoTime = event.time;
-                }
-            }
+				if (isNaN(event.time) && !isNaN(previousVideoTime)) {
+					resetVideo();
+				} else {
+					previousVideoTime = event.time;
+				}
+			}
 
 			private function init():void {
 				videoDisplay.mx_internal::videoPlayer.bufferTime = 1;
@@ -87,11 +87,11 @@
 					return;
 				}
 
-                videoDisplay.addEventListener(MouseEvent.DOUBLE_CLICK, fullscreenListener);
-                videoDisplay.addEventListener("MediaPlayerStateChange", stateChangeListener);
-                videoDisplay.addEventListener("currentTimeChange", timeChangeListener);
+				videoDisplay.addEventListener(MouseEvent.DOUBLE_CLICK, fullscreenListener);
+				videoDisplay.addEventListener("MediaPlayerStateChange", stateChangeListener);
+				videoDisplay.addEventListener("currentTimeChange", timeChangeListener);
 
-                resetVideoSource();
+				resetVideoSource();
 			}
 	    ]]>
 	  </fx:Script>
