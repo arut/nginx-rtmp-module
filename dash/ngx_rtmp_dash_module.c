@@ -275,7 +275,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "        maxHeight=\"%ui\"\n"                                              \
     "        maxFrameRate=\"%ui\">\n"                                          \
     "      <Representation\n"                                                  \
-    "          id=\"video\"\n"                                                 \
+    "          id=\"%V_H264\"\n"                                               \
     "          mimeType=\"video/mp4\"\n"                                       \
     "          codecs=\"avc1.42c028\"\n"                                       \
     "          width=\"%ui\"\n"                                                \
@@ -311,7 +311,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                                 "23003:3:audio_channel_configuration:2011\"\n" \
     "          value=\"1\"/>\n"                                                \
     "      <Representation\n"                                                  \
-    "          id=\"audio\"\n"                                                 \
+    "          id=\"%V_AAC\"\n"                                                \
     "          mimeType=\"audio/mp4\"\n"                                       \
     "          codecs=\"mp4a.%s\"\n"                                           \
     "          audioSamplingRate=\"%ui\"\n"                                    \
@@ -381,6 +381,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          codec_ctx->width, 
                          codec_ctx->height,
                          codec_ctx->frame_rate,
+			 &ctx->name,
                          codec_ctx->width, 
                          codec_ctx->height,
                          codec_ctx->frame_rate,
@@ -400,7 +401,8 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     }
 
     if (ctx->has_audio) {
-        p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_AUDIO, 
+        p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_AUDIO,
+			 &ctx->name, 
                          codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ?
                          "40.2" : "6b",
                          codec_ctx->sample_rate,
