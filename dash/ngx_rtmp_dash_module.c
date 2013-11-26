@@ -903,7 +903,7 @@ ngx_rtmp_dash_update_fragments(ngx_rtmp_session_t *s, ngx_int_t boundary,
 
 static ngx_int_t
 ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
-    ngx_rtmp_dash_track_t *t, ngx_int_t key, uint32_t timestamp)
+    ngx_rtmp_dash_track_t *t, ngx_int_t key, uint32_t timestamp, uint32_t delay)
 {
     u_char         *p;
     size_t          size, bsize;
@@ -1003,7 +1003,7 @@ ngx_rtmp_dash_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     in->buf->pos += 2;
 
-    return ngx_rtmp_dash_append(s, in, &ctx->audio, 0, h->timestamp);
+    return ngx_rtmp_dash_append(s, in, &ctx->audio, 0, h->timestamp, 0);
 }
 
 
@@ -1011,7 +1011,9 @@ static ngx_int_t
 ngx_rtmp_dash_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
     ngx_chain_t *in)
 {
+    u_char                    *p;
     uint8_t                    ftype, htype;
+    uint32_t                   delay;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
     ngx_rtmp_dash_app_conf_t  *dacf;
@@ -1045,13 +1047,21 @@ ngx_rtmp_dash_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
+    p = (u_char *) &delay;
+
+    p[0] = in->buf->pos[4];
+    p[1] = in->buf->pos[3];
+    p[2] = in->buf->pos[2];
+    p[3] = 0;
+
     ctx->has_video = 1;
 
     /* skip RTMP & H264 headers */
 
     in->buf->pos += 5;
 
-    return ngx_rtmp_dash_append(s, in, &ctx->video, ftype == 1, h->timestamp);
+    return ngx_rtmp_dash_append(s, in, &ctx->video, ftype == 1, h->timestamp,
+                                delay);
 }
 
 
