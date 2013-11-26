@@ -16,7 +16,7 @@
 typedef struct ngx_rtmp_eval_s ngx_rtmp_eval_t;
 
 
-typedef void (* ngx_rtmp_eval_pt)(ngx_rtmp_session_t *s, ngx_rtmp_eval_t *e,
+typedef void (* ngx_rtmp_eval_pt)(void *ctx, ngx_rtmp_eval_t *e,
                                   ngx_str_t *ret);
 
 
@@ -34,8 +34,8 @@ struct ngx_rtmp_eval_s {
 extern ngx_rtmp_eval_t      ngx_rtmp_eval_session[];
 
 
-ngx_int_t ngx_rtmp_eval(ngx_rtmp_session_t *s, ngx_str_t *in,
-          ngx_rtmp_eval_t **e, ngx_str_t *out);
+ngx_int_t ngx_rtmp_eval(void *ctx, ngx_str_t *in, ngx_rtmp_eval_t **e,
+    ngx_str_t *out, ngx_log_t *log);
 
 
 ngx_int_t ngx_rtmp_eval_streams(ngx_str_t *in);
