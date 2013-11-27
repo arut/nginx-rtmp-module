@@ -841,11 +841,13 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_int_t discont)
 {
     ngx_rtmp_hls_ctx_t     *ctx;
+    ngx_rtmp_codec_ctx_t   *codec_ctx;
     ngx_rtmp_hls_frag_t    *f;
     ngx_uint_t              nretry;
     uint64_t                id;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
     if (ctx->opened) {
         return NGX_OK;
     }
@@ -886,7 +888,7 @@ retry:
         return NGX_ERROR;
     }
 
-    if (ngx_rtmp_mpegts_write_header(&ctx->file) != NGX_OK) {
+    if (ngx_rtmp_mpegts_write_header(&ctx->file, &codec_ctx->audio_codec_id) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: error writing fragment header");
         ngx_close_file(ctx->file.fd);
@@ -1442,7 +1444,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     size_t                          bsize;
     ngx_buf_t                      *b;
     u_char                         *p;
-    ngx_uint_t                      objtype, srindex, chconf, size;
+    ngx_uint_t                      objtype, srindex, chconf, size, samples_per_frame;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
@@ -1456,11 +1458,17 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    if (codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_AAC ||
-        codec_ctx->aac_header == NULL)
+    if ((codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_AAC) && 
+      (codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_MP3)) 
     {
         return NGX_OK;
     }
+
+    if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC &&
+        codec_ctx->aac_header == NULL)
+    {
+        return NGX_OK;
+    } 
 
     b = ctx->aframe;
 
@@ -1482,7 +1490,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         b->pos = b->last = b->start;
     }
 
-    size = h->mlen - 2 + 7;
+    size = codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 ? h->mlen - 1 : h->mlen - 2 + 7;
     pts = (uint64_t) h->timestamp * 90;
 
     if (b->start + size > b->end) {
@@ -1506,14 +1514,22 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: audio pts=%uL", pts);
 
-    if (b->last + 7 > b->end) {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "hls: not enough buffer for audio header");
-        return NGX_OK;
-    }
-
     p = b->last;
-    b->last += 5;
+    if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
+        if (b->last + 7 > b->end) {
+            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "hls: not enough buffer for audio header");
+            return NGX_OK;
+        }
+        b->last += 5;
+    }
+    else {
+        /* For some reason the pointer is already incremented past the rest
+           of the RTMP frame header.  I'm not sure where in the code this is
+           being done.  Regardless, there's an extra byte that needs to be skipped
+           for MP3. */
+        in->buf->pos += 1;
+    }
 
     /* copy payload */
 
@@ -1528,29 +1544,30 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     /* make up ADTS header */
+    if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
+        if (ngx_rtmp_hls_parse_aac_header(s, &objtype, &srindex, &chconf)
+            != NGX_OK)
+        {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                          "hls: aac header error");
+            return NGX_OK;
+        }
+        
+        /* we have 5 free bytes + 2 bytes of RTMP frame header */
 
-    if (ngx_rtmp_hls_parse_aac_header(s, &objtype, &srindex, &chconf)
-        != NGX_OK)
-    {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                      "hls: aac header error");
-        return NGX_OK;
-    }
-    
-    /* we have 5 free bytes + 2 bytes of RTMP frame header */
+        p[0] = 0xff;
+        p[1] = 0xf1;
+        p[2] = (u_char) (((objtype - 1) << 6) | (srindex << 2) |
+                         ((chconf & 0x04) >> 2));
+        p[3] = (u_char) (((chconf & 0x03) << 6) | ((size >> 11) & 0x03));
+        p[4] = (u_char) (size >> 3);
+        p[5] = (u_char) ((size << 5) | 0x1f);
+        p[6] = 0xfc;
 
-    p[0] = 0xff;
-    p[1] = 0xf1;
-    p[2] = (u_char) (((objtype - 1) << 6) | (srindex << 2) |
-                     ((chconf & 0x04) >> 2));
-    p[3] = (u_char) (((chconf & 0x03) << 6) | ((size >> 11) & 0x03));
-    p[4] = (u_char) (size >> 3);
-    p[5] = (u_char) ((size << 5) | 0x1f);
-    p[6] = 0xfc;
-
-    if (p != b->start) {
-        ctx->aframe_num++;
-        return NGX_OK;
+        if (p != b->start) {
+            ctx->aframe_num++;
+            return NGX_OK;
+        }
     }
 
     ctx->aframe_pts = pts;
@@ -1564,7 +1581,9 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /* TODO: We assume here AAC frame size is 1024
      *       Need to handle AAC frames with frame size of 960 */
 
-    est_pts = ctx->aframe_base + ctx->aframe_num * 90000 * 1024 /
+    samples_per_frame = codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ? 1024 : 1152;
+
+    est_pts = ctx->aframe_base + ctx->aframe_num * 90000 * samples_per_frame /
                                  codec_ctx->sample_rate;
     dpts = (int64_t) (est_pts - pts);
 
@@ -1577,6 +1596,10 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     {
         ctx->aframe_num++;
         ctx->aframe_pts = est_pts;
+
+        if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3) {
+            ngx_rtmp_hls_flush_audio(s);
+        }
         return NGX_OK;
     }
 
