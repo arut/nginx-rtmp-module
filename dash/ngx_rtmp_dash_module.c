@@ -273,6 +273,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 
 #define NGX_RTMP_DASH_MANIFEST_VIDEO                                           \
     "    <AdaptationSet\n"                                                     \
+    "        id=\"1\"\n"						       \
     "        segmentAlignment=\"true\"\n"                                      \
     "        maxWidth=\"%ui\"\n"                                               \
     "        maxHeight=\"%ui\"\n"                                              \
@@ -308,6 +309,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 
 #define NGX_RTMP_DASH_MANIFEST_AUDIO                                           \
     "    <AdaptationSet\n"                                                     \
+    "        id=\"2\"\n"						       \
     "        segmentAlignment=\"true\">\n"                                     \
     "      <AudioChannelConfiguration\n"                                       \
     "          schemeIdUri=\"urn:mpeg:dash:"                                   \
@@ -1189,6 +1191,14 @@ ngx_rtmp_dash_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if (htype != 1) {
         return NGX_OK;
     }
+    
+    p = (u_char *) &delay;
+
+    p[0] = in->buf->pos[4];
+    p[1] = in->buf->pos[3];
+    p[2] = in->buf->pos[2];
+    p[3] = 0;
+
 
     p = (u_char *) &delay;
 
