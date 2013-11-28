@@ -1280,7 +1280,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
         nentries++;
 
-        if (ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
+        if (!dir.valid_info && ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
                           "dash: cleanup " ngx_de_info_n " \"%V\" failed",
                           &spath);
