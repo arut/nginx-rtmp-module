@@ -431,7 +431,9 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 
     ngx_close_file(fd);
 
-    if (ngx_rtmp_dash_rename_file(ctx->playlist_bak.data, ctx->playlist.data)) {
+    if (ngx_rtmp_dash_rename_file(ctx->playlist_bak.data, ctx->playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "dash: rename failed: '%V'->'%V'", 
                       &ctx->playlist_bak, &ctx->playlist);

@@ -474,10 +474,10 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
 
     ngx_close_file(fd);
 
-    rc = ngx_rtmp_hls_rename_file(ctx->var_playlist_bak.data,
-                                  ctx->var_playlist.data);
-
-    if (rc != NGX_OK) {
+    if (ngx_rtmp_hls_rename_file(ctx->var_playlist_bak.data,
+                                 ctx->var_playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->var_playlist_bak, &ctx->var_playlist);
@@ -497,7 +497,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
     ngx_rtmp_hls_app_conf_t        *hacf;
-    ngx_int_t                       nretry, rc;
+    ngx_int_t                       nretry;
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
     ngx_str_t                       name_part;
@@ -592,9 +592,9 @@ retry:
 
     ngx_close_file(fd);
 
-    rc = ngx_rtmp_hls_rename_file(ctx->playlist_bak.data, ctx->playlist.data);
-
-    if (rc != NGX_OK) {
+    if (ngx_rtmp_hls_rename_file(ctx->playlist_bak.data, ctx->playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->playlist_bak, &ctx->playlist);
