@@ -220,7 +220,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     ssize_t                    n;
     ngx_fd_t                   fd;
     struct tm                  tm;
-    ngx_str_t                  playlist, playlist_bak, noname, *name;
+    ngx_str_t                  noname, *name;
     ngx_uint_t                 i;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
@@ -434,7 +434,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     if (ngx_rtmp_dash_rename_file(ctx->playlist_bak.data, ctx->playlist.data)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "dash: rename failed: '%V'->'%V'", 
-                      &playlist_bak, &playlist);
+                      &ctx->playlist_bak, &ctx->playlist);
         return NGX_ERROR;
     }
 
