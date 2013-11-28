@@ -1199,14 +1199,6 @@ ngx_rtmp_dash_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     p[2] = in->buf->pos[2];
     p[3] = 0;
 
-
-    p = (u_char *) &delay;
-
-    p[0] = in->buf->pos[4];
-    p[1] = in->buf->pos[3];
-    p[2] = in->buf->pos[2];
-    p[3] = 0;
-
     ctx->has_video = 1;
 
     /* skip RTMP & H264 headers */
