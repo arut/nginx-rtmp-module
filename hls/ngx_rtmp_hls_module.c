@@ -1914,13 +1914,11 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                    "hls: cleanup path='%V' playlen=%M",
                    ppath, playlen);
 
-                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0, "hls: cleanup test 1 '%s'", ppath->data);
     if (ngx_open_dir(ppath, &dir) != NGX_OK) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, ngx_errno,
                       "hls: cleanup open dir failed '%V'", ppath);
         return NGX_ERROR;
     }
-                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0, "hls: cleanup test 2 '%s'", ppath->data);
 
     nentries = 0;
     nerased = 0;
@@ -1961,7 +1959,6 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
         spath.len = p - path;
 
         nentries++;
-                ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0, "hls: cleanup test 3 '%s'", ppath->data);
 
         if (!dir.valid_info && ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
@@ -1977,10 +1974,17 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                                "hls: cleanup dir '%V'", &name);
 
+                /* 
+                 * null-termination gets spoiled in win32
+                 * version of ngx_open_dir
+                 */
+
+                *p = 0;
+
                 if (ngx_delete_dir(path) == NGX_FILE_ERROR) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
                                   "hls: cleanup " ngx_delete_dir_n 
-                                  " failed on '%V' ('%s')", &spath, path);
+                                  " failed on '%V'", &spath);
                 } else {
                     nerased++;
                 }

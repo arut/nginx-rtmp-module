@@ -1294,6 +1294,13 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                                "dash: cleanup dir '%V'", &name);
 
+                /* 
+                 * null-termination gets spoiled in win32
+                 * version of ngx_open_dir
+                 */
+
+                *p = 0;
+
                 if (ngx_delete_dir(path) == NGX_FILE_ERROR) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
                                   "dash: cleanup " ngx_delete_dir_n
