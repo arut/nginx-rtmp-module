@@ -345,7 +345,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                        ngx_rtmp_dash_get_frag(s, 0)->timestamp / 1000, &tm);
     
     *ngx_sprintf(start_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
-                 tm.tm_year, tm.tm_mon,
+                 tm.tm_year + 1900, tm.tm_mon + 1,
                  tm.tm_mday, tm.tm_hour,
                  tm.tm_min, tm.tm_sec,
                  ctx->start_time.gmtoff < 0 ? '-' : '+',
@@ -358,7 +358,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                        1000, &tm);
     
     *ngx_sprintf(end_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
-                 tm.tm_year, tm.tm_mon,
+                 tm.tm_year + 1900, tm.tm_mon + 1,
                  tm.tm_mday, tm.tm_hour,
                  tm.tm_min, tm.tm_sec,
                  ctx->start_time.gmtoff < 0 ? '-' : '+',
@@ -438,7 +438,9 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 
     ngx_close_file(fd);
 
-    if (ngx_rtmp_dash_rename_file(ctx->playlist_bak.data, ctx->playlist.data)) {
+    if (ngx_rtmp_dash_rename_file(ctx->playlist_bak.data, ctx->playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "dash: rename failed: '%V'->'%V'", 
                       &ctx->playlist_bak, &ctx->playlist);
@@ -1287,7 +1289,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
         nentries++;
 
-        if (ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
+        if (!dir.valid_info && ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
                           "dash: cleanup " ngx_de_info_n " \"%V\" failed",
                           &spath);
@@ -1301,9 +1303,10 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                                "dash: cleanup dir '%V'", &name);
 
-                if (ngx_delete_dir(spath.data) != NGX_OK) {
+                if (ngx_delete_dir(spath.data) == NGX_FILE_ERROR) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                                  "dash: cleanup dir error '%V'", &spath);
+                                  "dash: cleanup " ngx_delete_dir_n
+                                  "failed on '%V'", &spath);
                 } else {
                     nerased++;
                 }
@@ -1391,7 +1394,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                        "dash: cleanup '%V' mtime=%T age=%T",
                        &name, mtime, ngx_cached_time->sec - mtime);
 
-        if (ngx_delete_file(spath.data) != NGX_OK) {
+        if (ngx_delete_file(spath.data) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
                           "dash: cleanup " ngx_delete_file_n " failed on '%V'",
                           &spath);

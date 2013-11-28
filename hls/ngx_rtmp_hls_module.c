@@ -315,7 +315,7 @@ ngx_rtmp_hls_create_parent_dir(ngx_rtmp_session_t *s)
 
     *ngx_snprintf(path, sizeof(path) - 1, "%V", &hacf->path) = 0;
 
-    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
+    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
         err = ngx_errno;
         if (err != NGX_EEXIST) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, err,
@@ -342,7 +342,7 @@ ngx_rtmp_hls_create_parent_dir(ngx_rtmp_session_t *s)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: creating nested folder: '%s'", path);
 
-    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
+    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: error creating nested folder: '%s'", path);
         return NGX_ERROR;
@@ -474,10 +474,10 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
 
     ngx_close_file(fd);
 
-    rc = ngx_rtmp_hls_rename_file(ctx->var_playlist_bak.data,
-                                  ctx->var_playlist.data);
-
-    if (rc != NGX_OK) {
+    if (ngx_rtmp_hls_rename_file(ctx->var_playlist_bak.data,
+                                 ctx->var_playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->var_playlist_bak, &ctx->var_playlist);
@@ -497,7 +497,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
     ngx_rtmp_hls_app_conf_t        *hacf;
-    ngx_int_t                       nretry, rc;
+    ngx_int_t                       nretry;
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
     ngx_str_t                       name_part;
@@ -592,9 +592,9 @@ retry:
 
     ngx_close_file(fd);
 
-    rc = ngx_rtmp_hls_rename_file(ctx->playlist_bak.data, ctx->playlist.data);
-
-    if (rc != NGX_OK) {
+    if (ngx_rtmp_hls_rename_file(ctx->playlist_bak.data, ctx->playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->playlist_bak, &ctx->playlist);
@@ -1941,7 +1941,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
         nentries++;
 
-        if (ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
+        if (!dir.valid_info && ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
                           "hls: cleanup " ngx_de_info_n " \"%V\" failed",
                           &spath);
@@ -1957,7 +1957,8 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
                 if (ngx_delete_dir(spath.data) != NGX_OK) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                                  "hls: cleanup dir error '%V'", &spath);
+                                  "hls: cleanup " ngx_delete_dir_n 
+                                  "failed on '%V'", &spath);
                 } else {
                     nerased++;
                 }
@@ -1999,9 +2000,10 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                        "hls: cleanup '%V' mtime=%T age=%T",
                        &name, mtime, ngx_cached_time->sec - mtime);
 
-        if (ngx_delete_file(spath.data) != NGX_OK) {
+        if (ngx_delete_file(spath.data) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                          "hls: cleanup error '%V'", &spath);
+                          "hls: cleanup " ngx_delete_file_n " failed on '%V'",
+                          &spath);
             continue;
         }
 
