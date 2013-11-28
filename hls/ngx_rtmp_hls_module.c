@@ -1142,7 +1142,7 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     p = ngx_cpymem(p, ctx->name.data, ctx->name.len);
 
-    /* ctx->stream_path holds initial part of stream file path 
+    /* ctx->stream holds initial part of stream file path
      * however the space for the whole stream path
      * is allocated */
 
