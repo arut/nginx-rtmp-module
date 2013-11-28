@@ -742,7 +742,9 @@ ngx_rtmp_ensure_directory(ngx_rtmp_session_t *s)
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
 
-    if (ngx_file_info(dacf->path.data, &fi) == NGX_FILE_ERROR) {
+    *ngx_snprintf(path, sizeof(path) - 1, "%V", &dacf->path) = 0;
+
+    if (ngx_file_info(path, &fi) == NGX_FILE_ERROR) {
 
         if (ngx_errno != NGX_ENOENT) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
