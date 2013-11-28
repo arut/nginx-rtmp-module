@@ -1294,9 +1294,10 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                                "dash: cleanup dir '%V'", &name);
 
-                if (ngx_delete_dir(spath.data) != NGX_OK) {
+                if (ngx_delete_dir(spath.data) == NGX_FILE_ERROR) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                                  "dash: cleanup dir error '%V'", &spath);
+                                  "dash: cleanup " ngx_delete_dir_n
+                                  "failed on '%V'", &spath);
                 } else {
                     nerased++;
                 }
@@ -1384,7 +1385,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                        "dash: cleanup '%V' mtime=%T age=%T",
                        &name, mtime, ngx_cached_time->sec - mtime);
 
-        if (ngx_delete_file(spath.data) != NGX_OK) {
+        if (ngx_delete_file(spath.data) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
                           "dash: cleanup " ngx_delete_file_n " failed on '%V'",
                           &spath);
