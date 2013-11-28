@@ -1261,7 +1261,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, err,
                           "dash: cleanup " ngx_read_dir_n
-                          " \"%V\" failed", ppath);
+                          " '%V' failed", ppath);
             return NGX_ERROR;
         }
 
