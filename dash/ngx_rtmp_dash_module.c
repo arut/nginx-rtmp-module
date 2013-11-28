@@ -340,7 +340,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                        ngx_rtmp_dash_get_frag(s, 0)->timestamp / 1000, &tm);
     
     *ngx_sprintf(start_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
-                 tm.tm_year, tm.tm_mon,
+                 tm.tm_year + 1900, tm.tm_mon + 1,
                  tm.tm_mday, tm.tm_hour,
                  tm.tm_min, tm.tm_sec,
                  ctx->start_time.gmtoff < 0 ? '-' : '+',
@@ -353,7 +353,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                        1000, &tm);
     
     *ngx_sprintf(end_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
-                 tm.tm_year, tm.tm_mon,
+                 tm.tm_year + 1900, tm.tm_mon + 1,
                  tm.tm_mday, tm.tm_hour,
                  tm.tm_min, tm.tm_sec,
                  ctx->start_time.gmtoff < 0 ? '-' : '+',

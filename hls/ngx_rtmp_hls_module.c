@@ -315,7 +315,7 @@ ngx_rtmp_hls_create_parent_dir(ngx_rtmp_session_t *s)
 
     *ngx_snprintf(path, sizeof(path) - 1, "%V", &hacf->path) = 0;
 
-    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
+    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
         err = ngx_errno;
         if (err != NGX_EEXIST) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, err,
@@ -342,7 +342,7 @@ ngx_rtmp_hls_create_parent_dir(ngx_rtmp_session_t *s)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: creating nested folder: '%s'", path);
 
-    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
+    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: error creating nested folder: '%s'", path);
         return NGX_ERROR;
