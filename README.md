@@ -1,4 +1,4 @@
-# NGINX-based RTMP server
+# NGINX-based Media Streaming Server
 ## nginx-rtmp-module
 
 
