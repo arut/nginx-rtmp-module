@@ -741,7 +741,7 @@ ngx_rtmp_dash_open_fragments(ngx_rtmp_session_t *s)
 
 
 static ngx_int_t
-ngx_rtmp_ensure_directory(ngx_rtmp_session_t *s)
+ngx_rtmp_dash_ensure_directory(ngx_rtmp_session_t *s)
 {
     size_t                     len;
     ngx_file_info_t            fi;
@@ -765,9 +765,7 @@ ngx_rtmp_ensure_directory(ngx_rtmp_session_t *s)
 
         /* ENOENT */
 
-        if (ngx_create_dir(dacf->path.data, NGX_RTMP_DASH_DIR_ACCESS)
-            == NGX_FILE_ERROR)
-        {
+        if (ngx_create_dir(path, NGX_RTMP_DASH_DIR_ACCESS) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                           "dash: " ngx_create_dir_n " failed on '%V'",
                           &dacf->path);
@@ -961,7 +959,7 @@ ngx_rtmp_dash_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ctx->start_time = *ngx_cached_time;
 
-    if (ngx_rtmp_ensure_directory(s) != NGX_OK) {
+    if (ngx_rtmp_dash_ensure_directory(s) != NGX_OK) {
         return NGX_ERROR;
     }
 
