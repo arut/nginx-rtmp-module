@@ -1974,10 +1974,10 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                                "hls: cleanup dir '%V'", &name);
 
-                if (ngx_delete_dir(spath.data) != NGX_OK) {
+                if (ngx_delete_dir(path) == NGX_FILE_ERROR) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
                                   "hls: cleanup " ngx_delete_dir_n 
-                                  "failed on '%V'", &spath);
+                                  " failed on '%V' ('%s')", &spath, path);
                 } else {
                     nerased++;
                 }
@@ -2019,7 +2019,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                        "hls: cleanup '%V' mtime=%T age=%T",
                        &name, mtime, ngx_cached_time->sec - mtime);
 
-        if (ngx_delete_file(spath.data) == NGX_FILE_ERROR) {
+        if (ngx_delete_file(path) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
                           "hls: cleanup " ngx_delete_file_n " failed on '%V'",
                           &spath);
