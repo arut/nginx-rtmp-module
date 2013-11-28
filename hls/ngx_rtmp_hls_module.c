@@ -295,61 +295,6 @@ ngx_module_t  ngx_rtmp_hls_module = {
 };
 
 
-static ngx_int_t
-ngx_rtmp_hls_create_parent_dir(ngx_rtmp_session_t *s)
-{
-    ngx_rtmp_hls_app_conf_t  *hacf;
-    ngx_rtmp_hls_ctx_t       *ctx;
-    ngx_err_t                 err;
-    size_t                    len;
-    static u_char             path[NGX_MAX_PATH + 1];
-
-    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
-
-    if (hacf->path.len == 0) {
-        return NGX_ERROR;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls: creating target folder: '%V'", &hacf->path);
-
-    if (ngx_create_dir(hacf->path.data, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
-        err = ngx_errno;
-        if (err != NGX_EEXIST) {
-            ngx_log_error(NGX_LOG_ERR, s->connection->log, err,
-                          "hls: error creating target folder: '%V'",
-                          &hacf->path);
-            return NGX_ERROR;
-        }
-    }
-
-    if (!hacf->nested) {
-        return NGX_OK;
-    }
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-
-    len = hacf->path.len;
-    if (hacf->path.data[len - 1] == '/') {
-        len--;
-    }
-
-    *ngx_snprintf(path, sizeof(path) - 1, "%*s/%V", len, hacf->path.data,
-                  &ctx->name) = 0;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls: creating nested folder: '%s'", path);
-
-    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: error creating nested folder: '%s'", path);
-        return NGX_ERROR;
-    }
-
-    return NGX_OK;
-}
-
-
 static ngx_rtmp_hls_frag_t *
 ngx_rtmp_hls_get_frag(ngx_rtmp_session_t *s, ngx_int_t n)
 {
@@ -472,10 +417,10 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
 
     ngx_close_file(fd);
 
-    rc = ngx_rtmp_hls_rename_file(ctx->var_playlist_bak.data,
-                                  ctx->var_playlist.data);
-
-    if (rc != NGX_OK) {
+    if (ngx_rtmp_hls_rename_file(ctx->var_playlist_bak.data,
+                                 ctx->var_playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->var_playlist_bak, &ctx->var_playlist);
@@ -495,7 +440,6 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
     ngx_rtmp_hls_app_conf_t        *hacf;
-    ngx_int_t                       nretry, rc;
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
     ngx_str_t                       name_part;
@@ -505,26 +449,13 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
-    nretry = 0;
-
-retry:
-
     fd = ngx_open_file(ctx->playlist_bak.data, NGX_FILE_WRONLY, 
                        NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
 
     if (fd == NGX_INVALID_FILE) {
-
-        if (ngx_errno == NGX_ENOENT && nretry == 0 &&
-            ngx_rtmp_hls_create_parent_dir(s) == NGX_OK)
-        {
-            nretry++;
-            goto retry;
-        }
-
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: " ngx_open_file_n " failed: '%V'",
                       &ctx->playlist_bak);
-
         return NGX_ERROR;
     }
 
@@ -590,9 +521,9 @@ retry:
 
     ngx_close_file(fd);
 
-    rc = ngx_rtmp_hls_rename_file(ctx->playlist_bak.data, ctx->playlist.data);
-
-    if (rc != NGX_OK) {
+    if (ngx_rtmp_hls_rename_file(ctx->playlist_bak.data, ctx->playlist.data)
+        == NGX_FILE_ERROR)
+    {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: rename failed: '%V'->'%V'", 
                       &ctx->playlist_bak, &ctx->playlist);
@@ -842,7 +773,6 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 {
     ngx_rtmp_hls_ctx_t     *ctx;
     ngx_rtmp_hls_frag_t    *f;
-    ngx_uint_t              nretry;
     uint64_t                id;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
@@ -865,22 +795,10 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 
     ngx_str_set(&ctx->file.name, "hls");
 
-    nretry = 0;
-
-retry:
-
     ctx->file.fd = ngx_open_file(ctx->stream.data, NGX_FILE_WRONLY,
                                  NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
 
     if (ctx->file.fd == NGX_INVALID_FILE) {
-
-        if (ngx_errno == NGX_ENOENT && nretry == 0 &&
-            ngx_rtmp_hls_create_parent_dir(s) == NGX_OK)
-        {
-            nretry++;
-            goto retry;
-        }
-
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: error creating fragment file");
         return NGX_ERROR;
@@ -1058,6 +976,103 @@ done:
 
 
 static ngx_int_t
+ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s)
+{
+    size_t                    len;
+    ngx_file_info_t           fi;
+    ngx_rtmp_hls_ctx_t       *ctx;
+    ngx_rtmp_hls_app_conf_t  *hacf;
+
+    static u_char              path[NGX_MAX_PATH + 1];
+
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+
+    *ngx_snprintf(path, sizeof(path) - 1, "%V", &hacf->path) = 0;
+
+    if (ngx_file_info(path, &fi) == NGX_FILE_ERROR) {
+
+        if (ngx_errno != NGX_ENOENT) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                          "hls: " ngx_file_info_n " failed on '%V'",
+                          &hacf->path);
+            return NGX_ERROR;
+        }
+
+        /* ENOENT */
+
+        if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                          "hls: " ngx_create_dir_n " failed on '%V'",
+                          &hacf->path);
+            return NGX_ERROR;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: directory '%V' created", &hacf->path);
+
+    } else {
+
+        if (!ngx_is_dir(&fi)) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                          "hls: '%V' exists and is not a directory",
+                          &hacf->path);
+            return  NGX_ERROR;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: directory '%V' exists", &hacf->path);
+    }
+
+    if (!hacf->nested) {
+        return NGX_OK;
+    }
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    len = hacf->path.len;
+    if (hacf->path.data[len - 1] == '/') {
+        len--;
+    }
+
+    *ngx_snprintf(path, sizeof(path) - 1, "%*s/%V", len, hacf->path.data,
+                  &ctx->name) = 0;
+
+    if (ngx_file_info(path, &fi) != NGX_FILE_ERROR) {
+
+        if (ngx_is_dir(&fi)) {
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "hls: directory '%s' exists", path);
+            return NGX_OK;
+        }
+
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "hls: '%s' exists and is not a directory", path);
+
+        return  NGX_ERROR;
+    }
+
+    if (ngx_errno != NGX_ENOENT) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: " ngx_file_info_n " failed on '%s'", path);
+        return NGX_ERROR;
+    }
+
+    /* NGX_ENOENT */
+
+    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                      "hls: " ngx_create_dir_n " failed on '%s'", path);
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: directory '%s' created", path);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     ngx_rtmp_hls_app_conf_t        *hacf;
@@ -1142,9 +1157,11 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     p = ngx_cpymem(p, ctx->name.data, ctx->name.len);
 
-    /* ctx->stream_path holds initial part of stream file path 
+    /*
+     * ctx->stream holds initial part of stream file path
      * however the space for the whole stream path
-     * is allocated */
+     * is allocated
+     */
 
     ctx->stream.len = p - ctx->playlist.data + 1;
     ctx->stream.data = ngx_palloc(s->connection->pool,
@@ -1226,6 +1243,10 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     if (hacf->continuous) {
         ngx_rtmp_hls_restore_stream(s);
+    }
+
+    if (ngx_rtmp_hls_ensure_directory(s) != NGX_OK) {
+        return NGX_ERROR;
     }
 
 next:
@@ -1920,7 +1941,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, err,
                           "hls: cleanup " ngx_read_dir_n
-                          " \"%V\" failed", ppath);
+                          " '%V' failed", ppath);
             return NGX_ERROR;
         }
 
@@ -1939,7 +1960,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
         nentries++;
 
-        if (ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
+        if (!dir.valid_info && ngx_de_info(path, &dir) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, ngx_errno,
                           "hls: cleanup " ngx_de_info_n " \"%V\" failed",
                           &spath);
@@ -1953,9 +1974,17 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                                "hls: cleanup dir '%V'", &name);
 
-                if (ngx_delete_dir(spath.data) != NGX_OK) {
+                /* 
+                 * null-termination gets spoiled in win32
+                 * version of ngx_open_dir
+                 */
+
+                *p = 0;
+
+                if (ngx_delete_dir(path) == NGX_FILE_ERROR) {
                     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                                  "hls: cleanup dir error '%V'", &spath);
+                                  "hls: cleanup " ngx_delete_dir_n 
+                                  " failed on '%V'", &spath);
                 } else {
                     nerased++;
                 }
@@ -1997,9 +2026,10 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                        "hls: cleanup '%V' mtime=%T age=%T",
                        &name, mtime, ngx_cached_time->sec - mtime);
 
-        if (ngx_delete_file(spath.data) != NGX_OK) {
+        if (ngx_delete_file(path) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, ngx_errno,
-                          "hls: cleanup error '%V'", &spath);
+                          "hls: cleanup " ngx_delete_file_n " failed on '%V'",
+                          &spath);
             continue;
         }
 
