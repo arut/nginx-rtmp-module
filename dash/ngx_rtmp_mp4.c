@@ -108,7 +108,7 @@ ngx_rtmp_mp4_field_8(ngx_buf_t *b, uint8_t n)
 static ngx_int_t
 ngx_rtmp_mp4_put_descr(ngx_buf_t *b, int tag, unsigned int size)
 {
-    ngx_rtmp_mp4_field_8(b, tag);
+    ngx_rtmp_mp4_field_8(b, (uint8_t) tag);
     ngx_rtmp_mp4_field_8(b, size & 0x7F);
 
     return NGX_OK;
@@ -182,8 +182,8 @@ ngx_rtmp_mp4_update_box_size(ngx_buf_t *b, u_char *p)
 
 
 static ngx_int_t
-ngx_rtmp_mp4_write_matrix(ngx_buf_t *buf, int16_t a, int16_t b, int16_t c,
-    int16_t d, int16_t tx, int16_t ty)
+ngx_rtmp_mp4_write_matrix(ngx_buf_t *buf, uint32_t a, uint32_t b, uint32_t c,
+    uint32_t d, uint32_t tx, uint32_t ty)
 {
 
 /* 
@@ -543,8 +543,8 @@ ngx_rtmp_mp4_write_video(ngx_rtmp_session_t *s, ngx_buf_t *b,
     ngx_rtmp_mp4_field_32(b, 0);
 
     /* width & height */
-    ngx_rtmp_mp4_field_16(b, metadata->width);
-    ngx_rtmp_mp4_field_16(b, metadata->height);
+    ngx_rtmp_mp4_field_16(b, (uint16_t) metadata->width);
+    ngx_rtmp_mp4_field_16(b, (uint16_t) metadata->height);
 
     /* horizontal & vertical resolutions 72 dpi */
     ngx_rtmp_mp4_field_32(b, 0x00480000);
@@ -653,7 +653,7 @@ ngx_rtmp_mp4_write_audio(ngx_rtmp_session_t *s, ngx_buf_t *b,
     ngx_rtmp_mp4_field_16(b, 16); /* something mp4 specific */
     ngx_rtmp_mp4_field_16(b, 0); /* something mp4 specific */
     ngx_rtmp_mp4_field_16(b, 0); /* packet size (=0) */
-    ngx_rtmp_mp4_field_16(b, metadata->sample_rate); /* sample rate */
+    ngx_rtmp_mp4_field_16(b, (uint16_t) metadata->sample_rate);
     ngx_rtmp_mp4_field_16(b, 0); /* reserved */
 
     ngx_rtmp_mp4_write_esds(s, b, metadata);

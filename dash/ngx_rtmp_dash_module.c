@@ -219,7 +219,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     u_char                    *p, *last;
     ssize_t                    n;
     ngx_fd_t                   fd;
-    ngx_tm_t                   tm;
+    struct tm                  tm;
     ngx_str_t                  playlist, playlist_bak, noname, *name;
     ngx_uint_t                 i;
     ngx_rtmp_dash_ctx_t       *ctx;
@@ -336,26 +336,26 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "  </Period>\n"                                                            \
     "</MPD>\n"
 
-    ngx_localtime(ctx->start_time.sec +
-                  ngx_rtmp_dash_get_frag(s, 0)->timestamp / 1000, &tm);
+    ngx_libc_localtime(ctx->start_time.sec +
+                       ngx_rtmp_dash_get_frag(s, 0)->timestamp / 1000, &tm);
     
     *ngx_sprintf(start_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
-                 tm.ngx_tm_year, tm.ngx_tm_mon,
-                 tm.ngx_tm_mday, tm.ngx_tm_hour,
-                 tm.ngx_tm_min, tm.ngx_tm_sec,
+                 tm.tm_year, tm.tm_mon,
+                 tm.tm_mday, tm.tm_hour,
+                 tm.tm_min, tm.tm_sec,
                  ctx->start_time.gmtoff < 0 ? '-' : '+',
                  ngx_abs(ctx->start_time.gmtoff / 60),
                  ngx_abs(ctx->start_time.gmtoff % 60)) = 0;
 
-    ngx_localtime(ctx->start_time.sec +
-                  (ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->timestamp +
-                   ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->duration) / 1000,
-                  &tm);
+    ngx_libc_localtime(ctx->start_time.sec +
+                       (ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->timestamp +
+                        ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->duration) / 
+                       1000, &tm);
     
     *ngx_sprintf(end_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
-                 tm.ngx_tm_year, tm.ngx_tm_mon,
-                 tm.ngx_tm_mday, tm.ngx_tm_hour,
-                 tm.ngx_tm_min, tm.ngx_tm_sec,
+                 tm.tm_year, tm.tm_mon,
+                 tm.tm_mday, tm.tm_hour,
+                 tm.tm_min, tm.tm_sec,
                  ctx->start_time.gmtoff < 0 ? '-' : '+',
                  ngx_abs(ctx->start_time.gmtoff / 60),
                  ngx_abs(ctx->start_time.gmtoff % 60)) = 0;
@@ -597,11 +597,19 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
 
     left = (size_t) t->mdat_size;
 
+#if (NGX_WIN32)
+    if (SetFilePointer(t->fd, 0, 0, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "dash: SetFilePointer error");
+        goto done;
+    }
+#else
     if (lseek(t->fd, 0, SEEK_SET) == -1) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "dash: lseek error");
         goto done;
     }
+#endif
 
     while (left > 0) {
 
