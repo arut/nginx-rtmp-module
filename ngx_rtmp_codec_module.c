@@ -290,14 +290,24 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
 
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "codec: AAC header arrived, sample_rate=%ui", 
+                           "codec: aac header arrived, sample_rate=%ui", 
                            ctx->aac_sample_rate);
         }
     } else {
         if (ctx->video_codec_id == NGX_RTMP_VIDEO_H264) {
             header = &ctx->avc_header;
-            ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                    "codec: AVC/H264 header arrived");
+
+            if (in->buf->last - in->buf->pos > 8) {
+                p = in->buf->pos;
+                ctx->avc_profile = p[6];
+                ctx->avc_compat = p[7];
+                ctx->avc_level = p[8];
+            }
+
+            ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                           "codec: avc header arrived, "
+                           "profile=%ui, compat=%ui, level=%ui",
+                           ctx->avc_profile, ctx->avc_compat, ctx->avc_level);
         }
     }
 

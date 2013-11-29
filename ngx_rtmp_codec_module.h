@@ -59,6 +59,9 @@ typedef struct {
     ngx_uint_t                  audio_data_rate;
     ngx_uint_t                  audio_codec_id;
     ngx_uint_t                  aac_sample_rate;
+    ngx_uint_t                  avc_profile;
+    ngx_uint_t                  avc_compat;
+    ngx_uint_t                  avc_level;
     ngx_uint_t                  sample_rate;    /* 5512, 11025, 22050, 44100 */
     ngx_uint_t                  sample_size;    /* 1=8bit, 2=16bit */
     ngx_uint_t                  audio_channels; /* 1, 2 */

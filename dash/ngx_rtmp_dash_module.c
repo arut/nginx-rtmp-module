@@ -281,7 +281,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "      <Representation\n"                                                  \
     "          id=\"%V_H264\"\n"                                               \
     "          mimeType=\"video/mp4\"\n"                                       \
-    "          codecs=\"avc1.42c028\"\n"                                       \
+    "          codecs=\"avc1.%02uxi%02uxi%02uxi\"\n"                           \
     "          width=\"%ui\"\n"                                                \
     "          height=\"%ui\"\n"                                               \
     "          frameRate=\"%ui\"\n"                                            \
@@ -387,6 +387,9 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          codec_ctx->height,
                          codec_ctx->frame_rate,
                          &ctx->name,
+                         codec_ctx->avc_profile,
+                         codec_ctx->avc_compat,
+                         codec_ctx->avc_level,
                          codec_ctx->width, 
                          codec_ctx->height,
                          codec_ctx->frame_rate,
