@@ -457,14 +457,13 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 static ngx_int_t
 ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
 {
-    ngx_fd_t                  fd;
-    ngx_int_t                 rc;
-    ngx_buf_t                 b;
-    ngx_rtmp_dash_ctx_t      *ctx;
-    ngx_rtmp_codec_ctx_t     *codec_ctx;
-    ngx_rtmp_mp4_metadata_t   metadata;
+    ngx_fd_t               fd;
+    ngx_int_t              rc;
+    ngx_buf_t              b;
+    ngx_rtmp_dash_ctx_t   *ctx;
+    ngx_rtmp_codec_ctx_t  *codec_ctx;
 
-    static u_char             buffer[NGX_RTMP_DASH_BUFSIZE];
+    static u_char          buffer[NGX_RTMP_DASH_BUFSIZE];
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
@@ -472,9 +471,6 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     if (ctx == NULL || codec_ctx == NULL) {
         return NGX_ERROR;
     }
-
-    metadata.width = codec_ctx->width;
-    metadata.height = codec_ctx->height;
 
     /* init video */
 
@@ -493,10 +489,9 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     b.end = b.start + sizeof(buffer);
     b.pos = b.last = b.start;
 
-    metadata.video = 1;
-
-    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT, &metadata); 
-    ngx_rtmp_mp4_write_moov(s, &b, &metadata);
+    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT,
+                            NGX_RTMP_MP4_VIDEO_TRACK);
+    ngx_rtmp_mp4_write_moov(s, &b, NGX_RTMP_MP4_VIDEO_TRACK);
 
     rc = ngx_write_fd(fd, b.start, (size_t) (b.last - b.start)); 
     if (rc == NGX_ERROR) {
@@ -521,10 +516,9 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
 
     b.pos = b.last = b.start;
 
-    metadata.video = 0;
-
-    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT, &metadata); 
-    ngx_rtmp_mp4_write_moov(s, &b, &metadata);
+    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT,
+                            NGX_RTMP_MP4_AUDIO_TRACK);
+    ngx_rtmp_mp4_write_moov(s, &b, NGX_RTMP_MP4_AUDIO_TRACK);
 
     rc = ngx_write_fd(fd, b.start, (size_t) (b.last - b.start));
     if (rc == NGX_ERROR) {
@@ -565,7 +559,9 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
     b.end = buffer + sizeof(buffer);
     b.pos = b.last = b.start;
 
-    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_SEG, NULL); 
+    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_SEG, t->type == 'v' ?
+                            NGX_RTMP_MP4_VIDEO_TRACK :
+                            NGX_RTMP_MP4_AUDIO_TRACK);
 
     pos = b.last;
     b.last += 44; /* leave room for sidx */
@@ -1046,10 +1042,11 @@ static ngx_int_t
 ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
     ngx_rtmp_dash_track_t *t, ngx_int_t key, uint32_t timestamp, uint32_t delay)
 {
-    u_char         *p;
-    size_t          size, bsize;
+    u_char                 *p;
+    size_t                  size, bsize;
+    ngx_rtmp_mp4_sample_t  *smpl;
 
-    static u_char   buffer[NGX_RTMP_DASH_BUFSIZE];
+    static u_char           buffer[NGX_RTMP_DASH_BUFSIZE];
 
     p = buffer;
     size = 0;
@@ -1081,15 +1078,17 @@ ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
             return NGX_ERROR;
         }
 
-        t->samples[t->sample_count].delay = delay;
-        t->samples[t->sample_count].size = (uint32_t) size;
-        t->samples[t->sample_count].duration = 0;
-        t->samples[t->sample_count].timestamp = timestamp;
-        t->samples[t->sample_count].key = (key ? 1 : 0);
+        smpl = &t->samples[t->sample_count];
+
+        smpl->delay = delay;
+        smpl->size = (uint32_t) size;
+        smpl->duration = 0;
+        smpl->timestamp = timestamp;
+        smpl->key = (key ? 1 : 0);
 
         if (t->sample_count > 0) {
-            t->samples[t->sample_count - 1].duration = timestamp -
-                                      t->samples[t->sample_count - 1].timestamp;
+            smpl = &t->samples[t->sample_count - 1];
+            smpl->duration = timestamp - smpl->timestamp;
         }
 
         t->sample_count++;

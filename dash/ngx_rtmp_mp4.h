@@ -24,23 +24,22 @@ typedef struct {
 } ngx_rtmp_mp4_sample_t;
 
 
-typedef struct {
-    ngx_uint_t      width;
-    ngx_uint_t      height;
-    ngx_uint_t      video;
-} ngx_rtmp_mp4_metadata_t;
-
-
-enum {
-    NGX_RTMP_MP4_FILETYPE_INIT = 0,
+typedef enum {
+    NGX_RTMP_MP4_FILETYPE_INIT,
     NGX_RTMP_MP4_FILETYPE_SEG
-};
+} ngx_rtmp_mp4_file_type_t;
 
 
-ngx_int_t ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b, int type, 
-    ngx_rtmp_mp4_metadata_t *metadata);
-ngx_int_t ngx_rtmp_mp4_write_moov(ngx_rtmp_session_t *s, ngx_buf_t *b, 
-    ngx_rtmp_mp4_metadata_t *metadata);
+typedef enum {
+    NGX_RTMP_MP4_VIDEO_TRACK,
+    NGX_RTMP_MP4_AUDIO_TRACK
+} ngx_rtmp_mp4_track_type_t;
+
+
+ngx_int_t ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b, ngx_rtmp_mp4_file_type_t ftype,
+    ngx_rtmp_mp4_track_type_t ttype);
+ngx_int_t ngx_rtmp_mp4_write_moov(ngx_rtmp_session_t *s, ngx_buf_t *b,
+    ngx_rtmp_mp4_track_type_t ttype);
 ngx_int_t ngx_rtmp_mp4_write_moof(ngx_buf_t *b, uint32_t earliest_pres_time,
     uint32_t sample_count, ngx_rtmp_mp4_sample_t *samples,
     ngx_uint_t sample_mask, uint32_t index);
