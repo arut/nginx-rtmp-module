@@ -475,16 +475,13 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
 
     metadata.width = codec_ctx->width;
     metadata.height = codec_ctx->height;
-    metadata.sample_rate = codec_ctx->sample_rate;
-    metadata.frame_rate = codec_ctx->frame_rate;
-    metadata.audio_codec = codec_ctx->audio_codec_id;
 
     /* init video */
 
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "init.m4v") = 0;
 
     fd = ngx_open_file(ctx->stream.data, NGX_FILE_RDWR, NGX_FILE_TRUNCATE,
-                            NGX_FILE_DEFAULT_ACCESS);
+                       NGX_FILE_DEFAULT_ACCESS);
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -496,10 +493,8 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     b.end = b.start + sizeof(buffer);
     b.pos = b.last = b.start;
 
-    metadata.audio = 0;
     metadata.video = 1;
 
-    /*TODO: buffer control*/
     ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT, &metadata); 
     ngx_rtmp_mp4_write_moov(s, &b, &metadata);
 
@@ -527,9 +522,7 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     b.pos = b.last = b.start;
 
     metadata.video = 0;
-    metadata.audio = 1;
 
-    /*TODO: buffer control*/
     ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT, &metadata); 
     ngx_rtmp_mp4_write_moov(s, &b, &metadata);
 
@@ -1088,7 +1081,7 @@ ngx_rtmp_dash_append(ngx_rtmp_session_t *s, ngx_chain_t *in,
             return NGX_ERROR;
         }
 
-        t->samples[t->sample_count].delay = 0;
+        t->samples[t->sample_count].delay = delay;
         t->samples[t->sample_count].size = (uint32_t) size;
         t->samples[t->sample_count].duration = 0;
         t->samples[t->sample_count].timestamp = timestamp;

@@ -27,11 +27,7 @@ typedef struct {
 typedef struct {
     ngx_uint_t      width;
     ngx_uint_t      height;
-    ngx_uint_t      audio;
     ngx_uint_t      video;
-    ngx_uint_t      sample_rate;
-    ngx_uint_t      frame_rate;
-    ngx_uint_t      audio_codec;
 } ngx_rtmp_mp4_metadata_t;
 
 
