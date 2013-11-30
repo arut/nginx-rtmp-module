@@ -880,7 +880,7 @@ ngx_rtmp_finalize_set_chunk_size(ngx_rtmp_session_t *s)
     if (s->in_chunk_size_changing && s->in_old_pool) {
         ngx_destroy_pool(s->in_old_pool);
         s->in_old_pool = NULL;
-    	s->in_chunk_size_changing = 0;
+        s->in_chunk_size_changing = 0;
     }
     return NGX_OK;
 }

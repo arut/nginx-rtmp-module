@@ -265,33 +265,33 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
 
 
 static ngx_rtmp_module_t  ngx_rtmp_hls_module_ctx = {
-	NULL,                               /* preconfiguration */
-	ngx_rtmp_hls_postconfiguration,     /* postconfiguration */
+    NULL,                               /* preconfiguration */
+    ngx_rtmp_hls_postconfiguration,     /* postconfiguration */
 
-	NULL,                               /* create main configuration */
-	NULL,                               /* init main configuration */
+    NULL,                               /* create main configuration */
+    NULL,                               /* init main configuration */
 
-	NULL,                               /* create server configuration */
-	NULL,                               /* merge server configuration */
+    NULL,                               /* create server configuration */
+    NULL,                               /* merge server configuration */
 
-	ngx_rtmp_hls_create_app_conf,       /* create location configuration */
-	ngx_rtmp_hls_merge_app_conf,        /* merge location configuration */
+    ngx_rtmp_hls_create_app_conf,       /* create location configuration */
+    ngx_rtmp_hls_merge_app_conf,        /* merge location configuration */
 };
 
 
 ngx_module_t  ngx_rtmp_hls_module = {
-	NGX_MODULE_V1,
-	&ngx_rtmp_hls_module_ctx,           /* module context */
-	ngx_rtmp_hls_commands,              /* module directives */
-	NGX_RTMP_MODULE,                    /* module type */
-	NULL,                               /* init master */
-	NULL,                               /* init module */
-	NULL,                               /* init process */
-	NULL,                               /* init thread */
-	NULL,                               /* exit thread */
-	NULL,                               /* exit process */
-	NULL,                               /* exit master */
-	NGX_MODULE_V1_PADDING
+    NGX_MODULE_V1,
+    &ngx_rtmp_hls_module_ctx,           /* module context */
+    ngx_rtmp_hls_commands,              /* module directives */
+    NGX_RTMP_MODULE,                    /* module type */
+    NULL,                               /* init master */
+    NULL,                               /* init module */
+    NULL,                               /* init process */
+    NULL,                               /* init thread */
+    NULL,                               /* exit thread */
+    NULL,                               /* exit process */
+    NULL,                               /* exit master */
+    NGX_MODULE_V1_PADDING
 };
 
 

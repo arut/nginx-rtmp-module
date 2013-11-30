@@ -73,33 +73,33 @@ static ngx_command_t  ngx_rtmp_stat_commands[] = {
 
 
 static ngx_http_module_t  ngx_rtmp_stat_module_ctx = {
-	NULL,                               /* preconfiguration */
-	ngx_rtmp_stat_postconfiguration,    /* postconfiguration */
+    NULL,                               /* preconfiguration */
+    ngx_rtmp_stat_postconfiguration,    /* postconfiguration */
 
-	NULL,                               /* create main configuration */
-	NULL,                               /* init main configuration */
+    NULL,                               /* create main configuration */
+    NULL,                               /* init main configuration */
 
-	NULL,                               /* create server configuration */
-	NULL,                               /* merge server configuration */
+    NULL,                               /* create server configuration */
+    NULL,                               /* merge server configuration */
 
-	ngx_rtmp_stat_create_loc_conf,      /* create location configuration */
-	ngx_rtmp_stat_merge_loc_conf,       /* merge location configuration */
+    ngx_rtmp_stat_create_loc_conf,      /* create location configuration */
+    ngx_rtmp_stat_merge_loc_conf,       /* merge location configuration */
 };
 
 
 ngx_module_t  ngx_rtmp_stat_module = {
-	NGX_MODULE_V1,
-	&ngx_rtmp_stat_module_ctx,          /* module context */
-	ngx_rtmp_stat_commands,             /* module directives */
-	NGX_HTTP_MODULE,                    /* module type */
-	NULL,                               /* init master */
-	NULL,                               /* init module */
-	ngx_rtmp_stat_init_process,         /* init process */
-	NULL,                               /* init thread */
-	NULL,                               /* exit thread */
-	NULL,                               /* exit process */
-	NULL,                               /* exit master */
-	NGX_MODULE_V1_PADDING
+    NGX_MODULE_V1,
+    &ngx_rtmp_stat_module_ctx,          /* module context */
+    ngx_rtmp_stat_commands,             /* module directives */
+    NGX_HTTP_MODULE,                    /* module type */
+    NULL,                               /* init master */
+    NULL,                               /* init module */
+    ngx_rtmp_stat_init_process,         /* init process */
+    NULL,                               /* init thread */
+    NULL,                               /* exit thread */
+    NULL,                               /* exit process */
+    NULL,                               /* exit master */
+    NGX_MODULE_V1_PADDING
 };
 
 
