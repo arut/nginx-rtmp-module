@@ -34,7 +34,7 @@
 				}
 			}
 
-			private function resetVideo():void {           
+			private function resetVideo():void {
 				videoEventsDisabled = true;
 
 				try {
