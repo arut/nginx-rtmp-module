@@ -29,4 +29,3 @@ void ngx_rtmp_update_bandwidth(ngx_rtmp_bandwidth_t *bw, uint32_t bytes);
 
 
 #endif /* _NGX_RTMP_BANDWIDTH_H_INCLUDED_ */
- 

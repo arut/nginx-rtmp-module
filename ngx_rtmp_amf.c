@@ -89,7 +89,7 @@ ngx_rtmp_amf_get(ngx_rtmp_amf_ctx_t *ctx, void *p, size_t n)
             }
             ctx->offset = offset + n;
             ctx->link = l;
-            
+
 #ifdef NGX_DEBUG
             ngx_rtmp_amf_debug("read", ctx->log, (u_char*)op, on);
 #endif
@@ -169,8 +169,8 @@ ngx_rtmp_amf_put(ngx_rtmp_amf_ctx_t *ctx, void *p, size_t n)
 }
 
 
-static ngx_int_t 
-ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts, 
+static ngx_int_t
+ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
         size_t nelts)
 {
     uint8_t                 type;
@@ -220,7 +220,7 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 
         /* TODO: if we require array to be sorted on name
          * then we could be able to use binary search */
-        for(n = 0; n < nelts 
+        for(n = 0; n < nelts
                 && (len != elts[n].name.len
                     || ngx_strncmp(name, elts[n].name.data, len));
                 ++n);
@@ -239,8 +239,8 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 }
 
 
-static ngx_int_t 
-ngx_rtmp_amf_read_array(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts, 
+static ngx_int_t
+ngx_rtmp_amf_read_array(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
         size_t nelts)
 {
     uint32_t                len;
@@ -262,8 +262,8 @@ ngx_rtmp_amf_read_array(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 }
 
 
-static ngx_int_t 
-ngx_rtmp_amf_read_variant(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts, 
+static ngx_int_t
+ngx_rtmp_amf_read_variant(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
         size_t nelts)
 {
     uint8_t                 type;
@@ -299,8 +299,8 @@ ngx_rtmp_amf_is_compatible_type(uint8_t t1, uint8_t t2)
 }
 
 
-ngx_int_t 
-ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts, 
+ngx_int_t
+ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
         size_t nelts)
 {
     void                       *data;
@@ -328,7 +328,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                     return NGX_ERROR;
             }
             type = type8;
-            data = (elts && 
+            data = (elts &&
                     ngx_rtmp_amf_is_compatible_type(
                                  (uint8_t) (elts->type & 0xff), (uint8_t) type))
                 ? elts->data
@@ -393,18 +393,18 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                 }
 
             case NGX_RTMP_AMF_OBJECT:
-                if (ngx_rtmp_amf_read_object(ctx, data, 
+                if (ngx_rtmp_amf_read_object(ctx, data,
                     data && elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
-                    ) != NGX_OK) 
+                    ) != NGX_OK)
                 {
                     return NGX_ERROR;
                 }
                 break;
 
             case NGX_RTMP_AMF_ARRAY:
-                if (ngx_rtmp_amf_read_array(ctx, data, 
+                if (ngx_rtmp_amf_read_array(ctx, data,
                     data && elts ? elts->len / sizeof(ngx_rtmp_amf_elt_t) : 0
-                    ) != NGX_OK) 
+                    ) != NGX_OK)
                 {
                     return NGX_ERROR;
                 }
@@ -418,7 +418,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                     return NGX_ERROR;
                 }
                 break;
-                
+
             case NGX_RTMP_AMF_INT8:
                 if (ngx_rtmp_amf_get(ctx, data, 1) != NGX_OK) {
                     return NGX_ERROR;
@@ -455,7 +455,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
 }
 
 
-static ngx_int_t 
+static ngx_int_t
 ngx_rtmp_amf_write_object(ngx_rtmp_amf_ctx_t *ctx,
         ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
@@ -467,9 +467,9 @@ ngx_rtmp_amf_write_object(ngx_rtmp_amf_ctx_t *ctx,
 
         len = (uint16_t) elts[n].name.len;
 
-        if (ngx_rtmp_amf_put(ctx, 
-                    ngx_rtmp_amf_reverse_copy(buf, 
-                        &len, 2), 2) != NGX_OK) 
+        if (ngx_rtmp_amf_put(ctx,
+                    ngx_rtmp_amf_reverse_copy(buf,
+                        &len, 2), 2) != NGX_OK)
         {
             return NGX_ERROR;
         }
@@ -491,7 +491,7 @@ ngx_rtmp_amf_write_object(ngx_rtmp_amf_ctx_t *ctx,
 }
 
 
-static ngx_int_t 
+static ngx_int_t
 ngx_rtmp_amf_write_array(ngx_rtmp_amf_ctx_t *ctx,
         ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
@@ -500,9 +500,9 @@ ngx_rtmp_amf_write_array(ngx_rtmp_amf_ctx_t *ctx,
     u_char                  buf[4];
 
     len = nelts;
-    if (ngx_rtmp_amf_put(ctx, 
-                ngx_rtmp_amf_reverse_copy(buf, 
-                    &len, 4), 4) != NGX_OK) 
+    if (ngx_rtmp_amf_put(ctx,
+                ngx_rtmp_amf_reverse_copy(buf,
+                    &len, 4), 4) != NGX_OK)
     {
         return NGX_ERROR;
     }
@@ -517,7 +517,7 @@ ngx_rtmp_amf_write_array(ngx_rtmp_amf_ctx_t *ctx,
 }
 
 
-ngx_int_t 
+ngx_int_t
 ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
         ngx_rtmp_amf_elt_t *elts, size_t nelts)
 {
@@ -545,9 +545,9 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
 
         switch(type) {
             case NGX_RTMP_AMF_NUMBER:
-                if (ngx_rtmp_amf_put(ctx, 
-                            ngx_rtmp_amf_reverse_copy(buf, 
-                                data, 8), 8) != NGX_OK) 
+                if (ngx_rtmp_amf_put(ctx,
+                            ngx_rtmp_amf_reverse_copy(buf,
+                                data, 8), 8) != NGX_OK)
                 {
                     return NGX_ERROR;
                 }
@@ -564,9 +564,9 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
                     len = (uint16_t) ngx_strlen((u_char*) data);
                 }
 
-                if (ngx_rtmp_amf_put(ctx, 
-                            ngx_rtmp_amf_reverse_copy(buf, 
-                                &len, 2), 2) != NGX_OK) 
+                if (ngx_rtmp_amf_put(ctx,
+                            ngx_rtmp_amf_reverse_copy(buf,
+                                &len, 2), 2) != NGX_OK)
                 {
                     return NGX_ERROR;
                 }
@@ -597,7 +597,7 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
                 break;
 
             case NGX_RTMP_AMF_ARRAY:
-                if (ngx_rtmp_amf_write_array(ctx, data, 
+                if (ngx_rtmp_amf_write_array(ctx, data,
                         elts[n].len / sizeof(ngx_rtmp_amf_elt_t)) != NGX_OK)
                 {
                     return NGX_ERROR;
@@ -612,8 +612,8 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
 
             case NGX_RTMP_AMF_INT16:
                 if (ngx_rtmp_amf_put(ctx,
-                            ngx_rtmp_amf_reverse_copy(buf, 
-                                data, 2), 2) != NGX_OK) 
+                            ngx_rtmp_amf_reverse_copy(buf,
+                                data, 2), 2) != NGX_OK)
                 {
                     return NGX_ERROR;
                 }
@@ -621,8 +621,8 @@ ngx_rtmp_amf_write(ngx_rtmp_amf_ctx_t *ctx,
 
             case NGX_RTMP_AMF_INT32:
                 if (ngx_rtmp_amf_put(ctx,
-                            ngx_rtmp_amf_reverse_copy(buf, 
-                                data, 4), 4) != NGX_OK) 
+                            ngx_rtmp_amf_reverse_copy(buf,
+                                data, 4), 4) != NGX_OK)
                 {
                     return NGX_ERROR;
                 }

@@ -18,11 +18,11 @@ static ngx_rtmp_play_pt             next_play;
 #define NGX_RTMP_ACCESS_PLAY        0x02
 
 
-static char * ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, 
+static char * ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 static ngx_int_t ngx_rtmp_access_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_access_create_app_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_access_merge_app_conf(ngx_conf_t *cf, 
+static char * ngx_rtmp_access_merge_app_conf(ngx_conf_t *cf,
        void *parent, void *child);
 
 
@@ -331,7 +331,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #if (NGX_HAVE_INET6)
     ngx_rtmp_access_rule6_t            *rule6;
 #endif
-    size_t                              n; 
+    size_t                              n;
     ngx_uint_t                          flags;
 
     ngx_memzero(&cidr, sizeof(ngx_cidr_t));
@@ -342,7 +342,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     flags = 0;
 
     if (cf->args->nelts == 2) {
-        
+
         flags = NGX_RTMP_ACCESS_PUBLISH | NGX_RTMP_ACCESS_PLAY;
 
     } else {
@@ -356,7 +356,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 continue;
 
             }
-            
+
             if (value[n].len == sizeof("play") - 1 &&
                 ngx_strcmp(value[1].data, "play") == 0)
             {
@@ -430,7 +430,7 @@ ngx_rtmp_access_rule(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
-static ngx_int_t 
+static ngx_int_t
 ngx_rtmp_access_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     if (s->auto_pushed) {
@@ -446,7 +446,7 @@ next:
 }
 
 
-static ngx_int_t 
+static ngx_int_t
 ngx_rtmp_access_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 {
     if (ngx_rtmp_access(s, NGX_RTMP_ACCESS_PLAY) != NGX_OK) {

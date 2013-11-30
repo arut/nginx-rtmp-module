@@ -14,7 +14,7 @@
 
 static char *ngx_rtmp_control(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void * ngx_rtmp_control_create_loc_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_control_merge_loc_conf(ngx_conf_t *cf, 
+static char * ngx_rtmp_control_merge_loc_conf(ngx_conf_t *cf,
        void *parent, void *child);
 
 
@@ -46,7 +46,7 @@ static ngx_conf_bitmask_t           ngx_rtmp_control_masks[] = {
     { ngx_string("record"),         NGX_RTMP_CONTROL_RECORD    },
     { ngx_string("drop"),           NGX_RTMP_CONTROL_DROP      },
     { ngx_null_string,              0                          }
-}; 
+};
 
 
 static ngx_command_t  ngx_rtmp_control_commands[] = {
@@ -133,7 +133,7 @@ ngx_rtmp_control_parse_core(ngx_http_request_t *r,
     ngx_rtmp_core_srv_conf_t  **pcscf;
     ngx_rtmp_core_app_conf_t  **pcacf;
 
- 
+
     core->cmcf = ngx_rtmp_core_main_conf;
     if (core->cmcf == NULL) {
         return "Missing main RTMP conf";
@@ -199,7 +199,7 @@ ngx_rtmp_control_parse_live(ngx_http_request_t *r,
     /* find live stream by name */
     for (live->ls = live->lacf->streams[ngx_hash_key(name.data, name.len) %
                                         live->lacf->nbuckets];
-         live->ls; live->ls = live->ls->next) 
+         live->ls; live->ls = live->ls->next)
     {
         len = ngx_strlen(live->ls->name);
 
@@ -319,7 +319,7 @@ ngx_rtmp_control_record(ngx_http_request_t *r, ngx_str_t *method)
 
     b->last = ngx_cpymem(b->pos, path.data, path.len);
     b->last_buf = 1;
-    
+
     ngx_http_send_header(r);
 
     return ngx_http_output_filter(r, &cl);

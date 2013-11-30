@@ -12,12 +12,12 @@
 #include <string.h>
 
 
-ngx_int_t 
+ngx_int_t
 ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
     ngx_buf_t              *b;
-    u_char                 *p; 
+    u_char                 *p;
     uint32_t                val;
     uint8_t                 limit;
 
@@ -67,7 +67,7 @@ ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
                 (void)limit;
 
                 ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                    "receive bandwidth=%uD limit=%d", 
+                    "receive bandwidth=%uD limit=%d",
                     val, (int)limit);
 
                 /* receive window size =val
@@ -83,12 +83,12 @@ ngx_rtmp_protocol_message_handler(ngx_rtmp_session_t *s,
 }
 
 
-ngx_int_t 
+ngx_int_t
 ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                               ngx_chain_t *in)
 {
     ngx_buf_t              *b;
-    u_char                 *p; 
+    u_char                 *p;
     uint16_t                evt;
     uint32_t                val;
 
@@ -107,7 +107,7 @@ ngx_rtmp_user_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     p[1] = b->pos[0];
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "RTMP recv user evt %s (%i)", 
+                   "RTMP recv user evt %s (%i)",
                    ngx_rtmp_user_message_type(evt), (ngx_int_t) evt);
 
     p = (u_char *) &val;
@@ -256,7 +256,7 @@ ngx_rtmp_fetch_uint32(ngx_chain_t **in, uint32_t *ret, ngx_int_t n)
 }
 
 
-ngx_int_t 
+ngx_int_t
 ngx_rtmp_aggregate_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                                    ngx_chain_t *in)
 {
@@ -322,7 +322,7 @@ ngx_rtmp_aggregate_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
 
         if (cl == NULL) {
-            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                           "RTMP error parsing aggregate");
             return NGX_ERROR;
         }
@@ -364,7 +364,7 @@ ngx_rtmp_aggregate_message_handler(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 }
 
 
-ngx_int_t 
+ngx_int_t
 ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
@@ -379,14 +379,14 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
     static ngx_rtmp_amf_elt_t   elts[] = {
 
         { NGX_RTMP_AMF_STRING,
-          ngx_null_string,  
+          ngx_null_string,
           func,   sizeof(func) },
     };
 
     /* AMF command names come with string type, but shared object names
      * come without type */
-    if (h->type == NGX_RTMP_MSG_AMF_SHARED || 
-        h->type == NGX_RTMP_MSG_AMF3_SHARED) 
+    if (h->type == NGX_RTMP_MSG_AMF_SHARED ||
+        h->type == NGX_RTMP_MSG_AMF3_SHARED)
     {
         elts[0].type |= NGX_RTMP_AMF_TYPELESS;
     } else {
@@ -396,7 +396,7 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
     if ((h->type == NGX_RTMP_MSG_AMF3_SHARED ||
          h->type == NGX_RTMP_MSG_AMF3_META ||
          h->type == NGX_RTMP_MSG_AMF3_CMD)
-         && in->buf->last > in->buf->pos) 
+         && in->buf->last > in->buf->pos)
     {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "AMF3 prefix: %ui", (ngx_int_t)*in->buf->pos);
@@ -411,8 +411,8 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
     act.log = s->connection->log;
     memset(func, 0, sizeof(func));
 
-    if (ngx_rtmp_amf_read(&act, elts, 
-                sizeof(elts) / sizeof(elts[0])) != NGX_OK) 
+    if (ngx_rtmp_amf_read(&act, elts,
+                sizeof(elts) / sizeof(elts[0])) != NGX_OK)
     {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "AMF cmd failed");
@@ -425,14 +425,14 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
 
     len = ngx_strlen(func);
 
-    ch = ngx_hash_find(&cmcf->amf_hash, 
+    ch = ngx_hash_find(&cmcf->amf_hash,
             ngx_hash_strlow(func, func, len), func, len);
 
     if (ch && ch->nelts) {
         ph = ch->elts;
         for (n = 0; n < ch->nelts; ++n, ++ph) {
             ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                "AMF func '%s' passed to handler %d/%d", 
+                "AMF func '%s' passed to handler %d/%d",
                 func, n, ch->nelts);
             switch ((*ph)(s, h, in)) {
                 case NGX_ERROR:
@@ -461,4 +461,4 @@ ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in,
     act.log = s->connection->log;
 
     return ngx_rtmp_amf_read(&act, elts, nelts);
-} 
+}

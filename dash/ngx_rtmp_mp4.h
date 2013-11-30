@@ -44,7 +44,7 @@ ngx_int_t ngx_rtmp_mp4_write_moof(ngx_buf_t *b, uint32_t earliest_pres_time,
     uint32_t sample_count, ngx_rtmp_mp4_sample_t *samples,
     ngx_uint_t sample_mask, uint32_t index);
 ngx_int_t ngx_rtmp_mp4_write_sidx(ngx_buf_t *b,
-    ngx_uint_t reference_size, uint32_t earliest_pres_time, 
+    ngx_uint_t reference_size, uint32_t earliest_pres_time,
     uint32_t latest_pres_time);
 ngx_uint_t ngx_rtmp_mp4_write_mdat(ngx_buf_t *b, ngx_uint_t size);
 

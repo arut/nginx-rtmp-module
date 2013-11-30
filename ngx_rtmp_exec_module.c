@@ -29,7 +29,7 @@ static ngx_int_t ngx_rtmp_exec_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_exec_create_main_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_exec_init_main_conf(ngx_conf_t *cf, void *conf);
 static void * ngx_rtmp_exec_create_app_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, 
+static char * ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf,
        void *parent, void *child);
 /*static char * ngx_rtmp_exec_block(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);*/
@@ -113,7 +113,7 @@ struct ngx_rtmp_exec_pull_ctx_s {
 
 typedef struct {
     ngx_int_t                           active;
-    ngx_array_t                         conf[NGX_RTMP_EXEC_MAX]; 
+    ngx_array_t                         conf[NGX_RTMP_EXEC_MAX];
                                                      /* ngx_rtmp_exec_conf_t */
     ngx_flag_t                          respawn;
     ngx_flag_t                          options;
@@ -153,7 +153,7 @@ static ngx_command_t  ngx_rtmp_exec_commands[] = {
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_1MORE,
       ngx_rtmp_exec_conf,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_exec_app_conf_t, conf) + 
+      offsetof(ngx_rtmp_exec_app_conf_t, conf) +
       NGX_RTMP_EXEC_PUSH * sizeof(ngx_array_t),
       NULL },
 
@@ -161,7 +161,7 @@ static ngx_command_t  ngx_rtmp_exec_commands[] = {
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_1MORE,
       ngx_rtmp_exec_conf,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_exec_app_conf_t, conf) + 
+      offsetof(ngx_rtmp_exec_app_conf_t, conf) +
       NGX_RTMP_EXEC_PUSH * sizeof(ngx_array_t),
       NULL },
 
@@ -213,7 +213,7 @@ static ngx_command_t  ngx_rtmp_exec_commands[] = {
       offsetof(ngx_rtmp_exec_app_conf_t, conf) +
       NGX_RTMP_EXEC_RECORD_DONE * sizeof(ngx_array_t),
       NULL },
-    
+
     { ngx_string("exec_static"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_1MORE,
       ngx_rtmp_exec_conf,
@@ -406,7 +406,7 @@ ngx_rtmp_exec_create_main_conf(ngx_conf_t *cf)
     emcf->respawn_timeout = NGX_CONF_UNSET_MSEC;
     emcf->kill_signal = NGX_CONF_UNSET;
 
-    if (ngx_array_init(&emcf->static_conf, cf->pool, 1, 
+    if (ngx_array_init(&emcf->static_conf, cf->pool, 1,
                        sizeof(ngx_rtmp_exec_conf_t)) != NGX_OK)
     {
         return NULL;
@@ -569,7 +569,7 @@ ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
 
     /* FreeBSD note:
      * When worker is restarted, child process (ffmpeg) will
-     * not be terminated if it's connected to another 
+     * not be terminated if it's connected to another
      * (still alive) worker. That leads to starting
      * another instance of exec_static process.
      * Need to kill previously started processes.
@@ -592,14 +592,14 @@ ngx_rtmp_exec_init_process(ngx_cycle_t *cycle)
 
 
 #if !(NGX_WIN32)
-static void 
+static void
 ngx_rtmp_exec_respawn(ngx_event_t *ev)
 {
     ngx_rtmp_exec_run((ngx_rtmp_exec_t *) ev->data);
 }
 
 
-static void 
+static void
 ngx_rtmp_exec_child_dead(ngx_event_t *ev)
 {
     ngx_connection_t   *dummy_conn = ev->data;
@@ -717,7 +717,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
         }
 
         if (ret == -1) {
-            
+
             close(pipefd[0]);
             close(pipefd[1]);
 
@@ -770,7 +770,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
                 close(fd);
             }
 
-            fd = open("/dev/null", O_RDWR);            
+            fd = open("/dev/null", O_RDWR);
 
             dup2(fd, STDIN_FILENO);
             dup2(fd, STDOUT_FILENO);
@@ -792,7 +792,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
                 } else {
                     ngx_rtmp_eval(e->eval_ctx, arg_in, e->eval, &a, e->log);
                 }
-                
+
                 if (ngx_rtmp_eval_streams(&a) != NGX_DONE) {
                     continue;
                 }
@@ -817,7 +817,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
 #endif
 
             if (execvp((char *) ec->cmd.data, args) == -1) {
-                char    *msg; 
+                char    *msg;
 
                 msg = strerror(errno);
 
@@ -839,7 +839,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             }
 
             if (pipefd[0] != -1) {
-                
+
                 e->active = 1;
                 e->pid = pid;
                 e->pipefd = pipefd[0];
@@ -865,7 +865,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             }
 
             ngx_log_debug2(NGX_LOG_DEBUG_RTMP, e->log, 0,
-                           "exec: child '%V' started pid=%i", 
+                           "exec: child '%V' started pid=%i",
                            &ec->cmd, (ngx_int_t) pid);
             break;
     }
@@ -885,7 +885,7 @@ ngx_rtmp_exec_init_ctx(ngx_rtmp_session_t *s, u_char name[NGX_RTMP_MAX_NAME],
     ngx_rtmp_exec_conf_t       *ec;
     ngx_rtmp_exec_app_conf_t   *eacf;
     ngx_rtmp_exec_main_conf_t  *emcf;
-    
+
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_exec_module);
 
     if (ctx != NULL) {
@@ -1240,7 +1240,7 @@ ngx_rtmp_exec_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     }
 
     ctx->flags = 0;
-    
+
     if (ctx->push_exec.nelts > 0) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "exec: delete %uz push command(s)",
@@ -1381,7 +1381,7 @@ ngx_rtmp_exec_conf(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 if (s == NULL) {
                     return NGX_CONF_ERROR;
                 }
-                
+
                 v.data += 5;
                 v.len -= 5;
 

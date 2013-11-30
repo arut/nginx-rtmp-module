@@ -1,6 +1,6 @@
 ngx_addon_name="ngx_rtmp_module"
 
-CORE_MODULES="$CORE_MODULES 
+CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_module                             \
                 ngx_rtmp_core_module                        \
                 ngx_rtmp_cmd_module                         \

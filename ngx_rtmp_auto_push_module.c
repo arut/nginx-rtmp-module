@@ -19,9 +19,9 @@ static void ngx_rtmp_auto_push_exit_process(ngx_cycle_t *cycle);
 static void * ngx_rtmp_auto_push_create_conf(ngx_cycle_t *cf);
 static char * ngx_rtmp_auto_push_init_conf(ngx_cycle_t *cycle, void *conf);
 #if (NGX_HAVE_UNIX_DOMAIN)
-static ngx_int_t ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, 
+static ngx_int_t ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s,
        ngx_rtmp_publish_t *v);
-static ngx_int_t ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s, 
+static ngx_int_t ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
        ngx_rtmp_delete_stream_t *v);
 #endif
 
@@ -112,7 +112,7 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
         return NGX_OK;
     }
 
-    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(cycle->conf_ctx, 
+    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(cycle->conf_ctx,
                                                     ngx_rtmp_auto_push_module);
     if (apcf->auto_push == 0) {
         return NGX_OK;
@@ -154,7 +154,7 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
     /* Disable unix socket client address extraction
      * from accept call
      * Nginx generates bad addr_text with this enabled */
-    ls->addr_ntop = 0; 
+    ls->addr_ntop = 0;
 
     ls->socklen = sizeof(struct sockaddr_un);
     sun = ngx_pcalloc(cycle->pool, ls->socklen);
@@ -163,17 +163,17 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
         return NGX_ERROR;
     }
     sun->sun_family = AF_UNIX;
-    *ngx_snprintf((u_char *) sun->sun_path, sizeof(sun->sun_path), 
-                  "%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i", 
+    *ngx_snprintf((u_char *) sun->sun_path, sizeof(sun->sun_path),
+                  "%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i",
                   &apcf->socket_dir, ngx_process_slot)
         = 0;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, cycle->log, 0, 
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, cycle->log, 0,
                    "auto_push: create socket '%s'",
                    sun->sun_path);
 
     if (ngx_file_info(sun->sun_path, &fi) != ENOENT) {
-        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, cycle->log, 0, 
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, cycle->log, 0,
                        "auto_push: delete existing socket '%s'",
                        sun->sun_path);
         ngx_delete_file(sun->sun_path);
@@ -247,14 +247,14 @@ ngx_rtmp_auto_push_exit_process(ngx_cycle_t *cycle)
     ngx_rtmp_auto_push_conf_t  *apcf;
     u_char                      path[NGX_MAX_PATH];
 
-    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(cycle->conf_ctx, 
+    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(cycle->conf_ctx,
                                                     ngx_rtmp_auto_push_module);
     if (apcf->auto_push == 0) {
         return;
     }
     *ngx_snprintf(path, sizeof(path),
-                  "%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i", 
-                  &apcf->socket_dir, ngx_process_slot) 
+                  "%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i",
+                  &apcf->socket_dir, ngx_process_slot)
          = 0;
 
     ngx_delete_file(path);
@@ -319,10 +319,10 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     ngx_core_conf_t                *ccf;
     ngx_file_info_t                 fi;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "auto_push: reconnect");
-    
-    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, 
+
+    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
                                                     ngx_rtmp_auto_push_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_auto_push_module);
     if (ctx == NULL) {
@@ -366,7 +366,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
         ngx_memzero(&at.url, sizeof(at.url));
         u = &at.url.url;
         p = ngx_snprintf(path, sizeof(path) - 1,
-                         "unix:%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i", 
+                         "unix:%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i",
                          &apcf->socket_dir, n);
         *p = 0;
 
@@ -388,12 +388,12 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
             continue;
         }
 
-        p = ngx_snprintf(flash_ver, sizeof(flash_ver) - 1, "APSH %i,%i", 
+        p = ngx_snprintf(flash_ver, sizeof(flash_ver) - 1, "APSH %i,%i",
                          (ngx_int_t) ngx_process_slot, (ngx_int_t) ngx_pid);
         at.flash_ver.data = flash_ver;
         at.flash_ver.len = p - flash_ver;
 
-        ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+        ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "auto_push: connect slot=%i pid=%P socket='%s' name='%s'",
                        n, pid, path, ctx->name);
 
@@ -455,7 +455,7 @@ ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, 
+    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
                                                     ngx_rtmp_auto_push_module);
     if (apcf->auto_push == 0) {
         goto next;
@@ -463,7 +463,7 @@ ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_auto_push_module);
     if (ctx == NULL) {
-        ctx = ngx_palloc(s->connection->pool, 
+        ctx = ngx_palloc(s->connection->pool,
                          sizeof(ngx_rtmp_auto_push_ctx_t));
         if (ctx == NULL) {
             goto next;
@@ -477,7 +477,7 @@ ngx_rtmp_auto_push_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ctx->push_evt.log = s->connection->log;
     ctx->push_evt.handler = ngx_rtmp_auto_push_reconnect;
 
-    ctx->slots = ngx_pcalloc(s->connection->pool, 
+    ctx->slots = ngx_pcalloc(s->connection->pool,
                              sizeof(ngx_int_t) * NGX_MAX_PROCESSES);
     if (ctx->slots == NULL) {
         goto next;
@@ -494,7 +494,7 @@ next:
 
 
 static ngx_int_t
-ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s, 
+ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
     ngx_rtmp_delete_stream_t *v)
 {
     ngx_rtmp_auto_push_conf_t      *apcf;
@@ -502,7 +502,7 @@ ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
     ngx_rtmp_relay_ctx_t           *rctx;
     ngx_int_t                       slot;
 
-    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx, 
+    apcf = (ngx_rtmp_auto_push_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
                                                     ngx_rtmp_auto_push_module);
     if (apcf->auto_push == 0) {
         goto next;
@@ -518,20 +518,20 @@ ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
 
     /* skip non-relays & publishers */
     rctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
-    if (rctx == NULL || 
+    if (rctx == NULL ||
         rctx->tag != &ngx_rtmp_auto_push_module ||
-        rctx->publish == NULL) 
+        rctx->publish == NULL)
     {
         goto next;
     }
 
     slot = (ngx_process_t *) rctx->data - &ngx_processes[0];
 
-    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "auto_push: disconnect slot=%i app='%V' name='%V'",
                    slot, &rctx->app, &rctx->name);
 
-    pctx = ngx_rtmp_get_module_ctx(rctx->publish->session, 
+    pctx = ngx_rtmp_get_module_ctx(rctx->publish->session,
                                    ngx_rtmp_auto_push_module);
     if (pctx == NULL) {
         goto next;

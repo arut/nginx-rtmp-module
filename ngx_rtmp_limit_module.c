@@ -80,7 +80,7 @@ ngx_rtmp_limit_create_main_conf(ngx_conf_t *cf)
 
 
 static ngx_int_t
-ngx_rtmp_limit_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+ngx_rtmp_limit_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t *in)
 {
     ngx_rtmp_limit_main_conf_t *lmcf;
@@ -118,7 +118,7 @@ ngx_rtmp_limit_connect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
 
 static ngx_int_t
-ngx_rtmp_limit_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+ngx_rtmp_limit_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t *in)
 {
     ngx_rtmp_limit_main_conf_t *lmcf;
@@ -184,7 +184,7 @@ ngx_rtmp_limit_postconfiguration(ngx_conf_t *cf)
 
     h = ngx_array_push(&cmcf->events[NGX_RTMP_CONNECT]);
     *h = ngx_rtmp_limit_connect;
-    
+
     h = ngx_array_push(&cmcf->events[NGX_RTMP_DISCONNECT]);
     *h = ngx_rtmp_limit_disconnect;
 

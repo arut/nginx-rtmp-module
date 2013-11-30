@@ -9,7 +9,7 @@
 #include "ngx_rtmp.h"
 
 
-ngx_chain_t * 
+ngx_chain_t *
 ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
 {
     u_char                     *p;
@@ -25,7 +25,7 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
 
         size = cscf->chunk_size + NGX_RTMP_MAX_CHUNK_HEADER;
 
-        p = ngx_pcalloc(cscf->pool, NGX_RTMP_REFCOUNT_BYTES 
+        p = ngx_pcalloc(cscf->pool, NGX_RTMP_REFCOUNT_BYTES
                 + sizeof(ngx_chain_t)
                 + sizeof(ngx_buf_t)
                 + size);
@@ -56,7 +56,7 @@ ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf)
 }
 
 
-void 
+void
 ngx_rtmp_free_shared_chain(ngx_rtmp_core_srv_conf_t *cscf, ngx_chain_t *in)
 {
     ngx_chain_t        *cl;
@@ -76,7 +76,7 @@ ngx_rtmp_free_shared_chain(ngx_rtmp_core_srv_conf_t *cscf, ngx_chain_t *in)
 
 
 ngx_chain_t *
-ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, 
+ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf,
         ngx_chain_t *head, ngx_chain_t *in)
 {
     ngx_chain_t                    *l, **ll;
@@ -105,7 +105,7 @@ ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf,
         }
 
         while (l->buf->end - l->buf->last >= in->buf->last - p) {
-            l->buf->last = ngx_cpymem(l->buf->last, p, 
+            l->buf->last = ngx_cpymem(l->buf->last, p,
                     in->buf->last - p);
             in = in->next;
             if (in == NULL) {

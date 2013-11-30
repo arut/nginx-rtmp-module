@@ -21,7 +21,7 @@ static ngx_rtmp_stream_eof_pt           next_stream_eof;
 
 static ngx_int_t ngx_rtmp_live_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_live_create_app_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, 
+static char * ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf,
        void *parent, void *child);
 static char *ngx_rtmp_live_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
@@ -189,7 +189,7 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         return NGX_CONF_ERROR;
     }
 
-    conf->streams = ngx_pcalloc(cf->pool, 
+    conf->streams = ngx_pcalloc(cf->pool,
             sizeof(ngx_rtmp_live_stream_t *) * conf->nbuckets);
 
     return NGX_CONF_OK;
@@ -253,7 +253,7 @@ ngx_rtmp_live_get_stream(ngx_rtmp_session_t *s, u_char *name, int create)
         *stream = ngx_palloc(lacf->pool, sizeof(ngx_rtmp_live_stream_t));
     }
     ngx_memzero(*stream, sizeof(ngx_rtmp_live_stream_t));
-    ngx_memcpy((*stream)->name, name, 
+    ngx_memcpy((*stream)->name, name,
             ngx_min(sizeof((*stream)->name) - 1, len));
     (*stream)->epoch = ngx_current_msec;
 
@@ -261,7 +261,7 @@ ngx_rtmp_live_get_stream(ngx_rtmp_session_t *s, u_char *name, int create)
 }
 
 
-static void 
+static void
 ngx_rtmp_live_idle(ngx_event_t *pev)
 {
     ngx_connection_t           *c;
@@ -511,7 +511,7 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
 
     ctx->session = s;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, 
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "live: join '%s'", name);
 
     stream = ngx_rtmp_live_get_stream(s, name, publisher || lacf->idle_streams);
@@ -612,7 +612,7 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
             for (pctx = ctx->stream->ctx; pctx; pctx = pctx->next) {
                 if (pctx->publishing == 0) {
                     ss = pctx->session;
-                    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0, 
+                    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                    "live: no publisher");
                     ngx_rtmp_finalize_session(ss);
                 }
@@ -693,7 +693,7 @@ next:
 }
 
 static ngx_int_t
-ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                  ngx_chain_t *in)
 {
     ngx_rtmp_live_ctx_t            *ctx, *pctx;
@@ -1083,7 +1083,7 @@ ngx_rtmp_live_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "live: play: name='%s' start=%uD duration=%uD reset=%d",
-                   v->name, (uint32_t) v->start, 
+                   v->name, (uint32_t) v->start,
                    (uint32_t) v->duration, (uint32_t) v->reset);
 
     /* join stream as subscriber */

@@ -25,7 +25,7 @@ ngx_rtmp_bandwidth_t        ngx_rtmp_bw_in;
 
 #ifdef NGX_DEBUG
 char*
-ngx_rtmp_message_type(uint8_t type) 
+ngx_rtmp_message_type(uint8_t type)
 {
     static char*    types[] = {
         "?",
@@ -60,7 +60,7 @@ ngx_rtmp_message_type(uint8_t type)
 
 
 char*
-ngx_rtmp_user_message_type(uint16_t evt) 
+ngx_rtmp_user_message_type(uint16_t evt)
 {
     static char*    evts[] = {
         "stream_begin",
@@ -99,14 +99,14 @@ ngx_rtmp_cycle(ngx_rtmp_session_t *s)
 
 
 static ngx_chain_t *
-ngx_rtmp_alloc_in_buf(ngx_rtmp_session_t *s) 
+ngx_rtmp_alloc_in_buf(ngx_rtmp_session_t *s)
 {
     ngx_chain_t        *cl;
     ngx_buf_t          *b;
     size_t              size;
 
     if ((cl = ngx_alloc_chain_link(s->in_pool)) == NULL
-       || (cl->buf = ngx_calloc_buf(s->in_pool)) == NULL) 
+       || (cl->buf = ngx_calloc_buf(s->in_pool)) == NULL)
     {
         return NULL;
     }
@@ -144,7 +144,7 @@ ngx_rtmp_reset_ping(ngx_rtmp_session_t *s)
 }
 
 
-static void 
+static void
 ngx_rtmp_ping(ngx_event_t *pev)
 {
     ngx_connection_t           *c;
@@ -163,14 +163,14 @@ ngx_rtmp_ping(ngx_event_t *pev)
     }
 
     if (s->ping_active) {
-        ngx_log_error(NGX_LOG_INFO, c->log, 0, 
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
                 "ping: unresponded");
         ngx_rtmp_finalize_session(s);
         return;
     }
 
     if (cscf->busy) {
-        ngx_log_error(NGX_LOG_INFO, c->log, 0, 
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
                 "ping: not busy between pings");
         ngx_rtmp_finalize_session(s);
         return;
@@ -247,7 +247,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 ngx_rtmp_finalize_set_chunk_size(s);
             }
 
-        } else { 
+        } else {
 
             if (old_pos) {
                 b->pos = b->last = b->start;
@@ -273,7 +273,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             s->in_bytes += n;
 
             if (s->ack_size && s->in_bytes - s->in_last_ack >= s->ack_size) {
-                
+
                 s->in_last_ack = s->in_bytes;
 
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0,
@@ -348,7 +348,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             if (fmt <= 2 ) {
                 if (b->last - p < 3)
                     continue;
-                /* timestamp: 
+                /* timestamp:
                  *  big-endian 3b -> little-endian 4b */
                 pp = (u_char*)&timestamp;
                 pp[2] = *p++;
@@ -362,7 +362,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     if (b->last - p < 4)
                         continue;
                     /* size:
-                     *  big-endian 3b -> little-endian 4b 
+                     *  big-endian 3b -> little-endian 4b
                      * type:
                      *  1b -> 1b*/
                     pp = (u_char*)&h->mlen;
@@ -432,7 +432,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
         size = b->last - b->pos;
         fsize = h->mlen - st->len;
 
-        if (size < ngx_min(fsize, s->in_chunk_size)) 
+        if (size < ngx_min(fsize, s->in_chunk_size))
             continue;
 
         /* buffer is ready */
@@ -495,7 +495,7 @@ ngx_rtmp_send(ngx_event_t *wev)
     }
 
     if (wev->timedout) {
-        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT, 
+        ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
                 "client timed out");
         c->timedout = 1;
         ngx_rtmp_finalize_session(s);
@@ -555,8 +555,8 @@ ngx_rtmp_send(ngx_event_t *wev)
 }
 
 
-void 
-ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+void
+ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_header_t *lh, ngx_chain_t *out)
 {
     ngx_chain_t                *l;
@@ -582,7 +582,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* detect packet size */
     mlen = 0;
-    nbufs = 0; 
+    nbufs = 0;
     for(l = out; l; l = l->next) {
         mlen += (l->buf->last - l->buf->pos);
         ++nbufs;
@@ -681,7 +681,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         *p++ = pp[1];
         *p++ = pp[0];
 
-        /* This CONTRADICTS the standard 
+        /* This CONTRADICTS the standard
          * but that's the way flash client
          * wants data to be encoded;
          * ffmpeg complains */
@@ -700,7 +700,7 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
 
 ngx_int_t
-ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out, 
+ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
         ngx_uint_t priority)
 {
     ngx_uint_t                      nmsg;
@@ -711,7 +711,7 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
         priority = 3;
     }
 
-    /* drop packet? 
+    /* drop packet?
      * Note we always leave 1 slot free */
     if (nmsg + priority * s->out_queue / 4 >= s->out_queue) {
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -742,7 +742,7 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 }
 
 
-ngx_int_t 
+ngx_int_t
 ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in)
 {
@@ -758,14 +758,14 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
         int             nbufs;
         ngx_chain_t    *ch;
 
-        for(nbufs = 1, ch = in; 
-                ch->next; 
+        for(nbufs = 1, ch = in;
+                ch->next;
                 ch = ch->next, ++nbufs);
 
         ngx_log_debug7(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "RTMP recv %s (%d) csid=%D timestamp=%D "
                 "mlen=%D msid=%D nbufs=%d",
-                ngx_rtmp_message_type(h->type), (int)h->type, 
+                ngx_rtmp_message_type(h->type), (int)h->type,
                 h->csid, h->timestamp, h->mlen, h->msid, nbufs);
     }
 #endif
@@ -788,7 +788,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
         }
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                 "calling handler %d", n);
-           
+
         switch ((*evh)(s, h, in)) {
             case NGX_ERROR:
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -803,7 +803,7 @@ ngx_rtmp_receive_message(ngx_rtmp_session_t *s,
 }
 
 
-ngx_int_t 
+ngx_int_t
 ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size)
 {
     ngx_rtmp_core_srv_conf_t           *cscf;
@@ -848,7 +848,7 @@ ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size)
                 bo = lo->buf;
 
                 if (bo->end - bo->last >= bi->last - bi->pos) {
-                    bo->last = ngx_cpymem(bo->last, bi->pos, 
+                    bo->last = ngx_cpymem(bo->last, bi->pos,
                             bi->last - bi->pos);
                     li = li->next;
                     if (li == fli)  {
@@ -859,7 +859,7 @@ ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size)
                     continue;
                 }
 
-                bi->pos += (ngx_cpymem(bo->last, bi->pos, 
+                bi->pos += (ngx_cpymem(bo->last, bi->pos,
                             bo->end - bo->last) - bo->last);
                 lo->next = ngx_rtmp_alloc_in_buf(s);
                 lo = lo->next;
@@ -874,7 +874,7 @@ ngx_rtmp_set_chunk_size(ngx_rtmp_session_t *s, ngx_uint_t size)
 }
 
 
-static ngx_int_t 
+static ngx_int_t
 ngx_rtmp_finalize_set_chunk_size(ngx_rtmp_session_t *s)
 {
     if (s->in_chunk_size_changing && s->in_old_pool) {

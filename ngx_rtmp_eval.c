@@ -246,7 +246,7 @@ ngx_rtmp_eval_streams(ngx_str_t *in)
     }
 
     if (*path == (u_char) '&') {
-        
+
         path++;
         v = ngx_atoi(path, in->data + in->len - path);
         if (v == NGX_ERROR) {
@@ -270,7 +270,7 @@ ngx_rtmp_eval_streams(ngx_str_t *in)
     }
 
     dup2(src, dst);
-    
+
     if (close_src) {
         ngx_close_file(src);
     }

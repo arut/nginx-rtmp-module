@@ -37,7 +37,7 @@ static u_char ngx_rtmp_mpegts_header[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    
+
     /* TS */
     0x47, 0x50, 0x01, 0x10, 0x00,
     /* PSI */
@@ -132,7 +132,7 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
     ngx_log_debug6(NGX_LOG_DEBUG_HTTP, file->log, 0,
                    "mpegts: pid=%ui, sid=%ui, pts=%uL, "
                    "dts=%uL, key=%ui, size=%ui",
-                   f->pid, f->sid, f->pts, f->dts, 
+                   f->pid, f->sid, f->pts, f->dts,
                    (ngx_uint_t) f->key, (size_t) (b->last - b->pos));
 
     first = 1;
@@ -189,7 +189,7 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
             *p++ = (u_char) flags;
             *p++ = (u_char) header_size;
 
-            p = ngx_rtmp_mpegts_write_pts(p, flags >> 6, f->pts + 
+            p = ngx_rtmp_mpegts_write_pts(p, flags >> 6, f->pts +
                                                          NGX_RTMP_HLS_DELAY);
 
             if (f->dts != f->pts) {

@@ -51,7 +51,7 @@
 
 * Proved to work with Wirecast,FMS,Wowza,
   JWPlayer,FlowPlayer,StrobeMediaPlayback,
-  ffmpeg,avconv,rtmpdump,flvstreamer 
+  ffmpeg,avconv,rtmpdump,flvstreamer
   and many more
 
 * Statistics in XML/XSL in machine- & human-
@@ -165,7 +165,7 @@ rtmp_auto_push directive.
                 live on;
 
                 # Every stream published here
-                # is automatically pushed to 
+                # is automatically pushed to
                 # these two machines
                 push rtmp1.example.com;
                 push rtmp2.example.com:1934;
@@ -178,7 +178,7 @@ rtmp_auto_push directive.
                 # and play locally
                 pull rtmp://rtmp3.example.com pageUrl=www.example.com/index.html;
             }
-            
+
             application mystaticpull {
                 live on;
 
@@ -201,8 +201,8 @@ rtmp_auto_push directive.
 
                 live on;
 
-                # The following notifications receive all 
-                # the session variables as well as 
+                # The following notifications receive all
+                # the session variables as well as
                 # particular call arguments in HTTP POST
                 # request
 
@@ -218,7 +218,7 @@ rtmp_auto_push directive.
                 on_done http://localhost:8080/done;
 
                 # All above mentioned notifications receive
-                # standard connect() arguments as well as 
+                # standard connect() arguments as well as
                 # play/publish ones. If any arguments are sent
                 # with GET-style syntax to play & publish
                 # these are also included.
@@ -247,8 +247,8 @@ rtmp_auto_push directive.
             # profile (see ffmpeg example).
             # This example creates RTMP stream from movie ready for HLS:
             #
-            # ffmpeg -loglevel verbose -re -i movie.avi  -vcodec libx264 
-            #    -vprofile baseline -acodec libmp3lame -ar 44100 -ac 1 
+            # ffmpeg -loglevel verbose -re -i movie.avi  -vcodec libx264
+            #    -vprofile baseline -acodec libmp3lame -ar 44100 -ac 1
             #    -f flv rtmp://localhost:1935/hls/movie
             #
             # If you need to transcode live stream use 'exec' feature.

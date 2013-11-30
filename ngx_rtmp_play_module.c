@@ -23,7 +23,7 @@ static char *ngx_rtmp_play_url(ngx_conf_t *cf, ngx_command_t *cmd,
 static void *ngx_rtmp_play_create_main_conf(ngx_conf_t *cf);
 static ngx_int_t ngx_rtmp_play_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_play_create_app_conf(ngx_conf_t *cf);
-static char * ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf, 
+static char * ngx_rtmp_play_merge_app_conf(ngx_conf_t *cf,
        void *parent, void *child);
 
 static ngx_int_t ngx_rtmp_play_do_init(ngx_rtmp_session_t *s);
@@ -122,7 +122,7 @@ ngx_rtmp_play_create_main_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    if (ngx_array_init(&pmcf->fmts, cf->pool, 1, 
+    if (ngx_array_init(&pmcf->fmts, cf->pool, 1,
                        sizeof(ngx_rtmp_play_fmt_t *))
         != NGX_OK)
     {
@@ -716,8 +716,8 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
      * we should not move out of play directory */
     for (p = v->name; *p; ++p) {
         if (ngx_path_separator(p[0]) &&
-            p[1] == '.' && p[2] == '.' && 
-            ngx_path_separator(p[3])) 
+            p[1] == '.' && p[2] == '.' &&
+            ngx_path_separator(p[3]))
         {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                          "play: bad name '%s'", v->name);
@@ -735,7 +735,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     ctx->session = s;
     ctx->aindex = ngx_rtmp_play_parse_index('a', v->args);
     ctx->vindex = ngx_rtmp_play_parse_index('v', v->args);
-    
+
     ctx->file.log = s->connection->log;
 
     ngx_memcpy(ctx->name, v->name, NGX_RTMP_MAX_NAME);
@@ -744,7 +744,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     name.data = v->name;
 
     pfmt = pmcf->fmts.elts;
-    
+
     for (n = 0; n < pmcf->fmts.nelts; ++n, ++pfmt) {
         fmt = *pfmt;
 
@@ -765,7 +765,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         }
 
         if (name.len >= sfx->len &&
-            ngx_strncasecmp(sfx->data, name.data + name.len - sfx->len, 
+            ngx_strncasecmp(sfx->data, name.data + name.len - sfx->len,
                             sfx->len) == 0)
         {
             ctx->fmt = fmt;
@@ -785,7 +785,7 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
     sfx = &ctx->fmt->sfx;
 
     if (name.len < sfx->len ||
-        ngx_strncasecmp(sfx->data, name.data + name.len - sfx->len, 
+        ngx_strncasecmp(sfx->data, name.data + name.len - sfx->len,
                         sfx->len))
     {
         ctx->sfx = *sfx;
@@ -857,7 +857,7 @@ ngx_rtmp_play_next_entry(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
                          pe->root, v->name + ctx->pfx_size, &ctx->sfx);
         *p = 0;
 
-        ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN, 
+        ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN,
                                      NGX_FILE_DEFAULT_ACCESS);
 
         if (ctx->file.fd == NGX_INVALID_FILE) {
@@ -994,7 +994,7 @@ ngx_rtmp_play_remote_create(ngx_rtmp_session_t *s, void *arg, ngx_pool_t *pool)
 }
 
 
-static ngx_int_t 
+static ngx_int_t
 ngx_rtmp_play_remote_handle(ngx_rtmp_session_t *s, void *arg, ngx_chain_t *in)
 {
     ngx_rtmp_play_t        *v = arg;
@@ -1022,7 +1022,7 @@ ngx_rtmp_play_remote_handle(ngx_rtmp_session_t *s, void *arg, ngx_chain_t *in)
 }
 
 
-static ngx_int_t 
+static ngx_int_t
 ngx_rtmp_play_remote_sink(ngx_rtmp_session_t *s, ngx_chain_t *in)
 {
     ngx_rtmp_play_ctx_t    *ctx;
@@ -1046,7 +1046,7 @@ ngx_rtmp_play_remote_sink(ngx_rtmp_session_t *s, ngx_chain_t *in)
             }
             /* 10th header byte is HTTP response header */
             if (++ctx->nheader == 10 && *b->pos != (u_char) '2') {
-                ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, 
+                ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                               "play: remote HTTP response code: %cxx",
                               *b->pos);
                 return NGX_ERROR;
@@ -1069,7 +1069,7 @@ ngx_rtmp_play_remote_sink(ngx_rtmp_session_t *s, ngx_chain_t *in)
         rc = ngx_write_fd(ctx->file.fd, b->pos, b->last - b->pos);
 
         if (rc == NGX_ERROR) {
-            ngx_log_error(NGX_LOG_INFO, s->connection->log, ngx_errno, 
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, ngx_errno,
                           "play: error writing to temp file");
             return NGX_ERROR;
         }
@@ -1209,7 +1209,7 @@ ngx_rtmp_play_url(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             if (pe->root == NULL) {
                 return NGX_CONF_ERROR;
             }
-                
+
             *pe->root = value[n];
 
             continue;

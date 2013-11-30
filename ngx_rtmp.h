@@ -307,7 +307,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     ngx_int_t               max_streams;
 
     ngx_uint_t              ack_window;
-    
+
     ngx_int_t               chunk_size;
     ngx_pool_t             *pool;
     ngx_chain_t            *free;
@@ -344,7 +344,7 @@ typedef struct {
     char                 *(*init_main_conf)(ngx_conf_t *cf, void *conf);
 
     void                 *(*create_srv_conf)(ngx_conf_t *cf);
-    char                 *(*merge_srv_conf)(ngx_conf_t *cf, void *prev, 
+    char                 *(*merge_srv_conf)(ngx_conf_t *cf, void *prev,
                                     void *conf);
 
     void                 *(*create_app_conf)(ngx_conf_t *cf);
@@ -390,7 +390,7 @@ char* ngx_rtmp_user_message_type(uint16_t evt);
 #endif
 
 void ngx_rtmp_init_connection(ngx_connection_t *c);
-ngx_rtmp_session_t * ngx_rtmp_init_session(ngx_connection_t *c, 
+ngx_rtmp_session_t * ngx_rtmp_init_session(ngx_connection_t *c,
      ngx_rtmp_addr_conf_t *addr_conf);
 void ngx_rtmp_finalize_session(ngx_rtmp_session_t *s);
 void ngx_rtmp_handshake(ngx_rtmp_session_t *s);
@@ -469,9 +469,9 @@ ngx_int_t ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
     --ngx_rtmp_ref(b)
 
 ngx_chain_t * ngx_rtmp_alloc_shared_buf(ngx_rtmp_core_srv_conf_t *cscf);
-void ngx_rtmp_free_shared_chain(ngx_rtmp_core_srv_conf_t *cscf, 
+void ngx_rtmp_free_shared_chain(ngx_rtmp_core_srv_conf_t *cscf,
         ngx_chain_t *in);
-ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf, 
+ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf,
         ngx_chain_t *head, ngx_chain_t *in);
 
 #define ngx_rtmp_acquire_shared_chain(in)   \
@@ -479,7 +479,7 @@ ngx_chain_t * ngx_rtmp_append_shared_bufs(ngx_rtmp_core_srv_conf_t *cscf,
 
 
 /* Sending messages */
-void ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h, 
+void ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_header_t *lh, ngx_chain_t *out);
 ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
         ngx_uint_t priority);
@@ -494,64 +494,64 @@ ngx_int_t ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 #define NGX_RTMP_LIMIT_DYNAMIC      2
 
 /* Protocol control messages */
-ngx_chain_t * ngx_rtmp_create_chunk_size(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_chunk_size(ngx_rtmp_session_t *s,
         uint32_t chunk_size);
-ngx_chain_t * ngx_rtmp_create_abort(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_abort(ngx_rtmp_session_t *s,
         uint32_t csid);
-ngx_chain_t * ngx_rtmp_create_ack(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_ack(ngx_rtmp_session_t *s,
         uint32_t seq);
-ngx_chain_t * ngx_rtmp_create_ack_size(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_ack_size(ngx_rtmp_session_t *s,
         uint32_t ack_size);
-ngx_chain_t * ngx_rtmp_create_bandwidth(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_bandwidth(ngx_rtmp_session_t *s,
         uint32_t ack_size, uint8_t limit_type);
 
-ngx_int_t ngx_rtmp_send_chunk_size(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_chunk_size(ngx_rtmp_session_t *s,
         uint32_t chunk_size);
-ngx_int_t ngx_rtmp_send_abort(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_abort(ngx_rtmp_session_t *s,
         uint32_t csid);
-ngx_int_t ngx_rtmp_send_ack(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_ack(ngx_rtmp_session_t *s,
         uint32_t seq);
-ngx_int_t ngx_rtmp_send_ack_size(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_ack_size(ngx_rtmp_session_t *s,
         uint32_t ack_size);
-ngx_int_t ngx_rtmp_send_bandwidth(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_bandwidth(ngx_rtmp_session_t *s,
         uint32_t ack_size, uint8_t limit_type);
 
 /* User control messages */
-ngx_chain_t * ngx_rtmp_create_stream_begin(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_stream_begin(ngx_rtmp_session_t *s,
         uint32_t msid);
-ngx_chain_t * ngx_rtmp_create_stream_eof(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_stream_eof(ngx_rtmp_session_t *s,
         uint32_t msid);
-ngx_chain_t * ngx_rtmp_create_stream_dry(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_stream_dry(ngx_rtmp_session_t *s,
         uint32_t msid);
-ngx_chain_t * ngx_rtmp_create_set_buflen(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_set_buflen(ngx_rtmp_session_t *s,
         uint32_t msid, uint32_t buflen_msec);
-ngx_chain_t * ngx_rtmp_create_recorded(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_recorded(ngx_rtmp_session_t *s,
         uint32_t msid);
 ngx_chain_t * ngx_rtmp_create_ping_request(ngx_rtmp_session_t *s,
         uint32_t timestamp);
-ngx_chain_t * ngx_rtmp_create_ping_response(ngx_rtmp_session_t *s, 
+ngx_chain_t * ngx_rtmp_create_ping_response(ngx_rtmp_session_t *s,
         uint32_t timestamp);
 
-ngx_int_t ngx_rtmp_send_stream_begin(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_stream_begin(ngx_rtmp_session_t *s,
         uint32_t msid);
-ngx_int_t ngx_rtmp_send_stream_eof(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_stream_eof(ngx_rtmp_session_t *s,
         uint32_t msid);
-ngx_int_t ngx_rtmp_send_stream_dry(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_stream_dry(ngx_rtmp_session_t *s,
         uint32_t msid);
-ngx_int_t ngx_rtmp_send_set_buflen(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_set_buflen(ngx_rtmp_session_t *s,
         uint32_t msid, uint32_t buflen_msec);
-ngx_int_t ngx_rtmp_send_recorded(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_recorded(ngx_rtmp_session_t *s,
         uint32_t msid);
 ngx_int_t ngx_rtmp_send_ping_request(ngx_rtmp_session_t *s,
         uint32_t timestamp);
-ngx_int_t ngx_rtmp_send_ping_response(ngx_rtmp_session_t *s, 
+ngx_int_t ngx_rtmp_send_ping_response(ngx_rtmp_session_t *s,
         uint32_t timestamp);
 
 /* AMF sender/receiver */
 ngx_int_t ngx_rtmp_append_amf(ngx_rtmp_session_t *s,
-        ngx_chain_t **first, ngx_chain_t **last, 
+        ngx_chain_t **first, ngx_chain_t **last,
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
-ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in, 
+ngx_int_t ngx_rtmp_receive_amf(ngx_rtmp_session_t *s, ngx_chain_t *in,
         ngx_rtmp_amf_elt_t *elts, size_t nelts);
 
 ngx_chain_t * ngx_rtmp_create_amf(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,

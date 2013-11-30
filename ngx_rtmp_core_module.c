@@ -30,7 +30,7 @@ ngx_rtmp_core_main_conf_t      *ngx_rtmp_core_main_conf;
 
 
 static ngx_conf_deprecated_t  ngx_conf_deprecated_so_keepalive = {
-    ngx_conf_deprecated, "so_keepalive", 
+    ngx_conf_deprecated, "so_keepalive",
     "so_keepalive\" parameter of the \"listen"
 };
 
@@ -260,10 +260,10 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 32);
     ngx_conf_merge_value(conf->chunk_size, prev->chunk_size, 4096);
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
-    ngx_conf_merge_size_value(conf->max_message, prev->max_message, 
+    ngx_conf_merge_size_value(conf->max_message, prev->max_message,
             1 * 1024 * 1024);
     ngx_conf_merge_size_value(conf->out_queue, prev->out_queue, 256);
-    ngx_conf_merge_size_value(conf->out_cork, prev->out_cork, 
+    ngx_conf_merge_size_value(conf->out_cork, prev->out_cork,
             conf->out_queue / 8);
     ngx_conf_merge_value(conf->play_time_fix, prev->play_time_fix, 1);
     ngx_conf_merge_value(conf->publish_time_fix, prev->publish_time_fix, 1);
@@ -437,7 +437,7 @@ ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         module = ngx_modules[i]->ctx;
 
         if (module->create_app_conf) {
-            ctx->app_conf[ngx_modules[i]->ctx_index] = 
+            ctx->app_conf[ngx_modules[i]->ctx_index] =
                                 module->create_app_conf(cf);
             if (ctx->app_conf[ngx_modules[i]->ctx_index] == NULL) {
                 return NGX_CONF_ERROR;
