@@ -314,14 +314,9 @@ rtmp_auto_push directive.
     rtmp_auto_push on;
 
     rtmp {
-
         server {
-
             listen 1935;
 
-            chunk_size 4000;
-
-            # TV mode: one publisher, many subscribers
             application mytv {
                 live on;
             }
