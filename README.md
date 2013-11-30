@@ -74,7 +74,7 @@ For building debug version of nginx add `--with-debug`
 
     ./configure --add-module=<path-to-nginx-rtmp-module> --with-debug
 
-[Read more details about debug log](https://github.com/arut/nginx-rtmp-module/wiki/Debug-log)
+[Read more about debug log](https://github.com/arut/nginx-rtmp-module/wiki/Debug-log)
 
 ### Windows limitations
 
