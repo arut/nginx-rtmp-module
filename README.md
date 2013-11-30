@@ -144,7 +144,8 @@ rtmp_auto_push directive.
                 #
                 # Multiple exec lines can be specified.
 
-                exec ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name};
+                exec ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32
+                            -f flv rtmp://localhost:1935/small/${name};
             }
 
             application small {
@@ -156,7 +157,8 @@ rtmp_auto_push directive.
                 live on;
 
                 # Stream from local webcam
-                exec_static ffmpeg -f video4linux2 -i /dev/video0 -c:v libx264 -an -f flv rtmp://localhost:1935/webcam/mystream;
+                exec_static ffmpeg -f video4linux2 -i /dev/video0 -c:v libx264 -an
+                                   -f flv rtmp://localhost:1935/webcam/mystream;
             }
 
             application mypush {
