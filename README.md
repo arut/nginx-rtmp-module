@@ -70,6 +70,12 @@ added as well:
 
     ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
 
+For building debug version of nginx add `--with-debug`
+
+    ./configure --add-module=<path-to-nginx-rtmp-module> --with-debug
+
+[Read more details about debug log](https://github.com/arut/nginx-rtmp-module/wiki/Debug-log)
+
 ### Windows limitations
 
 Windows support is limited. These features are not supported
