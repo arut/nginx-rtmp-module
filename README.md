@@ -47,9 +47,9 @@
   level for faster streaming and low
   memory footprint
 
-* Proved to work with Wirecast,FMS,Wowza,
-  JWPlayer,FlowPlayer,StrobeMediaPlayback,
-  ffmpeg,avconv,rtmpdump,flvstreamer
+* Proved to work with Wirecast, FMS, Wowza,
+  JWPlayer, FlowPlayer, StrobeMediaPlayback,
+  ffmpeg, avconv, rtmpdump, flvstreamer
   and many more
 
 * Statistics in XML/XSL in machine- & human-
