@@ -61,18 +61,18 @@
 
 cd to NGINX source directory & run this:
 
-    ./configure --add-module=<path-to-nginx-rtmp-module>
+    ./configure --add-module=/path/to/nginx-rtmp-module
     make
     make install
 
 Several versions of nginx (1.3.14 - 1.5.0) require http_ssl_module to be
 added as well:
 
-    ./configure --add-module=<path-to-nginx-rtmp-module> --with-http_ssl_module
+    ./configure --add-module=/path/to/nginx-rtmp-module --with-http_ssl_module
 
 For building debug version of nginx add `--with-debug`
 
-    ./configure --add-module=<path-to-nginx-rtmp-module> --with-debug
+    ./configure --add-module=/path/to-nginx/rtmp-module --with-debug
 
 [Read more about debug log](https://github.com/arut/nginx-rtmp-module/wiki/Debug-log)
 
