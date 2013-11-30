@@ -22,9 +22,9 @@
 
 ### Features
 
-* Live streaming of video/audio
+* RTMP/HLS/MPEG-DASH live streaming
 
-* Video on demand FLV/MP4,
+* RTMP Video on demand FLV/MP4,
   playing from local filesystem or HTTP
 
 * Stream relay support for distributed
@@ -35,8 +35,6 @@
 * H264/AAC support
 
 * Online transcoding with FFmpeg
-
-* HLS (HTTP Live Streaming) support
 
 * HTTP callbacks (publish/play/record/update etc)
 
@@ -256,10 +254,16 @@ rtmp_auto_push directive.
             application hls {
                 live on;
                 hls on;
-                hls_path /tmp/app;
-                hls_fragment 5s;
+                hls_path /tmp/hls;
             }
 
+            # MPEG-DASH is similar to HLS
+
+            application dash {
+                live on;
+                dash on;
+                dash_path /tmp/dash;
+            }
         }
     }
 
@@ -292,10 +296,13 @@ rtmp_auto_push directive.
                     application/vnd.apple.mpegurl m3u8;
                     video/mp2t ts;
                 }
-                alias /tmp/app;
-                expires -1;
+                root /tmp;
             }
 
+            location /dash {
+                # Serve DASH fragments
+                root /tmp;
+            }
         }
     }
 
