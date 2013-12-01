@@ -183,40 +183,46 @@ ngx_rtmp_mp4_write_matrix(ngx_buf_t *buf, uint32_t a, uint32_t b, uint32_t c,
 
 
 ngx_int_t
-ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b, ngx_rtmp_mp4_file_type_t ftype,
-    ngx_rtmp_mp4_track_type_t ttype)
+ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b)
 {
     u_char  *pos;
 
-    switch (ftype) {
+    pos = ngx_rtmp_mp4_start_box(b, "ftyp");
 
-    case NGX_RTMP_MP4_FILETYPE_INIT:
+    /* major brand */
+    ngx_rtmp_mp4_box(b, "iso6");
 
-        pos = ngx_rtmp_mp4_start_box(b, "ftyp");
+    /* minor version */
+    ngx_rtmp_mp4_field_32(b, 1);
 
-        ngx_rtmp_mp4_box(b, "iso5");
-        ngx_rtmp_mp4_field_32(b, 1);
+    /* compatible brands */
+    ngx_rtmp_mp4_box(b, "isom");
+    ngx_rtmp_mp4_box(b, "iso6");
+    ngx_rtmp_mp4_box(b, "dash");
 
-        if (ttype == NGX_RTMP_MP4_VIDEO_TRACK) {
-            ngx_rtmp_mp4_box(b, "avc1");
-        }
+    ngx_rtmp_mp4_update_box_size(b, pos);
 
-        ngx_rtmp_mp4_box(b, "iso5");
-        ngx_rtmp_mp4_box(b, "dash");
+    return NGX_OK;
+}
 
-        break;
 
-    default: /* NGX_RTMP_MP4_FILETYPE_SEG */
+ngx_int_t
+ngx_rtmp_mp4_write_styp(ngx_buf_t *b)
+{
+    u_char  *pos;
 
-        pos = ngx_rtmp_mp4_start_box(b, "styp");
+    pos = ngx_rtmp_mp4_start_box(b, "styp");
 
-        ngx_rtmp_mp4_box(b, "msdh");
-        ngx_rtmp_mp4_field_32(b, 0);
-        ngx_rtmp_mp4_box(b, "msdh");
-        ngx_rtmp_mp4_box(b, "msix");
+    /* major brand */
+    ngx_rtmp_mp4_box(b, "iso6");
 
-        break;
-    }
+    /* minor version */
+    ngx_rtmp_mp4_field_32(b, 1);
+
+    /* compatible brands */
+    ngx_rtmp_mp4_box(b, "isom");
+    ngx_rtmp_mp4_box(b, "iso6");
+    ngx_rtmp_mp4_box(b, "dash");
 
     ngx_rtmp_mp4_update_box_size(b, pos);
 

@@ -489,8 +489,7 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     b.end = b.start + sizeof(buffer);
     b.pos = b.last = b.start;
 
-    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT,
-                            NGX_RTMP_MP4_VIDEO_TRACK);
+    ngx_rtmp_mp4_write_ftyp(&b);
     ngx_rtmp_mp4_write_moov(s, &b, NGX_RTMP_MP4_VIDEO_TRACK);
 
     rc = ngx_write_fd(fd, b.start, (size_t) (b.last - b.start));
@@ -516,8 +515,7 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
 
     b.pos = b.last = b.start;
 
-    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_INIT,
-                            NGX_RTMP_MP4_AUDIO_TRACK);
+    ngx_rtmp_mp4_write_ftyp(&b);
     ngx_rtmp_mp4_write_moov(s, &b, NGX_RTMP_MP4_AUDIO_TRACK);
 
     rc = ngx_write_fd(fd, b.start, (size_t) (b.last - b.start));
@@ -559,9 +557,7 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
     b.end = buffer + sizeof(buffer);
     b.pos = b.last = b.start;
 
-    ngx_rtmp_mp4_write_ftyp(&b, NGX_RTMP_MP4_FILETYPE_SEG, t->type == 'v' ?
-                            NGX_RTMP_MP4_VIDEO_TRACK :
-                            NGX_RTMP_MP4_AUDIO_TRACK);
+    ngx_rtmp_mp4_write_styp(&b);
 
     pos = b.last;
     b.last += 44; /* leave room for sidx */

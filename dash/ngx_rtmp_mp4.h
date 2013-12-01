@@ -36,8 +36,8 @@ typedef enum {
 } ngx_rtmp_mp4_track_type_t;
 
 
-ngx_int_t ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b, ngx_rtmp_mp4_file_type_t ftype,
-    ngx_rtmp_mp4_track_type_t ttype);
+ngx_int_t ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b);
+ngx_int_t ngx_rtmp_mp4_write_styp(ngx_buf_t *b);
 ngx_int_t ngx_rtmp_mp4_write_moov(ngx_rtmp_session_t *s, ngx_buf_t *b,
     ngx_rtmp_mp4_track_type_t ttype);
 ngx_int_t ngx_rtmp_mp4_write_moof(ngx_buf_t *b, uint32_t earliest_pres_time,
