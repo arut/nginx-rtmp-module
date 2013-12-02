@@ -305,11 +305,13 @@ rtmp_auto_push directive.
                     video/mp2t ts;
                 }
                 root /tmp;
+                add_header Cache-Control no-cache;
             }
 
             location /dash {
                 # Serve DASH fragments
                 root /tmp;
+                add_header Cache-Control no-cache;
             }
         }
     }
