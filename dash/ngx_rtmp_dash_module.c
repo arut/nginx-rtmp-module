@@ -991,6 +991,7 @@ static void
 ngx_rtmp_dash_update_fragments(ngx_rtmp_session_t *s, ngx_int_t boundary,
     uint32_t timestamp)
 {
+    int32_t                    d;
     ngx_int_t                  hit;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_dash_frag_t      *f;
@@ -1000,7 +1001,19 @@ ngx_rtmp_dash_update_fragments(ngx_rtmp_session_t *s, ngx_int_t boundary,
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
     f = ngx_rtmp_dash_get_frag(s, ctx->nfrags);
 
-    hit = (timestamp >= f->timestamp + dacf->fraglen);
+    d = (int32_t) (timestamp - f->timestamp);
+
+    if (d >= 0) {
+
+        f->duration = timestamp - f->timestamp;
+        hit = (f->duration >= dacf->fraglen);
+
+    } else {
+
+        /* sometimes clients generate slightly unordered frames */
+
+        hit = (-d > 1000);
+    }
 
     if (ctx->has_video && !hit) {
         boundary = 0;
@@ -1021,8 +1034,6 @@ ngx_rtmp_dash_update_fragments(ngx_rtmp_session_t *s, ngx_int_t boundary,
     if (!ctx->opened) {
         boundary = 1;
     }
-
-    f->duration = (timestamp - f->timestamp);
 
     if (boundary) {
         ngx_rtmp_dash_close_fragments(s);
