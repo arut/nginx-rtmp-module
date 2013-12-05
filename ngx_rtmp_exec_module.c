@@ -529,6 +529,7 @@ ngx_rtmp_exec_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
         if (conf->conf[n].nelts) {
             conf->active = 1;
+            prev->active = 1;
         }
     }
 
