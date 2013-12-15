@@ -503,7 +503,7 @@ ngx_rtmp_play_copy_local_file(ngx_rtmp_session_t *s, u_char *name)
             ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                   "play: create dir '%s' for '%s'", dir, dpath);
             if (ngx_create_dir(dir, 0700) == NGX_FILE_ERROR) {
-                if (err != NGX_EEXIST) {
+                if (ngx_errno != NGX_EEXIST) {
                     ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                         "play: error creating dir '%s' for '%s'", dir, dpath);
                     break;
