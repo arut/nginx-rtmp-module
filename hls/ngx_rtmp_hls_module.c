@@ -2144,7 +2144,6 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->muxdelay, prev->muxdelay, 700);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 2);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
-    ngx_conf_merge_str_value(conf->path, prev->path, "");
     ngx_conf_merge_value(conf->continuous, prev->continuous, 1);
     ngx_conf_merge_value(conf->nested, prev->nested, 0);
     ngx_conf_merge_uint_value(conf->naming, prev->naming,
@@ -2166,38 +2165,38 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     /* schedule cleanup */
 
-    if (conf->path.len == 0 || !conf->cleanup ||
-        conf->type == NGX_RTMP_HLS_TYPE_EVENT)
+    if (conf->hls && conf->path.len && conf->cleanup &&
+        conf->type != NGX_RTMP_HLS_TYPE_EVENT)
     {
-        return NGX_CONF_OK;
+        if (conf->path.data[conf->path.len - 1] == '/') {
+            conf->path.len--;
+        }
+
+        cleanup = ngx_pcalloc(cf->pool, sizeof(*cleanup));
+        if (cleanup == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        cleanup->path = conf->path;
+        cleanup->playlen = conf->playlen;
+
+        conf->slot = ngx_pcalloc(cf->pool, sizeof(*conf->slot));
+        if (conf->slot == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        conf->slot->manager = ngx_rtmp_hls_cleanup;
+        conf->slot->name = conf->path;
+        conf->slot->data = cleanup;
+        conf->slot->conf_file = cf->conf_file->file.name.data;
+        conf->slot->line = cf->conf_file->line;
+
+        if (ngx_add_path(cf, &conf->slot) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
     }
 
-    if (conf->path.data[conf->path.len - 1] == '/') {
-        conf->path.len--;
-    }
-
-    cleanup = ngx_pcalloc(cf->pool, sizeof(*cleanup));
-    if (cleanup == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    cleanup->path = conf->path;
-    cleanup->playlen = conf->playlen;
-
-    conf->slot = ngx_pcalloc(cf->pool, sizeof(*conf->slot));
-    if (conf->slot == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    conf->slot->manager = ngx_rtmp_hls_cleanup;
-    conf->slot->name = conf->path;
-    conf->slot->data = cleanup;
-    conf->slot->conf_file = cf->conf_file->file.name.data;
-    conf->slot->line = cf->conf_file->line;
-
-    if (ngx_add_path(cf, &conf->slot) != NGX_OK) {
-        return NGX_CONF_ERROR;
-    }
+    ngx_conf_merge_str_value(conf->path, prev->path, "");
 
     return NGX_CONF_OK;
 }
