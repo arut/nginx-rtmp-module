@@ -43,6 +43,7 @@ NGX_ADDON_DEPS="$NGX_ADDON_DEPS                             \
                 $ngx_addon_dir/ngx_rtmp_record_module.h     \
                 $ngx_addon_dir/ngx_rtmp_relay_module.h      \
                 $ngx_addon_dir/ngx_rtmp_streams.h           \
+                $ngx_addon_dir/ngx_rtmp_bitop.h             \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.h        \
                 $ngx_addon_dir/dash/ngx_rtmp_mp4.h          \
                 "
@@ -77,6 +78,7 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_notify_module.c     \
                 $ngx_addon_dir/ngx_rtmp_log_module.c        \
                 $ngx_addon_dir/ngx_rtmp_limit_module.c      \
+                $ngx_addon_dir/ngx_rtmp_bitop.c             \
                 $ngx_addon_dir/hls/ngx_rtmp_hls_module.c    \
                 $ngx_addon_dir/dash/ngx_rtmp_dash_module.c  \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.c        \

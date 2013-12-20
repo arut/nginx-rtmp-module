@@ -511,14 +511,18 @@ ngx_rtmp_mp4_write_avcc(ngx_rtmp_session_t *s, ngx_buf_t *b)
 
     /* assume config fits one chunk (highly probable) */
 
-    /* check for start code */
-    for (p = in->buf->pos; p <= in->buf->last; p++) {
-        if (*p == 0x01) {
-            break;
-        }
-    }
+    /*
+     * Skip:
+     * - flv fmt
+     * - H264 CONF/PICT (0x00)
+     * - 0
+     * - 0
+     * - 0
+     */
 
-    if (in->buf->last - p > 0) {
+    p = in->buf->pos + 5;
+
+    if (p < in->buf->last) {
         ngx_rtmp_mp4_data(b, p, (size_t) (in->buf->last - p));
     } else {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,

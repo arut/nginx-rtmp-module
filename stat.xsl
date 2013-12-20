@@ -170,11 +170,12 @@
         </td>
         <td align="middle"><xsl:value-of select="meta/framerate"/></td>
         <td>
-            <xsl:value-of select="meta/video"/>
-            <xsl:apply-templates select="meta/profile"/>
-            <xsl:apply-templates select="meta/level"/>
+            <xsl:value-of select="meta/video/codec"/>&#160;<xsl:value-of select="meta/video/profile"/>&#160;<xsl:value-of select="meta/video/level"/>
         </td>
-        <td><xsl:value-of select="meta/audio"/></td>
+        <td>
+            <xsl:value-of select="meta/audio/codec"/>&#160;<xsl:value-of select="meta/audio/profile"/>
+            <xsl:apply-templates select="meta/audio/channels"/>
+        </td>
         <td><xsl:call-template name="streamstate"/></td>
         <td>
             <xsl:call-template name="showtime">
@@ -322,12 +323,8 @@
     active
 </xsl:template>
 
-<xsl:template match="profile">
-    / <xsl:value-of select="."/>
-</xsl:template>
-
-<xsl:template match="level">
-    / <xsl:value-of select="."/>
+<xsl:template match="channels">
+    x<xsl:value-of select="."/>
 </xsl:template>
 
 </xsl:stylesheet>
