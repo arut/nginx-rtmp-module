@@ -486,18 +486,20 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
             total_nclients += nclients;
 
             if (codec) {
-                NGX_RTMP_STAT_L("<meta><width>");
+                NGX_RTMP_STAT_L("<meta>");
+
+                NGX_RTMP_STAT_L("<video>");
+                NGX_RTMP_STAT_L("<width>");
                 NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
                               "%ui", codec->width) - buf);
                 NGX_RTMP_STAT_L("</width><height>");
                 NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
                               "%ui", codec->height) - buf);
-                NGX_RTMP_STAT_L("</height><framerate>");
+                NGX_RTMP_STAT_L("</height><frame_rate>");
                 NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
                               "%ui", codec->frame_rate) - buf);
-                NGX_RTMP_STAT_L("</framerate>");
+                NGX_RTMP_STAT_L("</frame_rate>");
 
-                NGX_RTMP_STAT_L("<video>");
                 cname = ngx_rtmp_get_video_codec_name(codec->video_codec_id);
                 if (*cname) {
                     NGX_RTMP_STAT_L("<codec>");
@@ -544,6 +546,17 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
                                   "%ui", codec->aac_chan_conf) - buf);
                     NGX_RTMP_STAT_L("</channels>");
+                } else if (codec->audio_channels) {
+                    NGX_RTMP_STAT_L("<channels>");
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
+                                  "%ui", codec->audio_channels) - buf);
+                    NGX_RTMP_STAT_L("</channels>");
+                }
+                if (codec->sample_rate) {
+                    NGX_RTMP_STAT_L("<sample_rate>");
+                    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
+                                  "%ui", codec->sample_rate) - buf);
+                    NGX_RTMP_STAT_L("</sample_rate>");
                 }
                 NGX_RTMP_STAT_L("</audio>");
 

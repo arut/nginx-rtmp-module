@@ -35,10 +35,8 @@
             <th>Out bytes</th>
             <th>Input bits/s</th>
             <th>Output bits/s</th>
-            <th>Size</th>
-            <th>Frame Rate</th>
-            <th>Video</th>
-            <th>Audio</th>
+            <th colspan="3">Video</th>
+            <th colspan="3">Audio</th>
             <th>State</th>
             <th>Time</th>
         </tr>
@@ -68,7 +66,13 @@
                    <xsl:with-param name="persec" select="1"/>
                </xsl:call-template>
            </td>
-           <td colspan="5"/>
+           <th bgcolor="#999999">codec</th>
+           <th bgcolor="#999999">size</th>
+           <th bgcolor="#999999">fps</th>
+           <th bgcolor="#999999">codec</th>
+           <th bgcolor="#999999">freq</th>
+           <th bgcolor="#999999">chan</th>
+           <td/>
            <td>
             <xsl:call-template name="showtime">
                 <xsl:with-param name="time" select="/rtmp/uptime * 1000"/>
@@ -164,17 +168,22 @@
             </xsl:call-template>
         </td>
         <td>
-            <xsl:if test="meta/width &gt; 0">
-                <xsl:value-of select="meta/width"/>x<xsl:value-of select="meta/height"/>
-            </xsl:if>
-        </td>
-        <td align="middle"><xsl:value-of select="meta/framerate"/></td>
-        <td>
             <xsl:value-of select="meta/video/codec"/>&#160;<xsl:value-of select="meta/video/profile"/>&#160;<xsl:value-of select="meta/video/level"/>
         </td>
         <td>
+            <xsl:apply-templates select="meta/video/width"/>
+        </td>
+        <td>
+            <xsl:value-of select="meta/video/frame_rate"/>
+        </td>
+        <td>
             <xsl:value-of select="meta/audio/codec"/>&#160;<xsl:value-of select="meta/audio/profile"/>
-            <xsl:apply-templates select="meta/audio/channels"/>
+        </td>
+        <td>
+            <xsl:apply-templates select="meta/audio/sample_rate"/>
+        </td>
+        <td>
+            <xsl:value-of select="meta/audio/channels"/>
         </td>
         <td><xsl:call-template name="streamstate"/></td>
         <td>
@@ -323,8 +332,8 @@
     active
 </xsl:template>
 
-<xsl:template match="channels">
-    x<xsl:value-of select="."/>
+<xsl:template match="width">
+    <xsl:value-of select="."/>x<xsl:value-of select="../height"/>
 </xsl:template>
 
 </xsl:stylesheet>
