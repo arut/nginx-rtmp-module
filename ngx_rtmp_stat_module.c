@@ -363,16 +363,24 @@ ngx_rtmp_stat_client(ngx_http_request_t *r, ngx_chain_t ***lll,
 
 
 static char *
-ngx_rtmp_stat_get_aac_profile(ngx_uint_t p) {
+ngx_rtmp_stat_get_aac_profile(ngx_uint_t p, ngx_uint_t sbr, ngx_uint_t ps) {
     switch (p) {
         case 1:
             return "Main";
         case 2:
+            if (ps) {
+                return "HEv2";
+            }
+            if (sbr) {
+                return "HE";
+            }
             return "LC";
         case 3:
             return "SSR";
         case 4:
             return "LTP";
+        case 5:
+            return "SBR";
         default:
             return "";
     }
@@ -526,7 +534,9 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                 if (codec->aac_profile) {
                     NGX_RTMP_STAT_L("<profile>");
                     NGX_RTMP_STAT_CS(
-                            ngx_rtmp_stat_get_aac_profile(codec->aac_profile));
+                            ngx_rtmp_stat_get_aac_profile(codec->aac_profile,
+                                                          codec->aac_sbr,
+                                                          codec->aac_ps));
                     NGX_RTMP_STAT_L("</profile>");
                 }
                 if (codec->aac_chan_conf) {

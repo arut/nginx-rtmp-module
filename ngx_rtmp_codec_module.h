@@ -60,6 +60,8 @@ typedef struct {
     ngx_uint_t                  audio_codec_id;
     ngx_uint_t                  aac_profile;
     ngx_uint_t                  aac_chan_conf;
+    ngx_uint_t                  aac_sbr;
+    ngx_uint_t                  aac_ps;
     ngx_uint_t                  avc_profile;
     ngx_uint_t                  avc_compat;
     ngx_uint_t                  avc_level;

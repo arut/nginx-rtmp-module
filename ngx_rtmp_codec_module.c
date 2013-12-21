@@ -292,13 +292,11 @@ ngx_rtmp_codec_parse_aac_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
     ngx_rtmp_bit_read(&br, 16);
 
     ctx->aac_profile = (ngx_uint_t) ngx_rtmp_bit_read(&br, 5);
-
     if (ctx->aac_profile == 31) {
         ctx->aac_profile = (ngx_uint_t) ngx_rtmp_bit_read(&br, 6) + 32;
     }
 
     idx = (ngx_uint_t) ngx_rtmp_bit_read(&br, 4);
-
     if (idx == 15) {
         ctx->sample_rate = (ngx_uint_t) ngx_rtmp_bit_read(&br, 24);
     } else {
@@ -307,15 +305,45 @@ ngx_rtmp_codec_parse_aac_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
 
     ctx->aac_chan_conf = (ngx_uint_t) ngx_rtmp_bit_read(&br, 4);
 
+    if (ctx->aac_profile == 5 || ctx->aac_profile == 29) {
+        
+        if (ctx->aac_profile == 29) {
+            ctx->aac_ps = 1;
+        }
+
+        ctx->aac_sbr = 1;
+
+        idx = (ngx_uint_t) ngx_rtmp_bit_read(&br, 4);
+        if (idx == 15) {
+            ctx->sample_rate = (ngx_uint_t) ngx_rtmp_bit_read(&br, 24);
+        } else {
+            ctx->sample_rate = aac_sample_rates[idx];
+        }
+
+        ctx->aac_profile = (ngx_uint_t) ngx_rtmp_bit_read(&br, 5);
+        if (ctx->aac_profile == 31) {
+            ctx->aac_profile = (ngx_uint_t) ngx_rtmp_bit_read(&br, 6) + 32;
+        }
+    }
+
     /* MPEG-4 Audio Specific Config
 
        5 bits: object type
        if (object type == 31)
-       6 bits + 32: object type
-       --->4 bits: frequency index
+         6 bits + 32: object type
+       4 bits: frequency index
        if (frequency index == 15)
-       24 bits: frequency
+         24 bits: frequency
        4 bits: channel configuration
+
+       if (object_type == 5)
+           4 bits: frequency index
+           if (frequency index == 15)
+             24 bits: frequency
+           5 bits: object type
+           if (object type == 31)
+             6 bits + 32: object type
+             
        var bits: AOT Specific Config
      */
 
