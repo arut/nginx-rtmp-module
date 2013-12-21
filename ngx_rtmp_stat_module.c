@@ -519,7 +519,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                 if (codec->avc_level) {
                     NGX_RTMP_STAT_L("<level>");
                     NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
-                                  "%ui", codec->avc_level) - buf);
+                                  "%.1f", codec->avc_level / 10.) - buf);
                     NGX_RTMP_STAT_L("</level>");
                 }
                 NGX_RTMP_STAT_L("</video>");
