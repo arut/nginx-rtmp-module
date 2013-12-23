@@ -31,58 +31,58 @@
         <tr bgcolor="#999999">
             <th>RTMP</th>
             <th>#clients</th>
+            <th colspan="4">Video</th>
+            <th colspan="4">Audio</th>
             <th>In bytes</th>
             <th>Out bytes</th>
             <th>In bits/s</th>
             <th>Out bits/s</th>
-            <th colspan="4">Video</th>
-            <th colspan="4">Audio</th>
             <th>State</th>
             <th>Time</th>
         </tr>
         <tr>
             <td colspan="2">Accepted: <xsl:value-of select="naccepted"/></td>
+            <th bgcolor="#999999">codec</th>
+            <th bgcolor="#999999">bits/s</th>
+            <th bgcolor="#999999">size</th>
+            <th bgcolor="#999999">fps</th>
+            <th bgcolor="#999999">codec</th>
+            <th bgcolor="#999999">bits/s</th>
+            <th bgcolor="#999999">freq</th>
+            <th bgcolor="#999999">chan</th>
             <td>
                 <xsl:call-template name="showsize">
                     <xsl:with-param name="size" select="bytes_in"/>
                 </xsl:call-template>
             </td>
             <td>
-               <xsl:call-template name="showsize">
-                   <xsl:with-param name="size" select="bytes_out"/>
-               </xsl:call-template>
-           </td>
+                <xsl:call-template name="showsize">
+                    <xsl:with-param name="size" select="bytes_out"/>
+                </xsl:call-template>
+            </td>
             <td>
-               <xsl:call-template name="showsize">
-                   <xsl:with-param name="size" select="bw_in"/>
-                   <xsl:with-param name="bits" select="1"/>
-                   <xsl:with-param name="persec" select="1"/>
-               </xsl:call-template>
-           </td>
-           <td>
-               <xsl:call-template name="showsize">
-                   <xsl:with-param name="size" select="bw_out"/>
-                   <xsl:with-param name="bits" select="1"/>
-                   <xsl:with-param name="persec" select="1"/>
-               </xsl:call-template>
-           </td>
-           <th bgcolor="#999999">codec</th>
-           <th bgcolor="#999999">bits/s</th>
-           <th bgcolor="#999999">size</th>
-           <th bgcolor="#999999">fps</th>
-           <th bgcolor="#999999">codec</th>
-           <th bgcolor="#999999">bits/s</th>
-           <th bgcolor="#999999">freq</th>
-           <th bgcolor="#999999">chan</th>
-           <td/>
-           <td>
-            <xsl:call-template name="showtime">
-                <xsl:with-param name="time" select="/rtmp/uptime * 1000"/>
-            </xsl:call-template>
-        </td>
-    </tr>
-    <xsl:apply-templates select="server"/>
-</table>
+                <xsl:call-template name="showsize">
+                    <xsl:with-param name="size" select="bw_in"/>
+                    <xsl:with-param name="bits" select="1"/>
+                    <xsl:with-param name="persec" select="1"/>
+                </xsl:call-template>
+            </td>
+            <td>
+                <xsl:call-template name="showsize">
+                    <xsl:with-param name="size" select="bw_out"/>
+                    <xsl:with-param name="bits" select="1"/>
+                    <xsl:with-param name="persec" select="1"/>
+                </xsl:call-template>
+            </td>
+            <td/>
+            <td>
+                <xsl:call-template name="showtime">
+                    <xsl:with-param name="time" select="/rtmp/uptime * 1000"/>
+                </xsl:call-template>
+            </td>
+        </tr>
+        <xsl:apply-templates select="server"/>
+    </table>
 </xsl:template>
 
 <xsl:template match="server">
@@ -146,30 +146,6 @@
         </td>
         <td align="middle"> <xsl:value-of select="nclients"/> </td>
         <td>
-            <xsl:call-template name="showsize">
-               <xsl:with-param name="size" select="bytes_in"/>
-           </xsl:call-template>
-        </td>
-        <td>
-            <xsl:call-template name="showsize">
-                <xsl:with-param name="size" select="bytes_out"/>
-            </xsl:call-template>
-        </td>
-        <td>
-            <xsl:call-template name="showsize">
-                <xsl:with-param name="size" select="bw_in"/>
-                <xsl:with-param name="bits" select="1"/>
-                <xsl:with-param name="persec" select="1"/>
-            </xsl:call-template>
-        </td>
-        <td>
-            <xsl:call-template name="showsize">
-                <xsl:with-param name="size" select="bw_out"/>
-                <xsl:with-param name="bits" select="1"/>
-                <xsl:with-param name="persec" select="1"/>
-            </xsl:call-template>
-        </td>
-        <td>
             <xsl:value-of select="meta/video/codec"/>&#160;<xsl:value-of select="meta/video/profile"/>&#160;<xsl:value-of select="meta/video/level"/>
         </td>
         <td>
@@ -201,6 +177,30 @@
         <td>
             <xsl:value-of select="meta/audio/channels"/>
         </td>
+        <td>
+            <xsl:call-template name="showsize">
+               <xsl:with-param name="size" select="bytes_in"/>
+           </xsl:call-template>
+        </td>
+        <td>
+            <xsl:call-template name="showsize">
+                <xsl:with-param name="size" select="bytes_out"/>
+            </xsl:call-template>
+        </td>
+        <td>
+            <xsl:call-template name="showsize">
+                <xsl:with-param name="size" select="bw_in"/>
+                <xsl:with-param name="bits" select="1"/>
+                <xsl:with-param name="persec" select="1"/>
+            </xsl:call-template>
+        </td>
+        <td>
+            <xsl:call-template name="showsize">
+                <xsl:with-param name="size" select="bw_out"/>
+                <xsl:with-param name="bits" select="1"/>
+                <xsl:with-param name="persec" select="1"/>
+            </xsl:call-template>
+        </td>
         <td><xsl:call-template name="streamstate"/></td>
         <td>
             <xsl:call-template name="showtime">
@@ -212,7 +212,7 @@
         <xsl:attribute name="id">
             <xsl:value-of select="../../name"/>-<xsl:value-of select="name"/>
         </xsl:attribute>
-        <td colspan="12" ngcolor="#eeeeee">
+        <td colspan="16" ngcolor="#eeeeee">
             <table cellspacing="1" cellpadding="5">
                 <tr>
                     <th>Id</th>
