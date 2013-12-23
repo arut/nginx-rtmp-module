@@ -48,6 +48,8 @@ struct ngx_rtmp_live_stream_s {
     ngx_rtmp_live_stream_t             *next;
     ngx_rtmp_live_ctx_t                *ctx;
     ngx_rtmp_bandwidth_t                bw_in;
+    ngx_rtmp_bandwidth_t                bw_in_audio;
+    ngx_rtmp_bandwidth_t                bw_in_video;
     ngx_rtmp_bandwidth_t                bw_out;
     ngx_msec_t                          epoch;
     unsigned                            active:1;

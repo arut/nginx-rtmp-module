@@ -245,34 +245,39 @@ ngx_rtmp_stat_output(ngx_http_request_t *r, ngx_chain_t ***lll,
 #define NGX_RTMP_STAT_ECS(s)        NGX_RTMP_STAT_E((s), ngx_strlen(s))
 
 
+#define NGX_RTMP_STAT_BW            0x01
+#define NGX_RTMP_STAT_BYTES         0x02
+#define NGX_RTMP_STAT_BW_BYTES      0x03
+
+
 static void
 ngx_rtmp_stat_bw(ngx_http_request_t *r, ngx_chain_t ***lll,
-        ngx_rtmp_bandwidth_t *bw_in, ngx_rtmp_bandwidth_t *bw_out)
+                 ngx_rtmp_bandwidth_t *bw, char *name,
+                 ngx_uint_t flags)
 {
     u_char  buf[NGX_INT64_LEN + 1];
 
-    ngx_rtmp_update_bandwidth(bw_in, 0);
-    ngx_rtmp_update_bandwidth(bw_out, 0);
+    ngx_rtmp_update_bandwidth(bw, 0);
 
-    NGX_RTMP_STAT_L("<in>");
-    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
-                  "%uL", bw_in->bytes) - buf);
-    NGX_RTMP_STAT_L("</in>\r\n");
+    if (flags & NGX_RTMP_STAT_BW) {
+        NGX_RTMP_STAT_L("<bw_");
+        NGX_RTMP_STAT_CS(name);
+        NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), ">%uL</bw_",
+                                        bw->bandwidth * 8)
+                           - buf);
+        NGX_RTMP_STAT_CS(name);
+        NGX_RTMP_STAT_L(">\r\n");
+    }
 
-    NGX_RTMP_STAT_L("<out>");
-    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
-                  "%uL", bw_out->bytes) - buf);
-    NGX_RTMP_STAT_L("</out>\r\n");
-
-    NGX_RTMP_STAT_L("<bwin>");
-    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
-                  "%uL", bw_in->bandwidth * 8) - buf);
-    NGX_RTMP_STAT_L("</bwin>\r\n");
-
-    NGX_RTMP_STAT_L("<bwout>");
-    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
-                  "%uL", bw_out->bandwidth * 8) - buf);
-    NGX_RTMP_STAT_L("</bwout>\r\n");
+    if (flags & NGX_RTMP_STAT_BYTES) {
+        NGX_RTMP_STAT_L("<bytes_");
+        NGX_RTMP_STAT_CS(name);
+        NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), ">%uL</bytes_",
+                                        bw->bytes)
+                           - buf);
+        NGX_RTMP_STAT_CS(name);
+        NGX_RTMP_STAT_L(">\r\n");
+    }
 }
 
 
@@ -440,7 +445,14 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                           - buf);
             NGX_RTMP_STAT_L("</time>");
 
-            ngx_rtmp_stat_bw(r, lll, &stream->bw_in, &stream->bw_out);
+            ngx_rtmp_stat_bw(r, lll, &stream->bw_in, "in",
+                             NGX_RTMP_STAT_BW_BYTES);
+            ngx_rtmp_stat_bw(r, lll, &stream->bw_out, "out",
+                             NGX_RTMP_STAT_BW_BYTES);
+            ngx_rtmp_stat_bw(r, lll, &stream->bw_in_audio, "audio",
+                             NGX_RTMP_STAT_BW);
+            ngx_rtmp_stat_bw(r, lll, &stream->bw_in_video, "video",
+                             NGX_RTMP_STAT_BW);
 
             nclients = 0;
             codec = NULL;
@@ -773,7 +785,8 @@ ngx_rtmp_stat_handler(ngx_http_request_t *r)
                   "%ui", ngx_rtmp_naccepted) - nbuf);
     NGX_RTMP_STAT_L("</naccepted>\r\n");
 
-    ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_in, &ngx_rtmp_bw_out);
+    ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_in, "in", NGX_RTMP_STAT_BW_BYTES);
+    ngx_rtmp_stat_bw(r, lll, &ngx_rtmp_bw_out, "out", NGX_RTMP_STAT_BW_BYTES);
 
     cscf = cmcf->servers.elts;
     for (n = 0; n < cmcf->servers.nelts; ++n, ++cscf) {
