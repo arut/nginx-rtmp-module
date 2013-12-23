@@ -432,7 +432,7 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
         /* seq scaling matrix present */
         if (ngx_rtmp_bit_read(&br, 1)) {
 
-            for (n = 0; n < (cf_idc != 3 ? 8 : 12); n++) {
+            for (n = 0; n < (cf_idc != 3 ? 8u : 12u); n++) {
 
                 /* seq scaling list present */
                 if (ngx_rtmp_bit_read(&br, 1)) {
@@ -470,7 +470,7 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
         ngx_rtmp_bit_read_golomb(&br);
 
         /* num ref frames in pic order */
-        num_ref_frames = ngx_rtmp_bit_read_golomb(&br);
+        num_ref_frames = (ngx_uint_t) ngx_rtmp_bit_read_golomb(&br);
 
         for (n = 0; n < num_ref_frames; n++) {
 
@@ -480,7 +480,7 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
     }
 
     /* num ref frames */
-    ctx->avc_ref_frames = ngx_rtmp_bit_read_golomb(&br);
+    ctx->avc_ref_frames = (ngx_uint_t) ngx_rtmp_bit_read_golomb(&br);
 
     /* gaps in frame num allowed */
     ngx_rtmp_bit_read(&br, 1);
