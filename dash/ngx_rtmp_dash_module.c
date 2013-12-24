@@ -642,7 +642,7 @@ ngx_rtmp_dash_close_fragments(ngx_rtmp_session_t *s)
     ngx_rtmp_dash_ctx_t  *ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
-    if (!ctx->opened) {
+    if (ctx == NULL || !ctx->opened) {
         return NGX_OK;
     }
 
