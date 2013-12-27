@@ -190,6 +190,26 @@ ngx_rtmp_log_var_remote_addr_getdata(ngx_rtmp_session_t *s, u_char *buf,
 
 
 static size_t
+ngx_rtmp_log_var_msec_getlen(ngx_rtmp_session_t *s,
+    ngx_rtmp_log_op_t *op)
+{
+    return NGX_TIME_T_LEN + 4;
+}
+
+
+static u_char *
+ngx_rtmp_log_var_msec_getdata(ngx_rtmp_session_t *s, u_char *buf,
+    ngx_rtmp_log_op_t *op)
+{
+    ngx_time_t  *tp;
+
+    tp = ngx_timeofday();
+    
+    return ngx_sprintf(buf, "%T.%03M", tp->sec, tp->msec);
+}
+
+
+static size_t
 ngx_rtmp_log_var_session_string_getlen(ngx_rtmp_session_t *s,
     ngx_rtmp_log_op_t *op)
 {
@@ -429,6 +449,11 @@ static ngx_rtmp_log_var_t ngx_rtmp_log_vars[] = {
     { ngx_string("time_local"),
       ngx_rtmp_log_var_time_local_getlen,
       ngx_rtmp_log_var_time_local_getdata,
+      0 },
+
+    { ngx_string("msec"),
+      ngx_rtmp_log_var_msec_getlen,
+      ngx_rtmp_log_var_msec_getdata,
       0 },
 
     { ngx_string("session_time"),
