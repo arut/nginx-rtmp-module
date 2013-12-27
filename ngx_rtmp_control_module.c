@@ -377,11 +377,13 @@ ngx_rtmp_control_drop_session(ngx_http_request_t *r,
             if (!lctx->publishing) {
                 return NGX_CONF_OK;
             }
+            break;
 
         case NGX_RTMP_CONTROL_DROP_SUBSCRIBER:
             if (lctx->publishing) {
                 return NGX_CONF_OK;
             }
+            break;
 
         case NGX_RTMP_CONTROL_DROP_CLIENT:
             break;
