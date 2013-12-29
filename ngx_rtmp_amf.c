@@ -229,9 +229,14 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
             return NGX_ERROR;
     }
 
-    if (ngx_rtmp_amf_get(ctx, &type, 1) != NGX_OK
-        || type != NGX_RTMP_AMF_END)
-    {
+    rc = ngx_rtmp_amf_get(ctx, &type, 1);
+
+    /* Envivo encoder does not finalize objects properly */
+    if (rc == NGX_DONE) {
+        return NGX_OK;
+    }
+
+    if (rc != NGX_OK || type != NGX_RTMP_AMF_END) {
         return NGX_ERROR;
     }
 
