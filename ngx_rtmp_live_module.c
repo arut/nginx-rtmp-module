@@ -563,28 +563,28 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
 }
 
 
-static ngx_int_t
-ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
+static void
+ngx_rtmp_live_leave(ngx_rtmp_session_t *s)
 {
-    ngx_rtmp_session_t             *ss;
-    ngx_rtmp_live_ctx_t            *ctx, **cctx, *pctx;
-    ngx_rtmp_live_stream_t        **stream;
-    ngx_rtmp_live_app_conf_t       *lacf;
+    ngx_rtmp_session_t         *ss;
+    ngx_rtmp_live_ctx_t        *ctx, **cctx, *pctx;
+    ngx_rtmp_live_stream_t    **stream;
+    ngx_rtmp_live_app_conf_t   *lacf;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
     if (lacf == NULL) {
-        goto next;
+        return;
     }
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
     if (ctx == NULL) {
-        goto next;
+        return;
     }
 
     if (ctx->stream == NULL) {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "live: not joined");
-        goto next;
+                       "live: leave: not joined");
+        return;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -622,7 +622,7 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 
     if (ctx->stream->ctx) {
         ctx->stream = NULL;
-        goto next;
+        return;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -631,7 +631,7 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
 
     stream = ngx_rtmp_live_get_stream(s, ctx->stream->name, 0);
     if (stream == NULL) {
-        goto next;
+        return;
     }
     *stream = (*stream)->next;
 
@@ -643,7 +643,15 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
         ngx_rtmp_send_status(s, "NetStream.Play.Stop", "status", "Stop live");
     }
 
-next:
+    return;
+}
+
+
+static ngx_int_t
+ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
+{
+    ngx_rtmp_live_leave(s);
+
     return next_close_stream(s, v);
 }
 
@@ -1110,6 +1118,27 @@ ngx_rtmp_live_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
 next:
     return next_play(s, v);
+}
+
+
+ngx_int_t
+ngx_rtmp_live_redirect(ngx_rtmp_session_t *s, u_char *name)
+{
+    ngx_uint_t            publishing;
+    ngx_rtmp_live_ctx_t  *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+    if (ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    publishing = ctx->publishing;
+
+    ngx_rtmp_live_leave(s);
+
+    ngx_rtmp_live_join(s, name, publishing);
+
+    return NGX_OK;
 }
 
 
