@@ -259,8 +259,8 @@ static const char *
 ngx_rtmp_control_walk_session(ngx_http_request_t *r,
     ngx_rtmp_live_ctx_t *lctx)
 {
-    ngx_str_t                 addr, *paddr;
-    ngx_rtmp_session_t       *s;
+    ngx_str_t                addr, *paddr;
+    ngx_rtmp_session_t      *s;
     ngx_rtmp_control_ctx_t  *ctx;
 
     s = lctx->session;
@@ -269,6 +269,7 @@ ngx_rtmp_control_walk_session(ngx_http_request_t *r,
         return NGX_CONF_OK;
     }
 
+    ngx_str_null(&addr);
     ngx_http_arg(r, (u_char *) "addr", sizeof("addr") - 1, &addr);
 
     if (addr.len) {
