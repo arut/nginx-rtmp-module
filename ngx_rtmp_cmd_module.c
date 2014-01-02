@@ -94,7 +94,7 @@ ngx_module_t  ngx_rtmp_cmd_module = {
 };
 
 
-static void
+void
 ngx_rtmp_cmd_fill_args(u_char name[NGX_RTMP_MAX_NAME],
         u_char args[NGX_RTMP_MAX_ARGS])
 {
