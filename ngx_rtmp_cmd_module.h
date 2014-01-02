@@ -97,6 +97,10 @@ typedef struct {
 } ngx_rtmp_set_buflen_t;
 
 
+void ngx_rtmp_cmd_fill_args(u_char name[NGX_RTMP_MAX_NAME],
+        u_char args[NGX_RTMP_MAX_ARGS]);
+
+
 typedef ngx_int_t (*ngx_rtmp_connect_pt)(ngx_rtmp_session_t *s,
         ngx_rtmp_connect_t *v);
 typedef ngx_int_t (*ngx_rtmp_disconnect_pt)(ngx_rtmp_session_t *s);
