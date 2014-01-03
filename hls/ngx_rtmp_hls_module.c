@@ -1348,22 +1348,24 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_msec_t                  ts_frag_len;
     ngx_int_t                   same_frag;
     ngx_buf_t                  *b;
+    int64_t                     d;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
-
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-
     f = NULL;
 
     if (ctx->opened) {
-
         f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
-        f->duration = (ts - ctx->frag_ts) / 90000.;
+        d = (int64_t) (ts - ctx->frag_ts);
 
-        if (f->duration * 1000 > hacf->max_fraglen) {
+        if (d > (int64_t) hacf->max_fraglen * 90 || d < -90000) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                          "hls: max fragment length reached");
+                          "hls: max fragment length reached: %.3f sec, ",
+                          f->duration);
             boundary = 1;
+
+        } else {
+            f->duration = (ts - ctx->frag_ts) / 90000.;
         }
     }
 

@@ -24,6 +24,9 @@ static ngx_int_t ngx_rtmp_mp4_send(ngx_rtmp_session_t *s,  ngx_file_t *f,
 static ngx_int_t ngx_rtmp_mp4_reset(ngx_rtmp_session_t *s);
 
 
+#define NGX_RTMP_MP4_MAX_FRAMES         8
+
+
 #pragma pack(push,4)
 
 
@@ -2092,15 +2095,16 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
     ngx_rtmp_header_t               h, lh;
     ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_chain_t                    *out, in;
-    ngx_rtmp_mp4_track_t           *t;
-    ngx_rtmp_mp4_cursor_t          *cr;
-    uint32_t                        buflen, end_timestamp, sched,
-                                    timestamp, last_timestamp, rdelay;
+    ngx_rtmp_mp4_track_t           *t, *cur_t;
+    ngx_rtmp_mp4_cursor_t          *cr, *cur_cr;
+    uint32_t                        buflen, end_timestamp,
+                                    timestamp, last_timestamp, rdelay,
+                                    cur_timestamp;
     ssize_t                         ret;
     u_char                          fhdr[5];
     size_t                          fhdr_size;
     ngx_int_t                       rc;
-    ngx_uint_t                      n, active;
+    ngx_uint_t                      n, counter;
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
@@ -2123,30 +2127,56 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
     buflen = (s->buflen ? s->buflen + NGX_RTMP_MP4_BUFLEN_ADDON:
                                       NGX_RTMP_MP4_DEFAULT_BUFLEN);
 
-    t = ctx->tracks;
-
-    sched  = 0;
-    active = 0;
+    counter = 0;
     last_timestamp = 0;
-
     end_timestamp = ctx->start_timestamp +
                     (ngx_current_msec - ctx->epoch) + buflen;
 
-    for (n = 0; n < ctx->ntracks; ++n, ++t) {
-        cr = &t->cursor;
-
-        if (!cr->valid) {
-            continue;
+    for ( ;; ) {
+        counter++;
+        if (counter > NGX_RTMP_MP4_MAX_FRAMES) {
+            return NGX_OK;
         }
 
-        timestamp = ngx_rtmp_mp4_to_rtmp_timestamp(t, cr->timestamp);
+        timestamp = 0;
+        t = NULL;
+
+        for (n = 0; n < ctx->ntracks; n++) {
+            cur_t = &ctx->tracks[n];
+            cur_cr = &cur_t->cursor;
+
+            if (!cur_cr->valid) {
+                continue;
+            }
+
+            cur_timestamp = ngx_rtmp_mp4_to_rtmp_timestamp(cur_t,
+                                                           cur_cr->timestamp);
+
+            if (t == NULL || cur_timestamp < timestamp) {
+                timestamp = cur_timestamp;
+                t = cur_t;
+            }
+        }
+
+        if (t == NULL) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "mp4: no track");
+            return NGX_DONE;
+        }
 
         if (timestamp > end_timestamp) {
             ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "mp4: track#%ui ahead %uD > %uD",
-                           t->id, timestamp, end_timestamp);
-            goto next;
+                    "mp4: track#%ui ahead %uD > %uD",
+                    t->id, timestamp, end_timestamp);
+
+            if (ts) {
+                *ts = last_timestamp;
+            }
+
+            return (uint32_t) (timestamp - end_timestamp);
         }
+
+        cr = &t->cursor;
 
         last_timestamp = ngx_rtmp_mp4_to_rtmp_timestamp(t, cr->last_timestamp);
 
@@ -2245,7 +2275,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "mp4: track#%ui too big frame: %D>%uz",
                           t->id, cr->size, sizeof(ngx_rtmp_mp4_buffer));
-            continue;
+            goto next;
         }
 
         ret = ngx_read_file(f, ngx_rtmp_mp4_buffer + fhdr_size,
@@ -2254,7 +2284,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
         if (ret != (ssize_t) cr->size) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "mp4: track#%ui could not read frame", t->id);
-            continue;
+            goto next;
         }
 
         in.buf = &in_buf;
@@ -2273,35 +2303,11 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
 
         s->current_time = timestamp;
 
-        if (ngx_rtmp_mp4_next(s, t) != NGX_OK) {
-            continue;
-        }
-
 next:
-        active = 1;
-
-        if (timestamp > end_timestamp &&
-            (sched == 0 || timestamp < end_timestamp + sched))
-        {
-            sched = (uint32_t) (timestamp - end_timestamp);
+        if (ngx_rtmp_mp4_next(s, t) != NGX_OK) {
+            return NGX_DONE;
         }
     }
-
-    if (sched) {
-        return sched;
-    }
-
-    if (active) {
-        return NGX_OK;
-    }
-
-    if (ts) {
-        *ts = last_timestamp;
-    }
-
-    /*ngx_rtmp_mp4_reset(s);*/
-
-    return NGX_DONE;
 }
 
 
