@@ -19,6 +19,7 @@ typedef struct {
     ngx_uint_t  sid;
     ngx_uint_t  cc;
     unsigned    key:1;
+    unsigned    discont:1;
 } ngx_rtmp_mpegts_frame_t;
 
 

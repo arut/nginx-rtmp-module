@@ -65,6 +65,9 @@ typedef struct {
     ngx_uint_t                          audio_cc;
     ngx_uint_t                          video_cc;
 
+    unsigned                            video_discont:1;
+    unsigned                            audio_discont:1;
+
     uint64_t                            aframe_base;
     uint64_t                            aframe_num;
 
@@ -1119,6 +1122,9 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         }
     }
 
+    ctx->video_discont = 1;
+    ctx->audio_discont = 1;
+
     if (ctx->frags == NULL) {
         ctx->frags = ngx_pcalloc(s->connection->pool,
                                  sizeof(ngx_rtmp_hls_frag_t) *
@@ -1435,6 +1441,9 @@ ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s)
     frame.cc = ctx->audio_cc;
     frame.pid = 0x101;
     frame.sid = 0xc0;
+    frame.discont = ctx->audio_discont;
+
+    ctx->audio_discont = 0;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: flush audio pts=%uL", frame.pts);
@@ -1793,6 +1802,9 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     frame.pid = 0x100;
     frame.sid = 0xe0;
     frame.key = (ftype == 1);
+    frame.discont = ctx->video_discont;
+
+    ctx->video_discont = 0;
 
     /*
      * start new fragment if

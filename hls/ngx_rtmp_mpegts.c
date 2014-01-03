@@ -154,11 +154,28 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
 
         if (first) {
 
-            if (f->key) {
+            if (f->key || f->discont) {
                 packet[3] |= 0x20; /* adaptation */
 
-                *p++ = 7;    /* size */
-                *p++ = 0x50; /* random access + PCR */
+                /* size */
+
+                *p++ = 7;
+
+                /* flags */
+
+                *p = 0x10; /* PCR */
+
+                if (f->discont) {
+                    *p |= 0x80; /* discont */
+                }
+
+                if (f->key) {
+                    *p |= 0x40; /* random access */
+                }
+
+                p++;
+
+                /* data */
 
                 p = ngx_rtmp_mpegts_write_pcr(p, f->dts - NGX_RTMP_HLS_DELAY);
             }
