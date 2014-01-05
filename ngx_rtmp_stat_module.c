@@ -255,7 +255,7 @@ ngx_rtmp_stat_bw(ngx_http_request_t *r, ngx_chain_t ***lll,
                  ngx_rtmp_bandwidth_t *bw, char *name,
                  ngx_uint_t flags)
 {
-    u_char  buf[NGX_INT64_LEN + 1];
+    u_char  buf[NGX_INT64_LEN + 9];
 
     ngx_rtmp_update_bandwidth(bw, 0);
 
