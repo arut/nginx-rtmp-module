@@ -1479,7 +1479,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     if (codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_AAC ||
-        codec_ctx->aac_header == NULL)
+        codec_ctx->aac_header == NULL || ngx_rtmp_is_codec_header(in))
     {
         return NGX_OK;
     }
