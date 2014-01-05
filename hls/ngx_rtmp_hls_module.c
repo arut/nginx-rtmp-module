@@ -1800,7 +1800,8 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
      */
 
     b = ctx->aframe;
-    boundary = frame.key && (codec_ctx->aac_header == NULL || b->last > b->pos);
+    boundary = frame.key && (codec_ctx->aac_header == NULL ||
+                             (b && b->last > b->pos));
 
     ngx_rtmp_hls_update_fragment(s, frame.dts, boundary, 1);
 
