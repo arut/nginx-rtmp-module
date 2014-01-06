@@ -1268,7 +1268,7 @@ ngx_rtmp_hls_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     }
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls: delete stream");
+                   "hls: close stream");
 
     ngx_rtmp_hls_close_fragment(s);
 
