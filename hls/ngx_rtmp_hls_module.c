@@ -1796,11 +1796,11 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /*
      * start new fragment if
      * - we have video key frame AND
-     * - we have audio buffered or have no audio at all
+     * - we have audio buffered or have no audio at all or stream is closed
      */
 
     b = ctx->aframe;
-    boundary = frame.key && (codec_ctx->aac_header == NULL ||
+    boundary = frame.key && (codec_ctx->aac_header == NULL || !ctx->opened ||
                              (b && b->last > b->pos));
 
     ngx_rtmp_hls_update_fragment(s, frame.dts, boundary, 1);
