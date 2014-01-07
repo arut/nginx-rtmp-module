@@ -1235,7 +1235,9 @@ ngx_rtmp_exec_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     if (ctx->flags & NGX_RTMP_EXEC_PUBLISHING) {
         ngx_rtmp_exec_unmanaged(s, &eacf->conf[NGX_RTMP_EXEC_PUBLISH_DONE],
                                 "publish_done");
-    } else {
+    }
+
+    if (ctx->flags & NGX_RTMP_EXEC_PLAYING) {
         ngx_rtmp_exec_unmanaged(s, &eacf->conf[NGX_RTMP_EXEC_PLAY_DONE],
                                 "play_done");
     }
