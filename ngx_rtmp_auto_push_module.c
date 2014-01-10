@@ -102,7 +102,7 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
 #if (NGX_HAVE_UNIX_DOMAIN)
     ngx_rtmp_auto_push_conf_t  *apcf;
     ngx_listening_t            *ls, *lss;
-    struct sockaddr_un         *sun;
+    struct sockaddr_un         *saun;
     int                         reuseaddr;
     ngx_socket_t                s;
     size_t                      n;
@@ -157,26 +157,26 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
     ls->addr_ntop = 0;
 
     ls->socklen = sizeof(struct sockaddr_un);
-    sun = ngx_pcalloc(cycle->pool, ls->socklen);
-    ls->sockaddr = (struct sockaddr *) sun;
+    saun = ngx_pcalloc(cycle->pool, ls->socklen);
+    ls->sockaddr = (struct sockaddr *) saun;
     if (ls->sockaddr == NULL) {
         return NGX_ERROR;
     }
-    sun->sun_family = AF_UNIX;
-    *ngx_snprintf((u_char *) sun->sun_path, sizeof(sun->sun_path),
+    saun->sun_family = AF_UNIX;
+    *ngx_snprintf((u_char *) saun->sun_path, sizeof(saun->sun_path),
                   "%V/" NGX_RTMP_AUTO_PUSH_SOCKNAME ".%i",
                   &apcf->socket_dir, ngx_process_slot)
         = 0;
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, cycle->log, 0,
                    "auto_push: create socket '%s'",
-                   sun->sun_path);
+                   saun->sun_path);
 
-    if (ngx_file_info(sun->sun_path, &fi) != ENOENT) {
+    if (ngx_file_info(saun->sun_path, &fi) != ENOENT) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, cycle->log, 0,
                        "auto_push: delete existing socket '%s'",
-                       sun->sun_path);
-        ngx_delete_file(sun->sun_path);
+                       saun->sun_path);
+        ngx_delete_file(saun->sun_path);
     }
 
     ngx_str_set(&ls->addr_text, "worker_socket");
@@ -205,7 +205,7 @@ ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle)
         }
     }
 
-    if (bind(s, (struct sockaddr *) sun, sizeof(*sun)) == -1) {
+    if (bind(s, (struct sockaddr *) saun, sizeof(*saun)) == -1) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
                       ngx_nonblocking_n " worker_socket bind failed");
         goto sock_error;
@@ -228,7 +228,7 @@ sock_error:
         ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
                 ngx_close_socket_n " worker_socket failed");
     }
-    ngx_delete_file(sun->sun_path);
+    ngx_delete_file(saun->sun_path);
 
     return NGX_ERROR;
 
