@@ -77,9 +77,6 @@ typedef struct {
 } ngx_rtmp_live_app_conf_t;
 
 
-ngx_int_t ngx_rtmp_live_redirect(ngx_rtmp_session_t *s, u_char *name);
-
-
 extern ngx_module_t  ngx_rtmp_live_module;
 
 
