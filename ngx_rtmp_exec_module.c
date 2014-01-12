@@ -124,7 +124,10 @@ typedef struct {
 
 typedef struct {
     ngx_uint_t                          flags;
-    ngx_str_t                           path;
+    ngx_str_t                           path;     /* /tmp/rec/myfile-123.flv */
+    ngx_str_t                           filename; /* myfile-123.flv */
+    ngx_str_t                           basename; /* myfile-123 */
+    ngx_str_t                           dirname;  /* /tmp/rec */
     ngx_str_t                           recorder;
     u_char                              name[NGX_RTMP_MAX_NAME];
     u_char                              args[NGX_RTMP_MAX_ARGS];
@@ -377,6 +380,18 @@ static ngx_rtmp_eval_t ngx_rtmp_exec_event_specific_eval[] = {
     { ngx_string("path"),
       ngx_rtmp_exec_eval_ctx_str,
       offsetof(ngx_rtmp_exec_ctx_t, path) },
+
+    { ngx_string("filename"),
+      ngx_rtmp_exec_eval_ctx_str,
+      offsetof(ngx_rtmp_exec_ctx_t, filename) },
+
+    { ngx_string("basename"),
+      ngx_rtmp_exec_eval_ctx_str,
+      offsetof(ngx_rtmp_exec_ctx_t, basename) },
+
+    { ngx_string("dirname"),
+      ngx_rtmp_exec_eval_ctx_str,
+      offsetof(ngx_rtmp_exec_ctx_t, dirname) },
 
     { ngx_string("recorder"),
       ngx_rtmp_exec_eval_ctx_str,
@@ -1290,6 +1305,8 @@ next:
 static ngx_int_t
 ngx_rtmp_exec_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
 {
+    u_char                     c;
+    ngx_uint_t                 ext, dir;
     ngx_rtmp_exec_ctx_t       *ctx;
     ngx_rtmp_exec_app_conf_t  *eacf;
 
@@ -1309,6 +1326,29 @@ ngx_rtmp_exec_record_done(ngx_rtmp_session_t *s, ngx_rtmp_record_done_t *v)
 
     ctx->recorder = v->recorder;
     ctx->path = v->path;
+
+    ctx->dirname.data = ctx->path.data;
+    ctx->dirname.len = 0;
+
+    for (dir = ctx->path.len; dir > 0; dir--) {
+        c = ctx->path.data[dir - 1];
+        if (c == '/' || c == '\\') {
+            ctx->dirname.len = dir - 1;
+            break;
+        }
+    }
+
+    ctx->filename.data = ctx->path.data + dir;
+    ctx->filename.len = ctx->path.len - dir;
+
+    ctx->basename = ctx->filename;
+
+    for (ext = ctx->filename.len; ext > 0; ext--) {
+        if (ctx->filename.data[ext - 1] == '.') {
+            ctx->basename.len = ext - 1;
+            break;
+        }
+    }
 
     ngx_rtmp_exec_unmanaged(s, &eacf->conf[NGX_RTMP_EXEC_RECORD_DONE],
                             "record_done");
