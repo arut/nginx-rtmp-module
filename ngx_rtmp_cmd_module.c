@@ -582,10 +582,19 @@ static ngx_int_t
 ngx_rtmp_cmd_play2_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
-    static u_char                   old_name[NGX_RTMP_MAX_NAME];
-    static u_char                   transition[NGX_RTMP_MAX_NAME];
     static ngx_rtmp_play_t          v;
     static ngx_rtmp_close_stream_t  vc;
+
+    static ngx_rtmp_amf_elt_t       in_obj[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("StartTime"),
+          &v.start, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("StreamName"),
+          &v.name, sizeof(v.name) },
+    };
 
     static ngx_rtmp_amf_elt_t       in_elts[] = {
 
@@ -594,25 +603,13 @@ ngx_rtmp_cmd_play2_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
           ngx_null_string,
           NULL, 0 },
 
-        { NGX_RTMP_AMF_NUMBER,
+        { NGX_RTMP_AMF_NULL,
           ngx_null_string,
-          &v.start, 0 },
+          NULL, 0 },
 
-        { NGX_RTMP_AMF_STRING,
+        { NGX_RTMP_AMF_OBJECT,
           ngx_null_string,
-          &old_name, sizeof(old_name) },
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          &v.name, sizeof(v.name) },
-
-        { NGX_RTMP_AMF_OPTIONAL | NGX_RTMP_AMF_NUMBER,
-          ngx_null_string,
-          &v.duration, 0 },
-
-        { NGX_RTMP_AMF_OPTIONAL | NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          &transition, sizeof(transition) }
+          &in_obj, sizeof(in_obj) }
     };
 
     ngx_memzero(&v, sizeof(v));
@@ -626,10 +623,8 @@ ngx_rtmp_cmd_play2_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_cmd_fill_args(v.name, v.args);
 
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                  "play2: old_name='%s' name='%s' args='%s' "
-                  "start=%i duration=%i transition='%s'",
-                  old_name, v.name, v.args, (ngx_int_t) v.start,
-                  (ngx_int_t) v.duration, transition);
+                  "play2: name='%s' args='%s' start=%i",
+                  v.name, v.args, (ngx_int_t) v.start);
 
     ngx_memzero(&vc, sizeof(vc));
 
