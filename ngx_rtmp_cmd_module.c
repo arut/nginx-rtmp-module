@@ -579,6 +579,63 @@ ngx_rtmp_cmd_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
 
 static ngx_int_t
+ngx_rtmp_cmd_play2_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    static ngx_rtmp_play_t          v;
+    static ngx_rtmp_close_stream_t  vc;
+
+    static ngx_rtmp_amf_elt_t       in_obj[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("start"),
+          &v.start, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("streamName"),
+          &v.name, sizeof(v.name) },
+    };
+
+    static ngx_rtmp_amf_elt_t       in_elts[] = {
+
+        /* transaction is always 0 */
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          &in_obj, sizeof(in_obj) }
+    };
+
+    ngx_memzero(&v, sizeof(v));
+
+    if (ngx_rtmp_receive_amf(s, in, in_elts,
+                             sizeof(in_elts) / sizeof(in_elts[0])))
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_rtmp_cmd_fill_args(v.name, v.args);
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "play2: name='%s' args='%s' start=%i",
+                  v.name, v.args, (ngx_int_t) v.start);
+
+    ngx_memzero(&vc, sizeof(vc));
+
+    /* close_stream should be synchronous */
+    ngx_rtmp_close_stream(s, &vc);
+
+    return ngx_rtmp_play(s, &v);
+}
+
+
+static ngx_int_t
 ngx_rtmp_cmd_pause_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
@@ -730,6 +787,7 @@ static ngx_rtmp_amf_handler_t ngx_rtmp_cmd_map[] = {
     { ngx_string("deleteStream"),       ngx_rtmp_cmd_delete_stream_init     },
     { ngx_string("publish"),            ngx_rtmp_cmd_publish_init           },
     { ngx_string("play"),               ngx_rtmp_cmd_play_init              },
+    { ngx_string("play2"),              ngx_rtmp_cmd_play2_init             },
     { ngx_string("seek"),               ngx_rtmp_cmd_seek_init              },
     { ngx_string("pause"),              ngx_rtmp_cmd_pause_init             },
     { ngx_string("pauseraw"),           ngx_rtmp_cmd_pause_init             },
