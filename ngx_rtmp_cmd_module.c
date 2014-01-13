@@ -588,11 +588,11 @@ ngx_rtmp_cmd_play2_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static ngx_rtmp_amf_elt_t       in_obj[] = {
 
         { NGX_RTMP_AMF_NUMBER,
-          ngx_string("StartTime"),
+          ngx_string("start"),
           &v.start, 0 },
 
         { NGX_RTMP_AMF_STRING,
-          ngx_string("StreamName"),
+          ngx_string("streamName"),
           &v.name, sizeof(v.name) },
     };
 
