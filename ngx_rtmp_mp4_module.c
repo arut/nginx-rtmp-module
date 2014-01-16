@@ -220,7 +220,6 @@ ngx_rtmp_mp4_from_rtmp_timestamp(ngx_rtmp_mp4_track_t *t, uint32_t ts)
 }
 
 
-#define NGX_RTMP_MP4_DEFAULT_BUFLEN     1000
 #define NGX_RTMP_MP4_BUFLEN_ADDON       1000
 
 
@@ -2124,8 +2123,7 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
         return rc;
     }
 
-    buflen = (s->buflen ? s->buflen + NGX_RTMP_MP4_BUFLEN_ADDON:
-                                      NGX_RTMP_MP4_DEFAULT_BUFLEN);
+    buflen = s->buflen + NGX_RTMP_MP4_BUFLEN_ADDON;
 
     counter = 0;
     last_timestamp = 0;

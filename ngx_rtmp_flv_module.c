@@ -47,7 +47,6 @@ typedef struct {
 
 
 #define NGX_RTMP_FLV_BUFFER             (1024*1024)
-#define NGX_RTMP_FLV_DEFAULT_BUFLEN     1000
 #define NGX_RTMP_FLV_BUFLEN_ADDON       1000
 #define NGX_RTMP_FLV_TAG_HEADER         11
 #define NGX_RTMP_FLV_DATA_OFFSET        13
@@ -531,8 +530,8 @@ next:
         return NGX_OK;
     }
 
-    buflen = (s->buflen ? s->buflen + NGX_RTMP_FLV_BUFLEN_ADDON:
-                                      NGX_RTMP_FLV_DEFAULT_BUFLEN);
+    buflen = s->buflen + NGX_RTMP_FLV_BUFLEN_ADDON;
+
     end_timestamp = (ngx_current_msec - ctx->epoch) +
                      ctx->start_timestamp + buflen;
 
