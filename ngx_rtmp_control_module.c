@@ -184,7 +184,7 @@ ngx_rtmp_control_drop_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s)
 {
     ngx_rtmp_control_ctx_t  *ctx;
 
-    ctx = ngx_http_get_module_ctx(s, ngx_rtmp_control_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_rtmp_control_module);
 
     ngx_rtmp_finalize_session(s);
 
