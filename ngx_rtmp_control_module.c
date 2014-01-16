@@ -259,7 +259,7 @@ static const char *
 ngx_rtmp_control_walk_session(ngx_http_request_t *r,
     ngx_rtmp_live_ctx_t *lctx)
 {
-    ngx_str_t                addr, *paddr;
+    ngx_str_t                addr, *paddr, clientid;
     ngx_rtmp_session_t      *s, **ss;
     ngx_rtmp_control_ctx_t  *ctx;
 
@@ -275,6 +275,17 @@ ngx_rtmp_control_walk_session(ngx_http_request_t *r,
         paddr = &s->connection->addr_text;
         if (paddr->len != addr.len ||
             ngx_strncmp(paddr->data, addr.data, addr.len))
+        {
+            return NGX_CONF_OK;
+        }
+    }
+
+    if (ngx_http_arg(r, (u_char *) "clientid", sizeof("clientid") - 1,
+                     &clientid)
+        == NGX_OK)
+    {
+        if (s->connection->number !=
+            (ngx_uint_t) ngx_atoi(clientid.data, clientid.len))
         {
             return NGX_CONF_OK;
         }
