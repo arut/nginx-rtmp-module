@@ -197,8 +197,15 @@ ngx_rtmp_amf_read_object(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
         }
 #endif
         /* read key */
-        if (ngx_rtmp_amf_get(ctx, buf, 2) != NGX_OK)
+        switch (ngx_rtmp_amf_get(ctx, buf, 2)) {
+        case NGX_DONE:
+            /* Envivio sends unfinalized arrays */
+            return NGX_OK;
+        case NGX_OK:
+            break;
+        default:
             return NGX_ERROR;
+        }
 
         ngx_rtmp_amf_reverse_copy(&len, buf, 2);
 
