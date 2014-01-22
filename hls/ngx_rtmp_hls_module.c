@@ -1417,7 +1417,7 @@ ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
-    if (!ctx->opened) {
+    if (ctx == NULL || !ctx->opened) {
         return NGX_OK;
     }
 
