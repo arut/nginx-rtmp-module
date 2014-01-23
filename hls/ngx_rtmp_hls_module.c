@@ -101,6 +101,7 @@ typedef struct {
     ngx_flag_t                          cleanup;
     ngx_array_t                        *variant;
     ngx_str_t                           base_url;
+    ngx_int_t                           granularity;
 } ngx_rtmp_hls_app_conf_t;
 
 
@@ -258,6 +259,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       ngx_conf_set_str_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, base_url),
+      NULL },
+
+    { ngx_string("hls_fragment_naming_granularity"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, granularity),
       NULL },
 
     ngx_null_command
@@ -770,16 +778,25 @@ static ngx_int_t
 ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_int_t discont)
 {
-    ngx_rtmp_hls_ctx_t     *ctx;
-    ngx_rtmp_hls_frag_t    *f;
-    uint64_t                id;
+    uint64_t                  id;
+    ngx_uint_t                g;
+    ngx_rtmp_hls_ctx_t       *ctx;
+    ngx_rtmp_hls_frag_t      *f;
+    ngx_rtmp_hls_app_conf_t  *hacf;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
     if (ctx->opened) {
         return NGX_OK;
     }
 
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+
     id = ngx_rtmp_hls_get_fragment_id(s, ts);
+
+    if (hacf->granularity) {
+        g = (ngx_uint_t) hacf->granularity;
+        id = (uint64_t) (id / g) * g;
+    }
 
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "%uL.ts", id) = 0;
 
@@ -2067,6 +2084,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->max_audio_delay = NGX_CONF_UNSET_MSEC;
     conf->audio_buffer_size = NGX_CONF_UNSET_SIZE;
     conf->cleanup = NGX_CONF_UNSET;
+    conf->granularity = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -2100,6 +2118,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
                               NGX_RTMP_HLS_BUFSIZE);
     ngx_conf_merge_value(conf->cleanup, prev->cleanup, 1);
     ngx_conf_merge_str_value(conf->base_url, prev->base_url, "");
+    ngx_conf_merge_value(conf->granularity, prev->granularity, 0);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
