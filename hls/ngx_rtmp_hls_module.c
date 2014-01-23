@@ -746,7 +746,7 @@ ngx_rtmp_hls_close_fragment(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_ctx_t         *ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-    if (!ctx->opened) {
+    if (ctx == NULL || !ctx->opened) {
         return NGX_OK;
     }
 
