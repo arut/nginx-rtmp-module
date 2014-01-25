@@ -25,6 +25,7 @@ static void * ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf,
        void *parent, void *child);
 static ngx_int_t ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s);
+static ngx_int_t ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s);
 
 
 #define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
@@ -789,6 +790,10 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
         return NGX_OK;
     }
 
+    if (ngx_rtmp_hls_ensure_directory(s) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
     id = ngx_rtmp_hls_get_fragment_id(s, ts);
@@ -1259,10 +1264,6 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     if (hacf->continuous) {
         ngx_rtmp_hls_restore_stream(s);
-    }
-
-    if (ngx_rtmp_hls_ensure_directory(s) != NGX_OK) {
-        return NGX_ERROR;
     }
 
 next:
