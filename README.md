@@ -245,7 +245,7 @@ rtmp_auto_push directive.
 
             # HLS
 
-            # For HLS to work please create a directory in tmpfs (/tmp/app here)
+            # For HLS to work please create a directory in tmpfs (/tmp/hls here)
             # for the fragments. The directory contents is served via HTTP (see
             # http{} section in config)
             #
