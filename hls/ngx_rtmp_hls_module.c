@@ -375,7 +375,7 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
         return NGX_ERROR;
     }
 
-#define NGX_RTMP_HLS_VAR_HEADER "#EXTM3U\n#EXT-X-VERSION:3\n"
+#define NGX_RTMP_HLS_VAR_HEADER "#EXTM3U\n#EXT-X-VERSION:5\n"
 
     rc = ngx_write_fd(fd, NGX_RTMP_HLS_VAR_HEADER,
                       sizeof(NGX_RTMP_HLS_VAR_HEADER) - 1);
@@ -393,7 +393,7 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
         p = buffer;
         last = buffer + sizeof(buffer);
 
-        p = ngx_slprintf(p, last, "#EXT-X-STREAM-INF:PROGRAM-ID=1");
+        p = ngx_slprintf(p, last, "\n#EXT-X-STREAM-INF:PROGRAM-ID=1");
 
         arg = var->args.elts;
         for (k = 0; k < var->args.nelts; k++, arg++) {
