@@ -1,3 +1,6 @@
+#ifndef _NGX_RTMP_DASH_TEMPLATES
+#define _NGX_RTMP_DASH_TEMPLATES
+
 #define NGX_RTMP_DASH_MANIFEST_HEADER                                          \
     "<?xml version=\"1.0\"?>\n"                                                \
     "<MPD\n"                                                                   \
@@ -12,13 +15,14 @@
     "    profiles=\"urn:hbbtv:dash:profile:isoff-live:2012,"                   \
                    "urn:mpeg:dash:profile:isoff-live:2011\"\n"                 \
     "    xmlns:xsi=\"http://www.w3.org/2011/XMLSchema-instance\"\n"            \
-    "    xsi:schemaLocation=\"urn:mpeg:DASH:schema:MPD:2011 DASH-MPD.xsd\">\n" \
-    "  <Period start=\"PT0S\" id=\"dash\">\n"
+    "    xsi:schemaLocation=\"urn:mpeg:DASH:schema:MPD:2011 DASH-MPD.xsd\">\n"
 
+#define NGX_RTMP_DASH_PERIOD_HEADER                                            \
+    "  <Period start=\"PT0S\" id=\"dash\">\n"
 
 #define NGX_RTMP_DASH_ADAPTATION_SET_VIDEO                                     \
     "    <AdaptationSet\n"                                                     \
-    "        id=\"1\"\n"                                                       \
+    "        group=\"1\"\n"                                                    \
     "        contentType=\"video\"\n"                                          \
     "        segmentAlignment=\"true\">\n"
 
@@ -42,7 +46,7 @@
 
 #define NGX_RTMP_DASH_ADAPTATION_SET_AUDIO                                     \
     "    <AdaptationSet\n"                                                     \
-    "        id=\"2\"\n"                                                       \
+    "        group=\"2\"\n"                                                    \
     "        segmentAlignment=\"true\">\n"                                     \
     "      <AudioChannelConfiguration\n"                                       \
     "          schemeIdUri=\"urn:mpeg:dash:"                                   \
@@ -75,11 +79,13 @@
 #define NGX_RTMP_DASH_MANIFEST_TIME                                            \
     "             <S t=\"%uD\" d=\"%uD\"/>\n"
 
+#define NGX_RTMP_DASH_PERIOD_FOOTER                                            \
+    "  </Period>\n"
+
 #define NGX_RTMP_DASH_MANIFEST_FOOTER                                          \
-    "  </Period>\n"                                                            \
     "</MPD>\n"
 
-// these are just stupid fillers for now...
-#define NGX_RTMP_DASH_MANIFEST_PLAYLIST_HEADER "<MPD>\n"
-#define NGX_RTMP_DASH_MANIFEST_PLAYLIST_LINE "<Representation name=\"%V\"/>\n"
-#define NGX_RTMP_DASH_MANIFEST_PLAYLIST_FOOTER "</MPD>\n"
+
+#define NGX_RTMP_DASH_MANIFEST_PATH "%V/%V%V%s"
+
+#endif

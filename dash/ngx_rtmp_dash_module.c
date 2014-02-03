@@ -226,22 +226,39 @@ ngx_rtmp_dash_rename_file(u_char *src, u_char *dst)
 
 
 static ngx_int_t
-ngx_rtmp_dash_write_manifest_playlist(ngx_rtmp_session_t *s)
+ngx_rtmp_dash_write_manifest_playlist(ngx_rtmp_session_t *s,
+    u_char *start_time, u_char *end_time)
 {
     // not sure if this will work in the long run, because we need
     // some method of pulling information across all live streams...
 
     static u_char               buffer[NGX_RTMP_DASH_BUFSIZE];
+    static u_char               rep_buffer[NGX_RTMP_DASH_BUFSIZE];
+    static u_char               rep_path[NGX_MAX_PATH + 1];
     ngx_uint_t                  i;
     ssize_t                     rc;
-    ngx_fd_t                    manifest_fd;
-    u_char                      *p, *last;
-    ngx_str_t                   *rep_name;
+    ngx_fd_t                    manifest_fd, rep_fd;
+    FILE                        *rep_file;
+    u_char                      *p, *last, *rep_p, *rep_last;
+    ngx_str_t                   *rep_name, app_name;
     ngx_rtmp_dash_ctx_t         *ctx;
     ngx_rtmp_dash_app_conf_t    *dacf;
+    u_char                      *suffix;
+    u_char                      nested_suffix[] = "/index.mpd";
+    u_char                      unnested_suffix[] = ".mpd";
+    unsigned int                in_child_set_block = 0;
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
+
+    app_name.len = ctx->name.len - ctx->representation.len;
+    app_name.data = ctx->name.data;
+    *(&app_name.data + app_name.len) = '\0';
+
+    p = buffer;
+    last = buffer + sizeof(buffer);
+
+    suffix = (dacf->nested) ? nested_suffix : unnested_suffix;
 
     manifest_fd = ngx_open_file(ctx->manifest_playlist_bak.data,
             NGX_FILE_WRONLY, NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
@@ -252,26 +269,101 @@ ngx_rtmp_dash_write_manifest_playlist(ngx_rtmp_session_t *s)
         return NGX_ERROR;
     }
 
-    // the information dumped here is useless right now, just
-    // experimenting at this point.
+    // right now, building all of this up in the current process. this
+    // could get really slow / dangerous as the number of streams increases
+    // file contention...
 
-    rc = ngx_write_fd(manifest_fd, NGX_RTMP_DASH_MANIFEST_PLAYLIST_HEADER,
-            sizeof(NGX_RTMP_DASH_MANIFEST_PLAYLIST_HEADER));
+    p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_HEADER,
+                     start_time,
+                     end_time,
+                     (ngx_uint_t) (dacf->fraglen / 1000),
+                     (ngx_uint_t) (dacf->fraglen / 1000),
+                     (ngx_uint_t) (dacf->fraglen / 500));
+
+    p = ngx_slprintf(p, last, NGX_RTMP_DASH_PERIOD_HEADER);
+    rc = ngx_write_fd(manifest_fd, buffer, p - buffer);
 
     rep_name = dacf->representation->elts;
 
     for (i = 0; i < dacf->representation->nelts; i++, rep_name++) {
+
         p = buffer;
-        last = buffer + sizeof(buffer);
+        in_child_set_block = 0;
 
-        p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_PLAYLIST_LINE,
-            rep_name);
+        // reading other representation contents
 
-        rc = ngx_write_fd(manifest_fd, buffer, p - buffer);
+        rep_p = rep_path;
+        rep_last = rep_path + sizeof(rep_path);
+
+        rep_p = ngx_slprintf(
+            rep_path, rep_last, NGX_RTMP_DASH_MANIFEST_PATH,
+            &dacf->path, &app_name, rep_name, suffix);
+
+        *rep_p = '\0';
+
+        rep_fd = ngx_open_file(rep_path, NGX_FILE_RDONLY, 0, 0);
+
+        if (rep_fd == NGX_INVALID_FILE) {
+            ngx_log_error(
+                NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "dash: couldn't open %s for manifest playlist",
+                rep_path);
+            // continuing on the off chance that some of the files are
+            // available before others -- is this dangerous?
+            continue;
+        }
+
+        rep_file = fdopen(rep_fd, "r");
+
+
+        // buffered read of child manifest...
+        rep_p = rep_buffer;
+
+        while (fgets((char *)rep_buffer, sizeof(rep_buffer),
+                rep_file) != NULL) {
+
+            // we dump everything from inside period elements, because
+            // currently we hardcode adaptation sets to the same group
+            // numbers for audio and video blocks. By the spec, this should
+            // work, although client testing will prove out the theory...
+
+            if (!in_child_set_block) {
+                if (strncmp((const char *)rep_buffer,
+                        NGX_RTMP_DASH_PERIOD_HEADER,
+                        strlen(NGX_RTMP_DASH_PERIOD_HEADER)) == 0) {
+                    in_child_set_block = 1;
+                    ngx_write_fd(manifest_fd, "<!-- START CHILD BLOCK -->\n",
+                        strlen("<!-- START CHILD BLOCK -->\n"));
+                }
+                continue;
+            } else if (strncmp((const char *)rep_buffer,
+                    NGX_RTMP_DASH_PERIOD_FOOTER,
+                    strlen(NGX_RTMP_DASH_PERIOD_FOOTER)) == 0) {
+                in_child_set_block = 0;
+                    ngx_write_fd(manifest_fd, "<!-- END CHILD BLOCK -->\n",
+                        strlen("<!-- END CHILD BLOCK -->\n"));
+                break;
+            }
+
+            rc = ngx_write_fd(manifest_fd, rep_buffer,
+                strnlen((char *)rep_buffer, sizeof(rep_buffer)));
+
+            if (rc == NGX_ERROR) {
+                ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                              "dash: writing rep to master playlist failed");
+                ngx_close_file(rep_fd);
+                ngx_close_file(manifest_fd);
+                return NGX_ERROR;
+            }
+        }
+
+        ngx_close_file(rep_fd);
+
     }
 
-    rc = ngx_write_fd(manifest_fd, NGX_RTMP_DASH_MANIFEST_PLAYLIST_FOOTER,
-            sizeof(NGX_RTMP_DASH_MANIFEST_PLAYLIST_FOOTER) - 1);
+    p = ngx_slprintf(p, last, NGX_RTMP_DASH_PERIOD_FOOTER);
+    p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_FOOTER);
+    rc = ngx_write_fd(manifest_fd, buffer, p - buffer);
 
     ngx_close_file(manifest_fd);
 
@@ -368,6 +460,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                      (ngx_uint_t) (dacf->fraglen / 1000),
                      (ngx_uint_t) (dacf->fraglen / 500));
 
+    p = ngx_slprintf(p, last, NGX_RTMP_DASH_PERIOD_HEADER);
     n = ngx_write_fd(fd, buffer, p - buffer);
 
     ngx_str_null(&noname);
@@ -429,7 +522,8 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
         n = ngx_write_fd(fd, buffer, p - buffer);
     }
 
-    p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_FOOTER);
+    p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_PERIOD_FOOTER);
+    p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_FOOTER);
     n = ngx_write_fd(fd, buffer, p - buffer);
 
     if (n < 0) {
@@ -451,7 +545,8 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     }
 
     if (dacf->representation->nelts > 0) {
-        return ngx_rtmp_dash_write_manifest_playlist(s);
+        return ngx_rtmp_dash_write_manifest_playlist(
+            s, start_time, end_time);
     }
 
     return NGX_OK;
