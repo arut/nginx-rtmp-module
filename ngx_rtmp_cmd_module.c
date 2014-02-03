@@ -626,6 +626,12 @@ ngx_rtmp_cmd_play2_init(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                   "play2: name='%s' args='%s' start=%i",
                   v.name, v.args, (ngx_int_t) v.start);
 
+    /* continue from current timestamp */
+
+    if (v.start < 0) {
+        v.start = s->current_time;
+    }
+
     ngx_memzero(&vc, sizeof(vc));
 
     /* close_stream should be synchronous */
