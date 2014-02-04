@@ -892,6 +892,13 @@ ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s,
 
     timestamp = h->timestamp - rctx->epoch;
 
+    if ((int32_t) timestamp < 0) {
+        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "record: %V cut timestamp=%D", &rracf->id, timestamp);
+
+        timestamp = 0;
+    }
+
     /* write tag header */
     ph = hdr;
 
@@ -1082,7 +1089,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
     if (!rctx->initialized) {
 
         rctx->initialized = 1;
-        rctx->epoch = h->timestamp + rctx->time_shift;
+        rctx->epoch = h->timestamp - rctx->time_shift;
 
         if (rctx->file.offset == 0 &&
             ngx_rtmp_record_write_header(&rctx->file) != NGX_OK)
