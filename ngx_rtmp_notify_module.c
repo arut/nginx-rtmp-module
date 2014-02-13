@@ -20,6 +20,7 @@ static ngx_rtmp_publish_pt                      next_publish;
 static ngx_rtmp_play_pt                         next_play;
 static ngx_rtmp_close_stream_pt                 next_close_stream;
 static ngx_rtmp_record_done_pt                  next_record_done;
+static ngx_rtmp_pause_pt                        next_pause;
 
 
 static char *ngx_rtmp_notify_on_srv_event(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -35,7 +36,7 @@ static char * ngx_rtmp_notify_merge_app_conf(ngx_conf_t *cf,
 static void *ngx_rtmp_notify_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_rtmp_notify_merge_srv_conf(ngx_conf_t *cf, void *parent,
        void *child);
-static ngx_int_t ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname,
+static ngx_int_t ngx_rtmp_notify_generic(ngx_rtmp_session_t *s, char *cbname,
        ngx_uint_t url_idx);
 
 
@@ -55,6 +56,8 @@ enum {
     NGX_RTMP_NOTIFY_DONE,
     NGX_RTMP_NOTIFY_RECORD_DONE,
     NGX_RTMP_NOTIFY_UPDATE,
+    NGX_RTMP_NOTIFY_PAUSE,
+    NGX_RTMP_NOTIFY_RESUME,
     NGX_RTMP_NOTIFY_APP_MAX
 };
 
@@ -88,13 +91,14 @@ typedef struct {
     u_char                                      args[NGX_RTMP_MAX_ARGS];
     ngx_event_t                                 update_evt;
     time_t                                      start;
+    unsigned                                    paused:1;
 } ngx_rtmp_notify_ctx_t;
 
 
 typedef struct {
     u_char                                     *cbname;
     ngx_uint_t                                  url_idx;
-} ngx_rtmp_notify_done_t;
+} ngx_rtmp_notify_generic_t;
 
 
 static ngx_command_t  ngx_rtmp_notify_commands[] = {
@@ -135,6 +139,20 @@ static ngx_command_t  ngx_rtmp_notify_commands[] = {
       NULL },
 
     { ngx_string("on_play_done"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_rtmp_notify_on_app_event,
+      NGX_RTMP_APP_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("on_pause"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_rtmp_notify_on_app_event,
+      NGX_RTMP_APP_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("on_resume"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
       ngx_rtmp_notify_on_app_event,
       NGX_RTMP_APP_CONF_OFFSET,
@@ -615,14 +633,14 @@ ngx_rtmp_notify_play_create(ngx_rtmp_session_t *s, void *arg,
 
 
 static ngx_chain_t *
-ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
+ngx_rtmp_notify_generic_create(ngx_rtmp_session_t *s, void *arg,
         ngx_pool_t *pool)
 {
-    ngx_rtmp_notify_done_t         *ds = arg;
+    ngx_rtmp_notify_generic_t      *ds = arg;
 
     ngx_chain_t                    *pl;
     ngx_buf_t                      *b;
-    size_t                          cbname_len, name_len, args_len;
+    size_t                          cbname_len, name_len, args_len, paused_len;
     ngx_rtmp_notify_ctx_t          *ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
@@ -635,10 +653,12 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
     cbname_len = ngx_strlen(ds->cbname);
     name_len = ctx ? ngx_strlen(ctx->name) : 0;
     args_len = ctx ? ngx_strlen(ctx->args) : 0;
+    paused_len = NGX_RTMP_NOTIFY_PLAY_DONE == ds->url_idx ? sizeof("&was_paused=0") : 0;
 
     b = ngx_create_temp_buf(pool,
                             sizeof("&call=") + cbname_len +
                             sizeof("&name=") + name_len * 3 +
+                            paused_len +
                             1 + args_len);
     if (b == NULL) {
         return NULL;
@@ -649,6 +669,13 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
 
     b->last = ngx_cpymem(b->last, (u_char*) "&call=", sizeof("&call=") - 1);
     b->last = ngx_cpymem(b->last, ds->cbname, cbname_len);
+
+    if (NGX_RTMP_NOTIFY_PLAY_DONE == ds->url_idx) {
+        b->last = ngx_cpymem(b->last,
+                             (u_char*) "&was_paused=",
+                             sizeof("&was_paused=") - 1);
+        *(b->last++) = ctx->paused ? '1' : '0';
+    }
 
     if (name_len) {
         b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);
@@ -1455,15 +1482,15 @@ ngx_rtmp_notify_close_stream(ngx_rtmp_session_t *s,
     }
 
     if (ctx->flags & NGX_RTMP_NOTIFY_PUBLISHING) {
-        ngx_rtmp_notify_done(s, "publish_done", NGX_RTMP_NOTIFY_PUBLISH_DONE);
+        ngx_rtmp_notify_generic(s, "publish_done", NGX_RTMP_NOTIFY_PUBLISH_DONE);
     }
 
     if (ctx->flags & NGX_RTMP_NOTIFY_PLAYING) {
-        ngx_rtmp_notify_done(s, "play_done", NGX_RTMP_NOTIFY_PLAY_DONE);
+        ngx_rtmp_notify_generic(s, "play_done", NGX_RTMP_NOTIFY_PLAY_DONE);
     }
 
     if (ctx->flags) {
-        ngx_rtmp_notify_done(s, "done", NGX_RTMP_NOTIFY_DONE);
+        ngx_rtmp_notify_generic(s, "done", NGX_RTMP_NOTIFY_DONE);
     }
 
     if (ctx->update_evt.timer_set) {
@@ -1511,10 +1538,65 @@ next:
 
 
 static ngx_int_t
-ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, ngx_uint_t url_idx)
+ngx_rtmp_notify_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
+{
+    ngx_rtmp_notify_app_conf_t     *nacf;
+    ngx_rtmp_notify_ctx_t          *ctx;
+    ngx_rtmp_netcall_init_t         ci;
+    ngx_rtmp_notify_generic_t       gs;
+    ngx_url_t                      *url;
+
+    if (s->auto_pushed) {
+        goto next;
+    }
+
+    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
+
+    if (nacf == NULL) {
+        goto next;
+    }
+
+    if (v->pause) {
+        ctx->paused = 1;
+
+        gs.url_idx = NGX_RTMP_NOTIFY_PAUSE;
+        gs.cbname = (u_char *) "on_pause";
+    } else {
+        ctx->paused = 0;
+
+        gs.url_idx = NGX_RTMP_NOTIFY_RESUME;
+        gs.cbname = (u_char *) "on_resume";
+    }
+
+    url = nacf->url[gs.url_idx];
+
+    if (url == NULL) {
+        goto next;
+    }
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: %s '%V'", gs.cbname, &url->url);
+
+    ngx_memzero(&ci, sizeof(ci));
+
+    ci.url = url;
+    ci.create = ngx_rtmp_notify_generic_create;
+    ci.arg = &gs;
+
+    ngx_rtmp_netcall_create(s, &ci);
+
+next:
+    return next_pause(s, v);
+}
+
+
+static ngx_int_t
+ngx_rtmp_notify_generic(ngx_rtmp_session_t *s, char *cbname, ngx_uint_t url_idx)
 {
     ngx_rtmp_netcall_init_t         ci;
-    ngx_rtmp_notify_done_t          ds;
+    ngx_rtmp_notify_generic_t       gs;
     ngx_rtmp_notify_app_conf_t     *nacf;
     ngx_url_t                      *url;
 
@@ -1528,14 +1610,14 @@ ngx_rtmp_notify_done(ngx_rtmp_session_t *s, char *cbname, ngx_uint_t url_idx)
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "notify: %s '%V'", cbname, &url->url);
 
-    ds.cbname = (u_char *) cbname;
-    ds.url_idx = url_idx;
+    gs.cbname = (u_char *) cbname;
+    gs.url_idx = url_idx;
 
     ngx_memzero(&ci, sizeof(ci));
 
     ci.url = url;
-    ci.arg = &ds;
-    ci.create = ngx_rtmp_notify_done_create;
+    ci.arg = &gs;
+    ci.create = ngx_rtmp_notify_generic_create;
 
     return ngx_rtmp_netcall_create(s, &ci);
 }
@@ -1640,8 +1722,16 @@ ngx_rtmp_notify_on_app_event(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             }
             break;
 
-        case sizeof("on_update") - 1:
-            n = NGX_RTMP_NOTIFY_UPDATE;
+        case sizeof("on_pause") - 1:
+            n = NGX_RTMP_NOTIFY_PAUSE;
+            break;
+
+        case sizeof("on_update") - 1: /* and on_resume */
+            if (name->data[3] == 'u') {
+                n = NGX_RTMP_NOTIFY_UPDATE;
+            } else {
+                n = NGX_RTMP_NOTIFY_RESUME;
+            }
             break;
 
         case sizeof("on_publish") - 1:
@@ -1719,6 +1809,9 @@ ngx_rtmp_notify_postconfiguration(ngx_conf_t *cf)
 
     next_record_done = ngx_rtmp_record_done;
     ngx_rtmp_record_done = ngx_rtmp_notify_record_done;
+
+    next_pause = ngx_rtmp_pause;
+    ngx_rtmp_pause = ngx_rtmp_notify_pause;
 
     return NGX_OK;
 }
