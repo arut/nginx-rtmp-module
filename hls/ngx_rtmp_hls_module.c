@@ -1363,7 +1363,7 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_rtmp_hls_app_conf_t    *hacf;
     ngx_rtmp_hls_frag_t        *f;
     ngx_msec_t                  ts_frag_len;
-    ngx_int_t                   same_frag, force;
+    ngx_int_t                   same_frag, force,discont;
     ngx_buf_t                  *b;
     int64_t                     d;
 
@@ -1371,6 +1371,7 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
     f = NULL;
     force = 0;
+    discont = 1;
 
     if (ctx->opened) {
         f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
@@ -1383,6 +1384,7 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 
         } else {
             f->duration = (ts - ctx->frag_ts) / 90000.;
+            discont = 0;
         }
     }
 
@@ -1412,7 +1414,7 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 
     if (boundary || force) {
         ngx_rtmp_hls_close_fragment(s);
-        ngx_rtmp_hls_open_fragment(s, ts, !f);
+        ngx_rtmp_hls_open_fragment(s, ts, discont);
     }
 
     b = ctx->aframe;
