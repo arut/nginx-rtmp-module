@@ -904,6 +904,10 @@ ngx_rtmp_play_open(ngx_rtmp_session_t *s, double start)
         return NGX_ERROR;
     }
 
+    if (ngx_rtmp_send_sample_access(s) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
     if (ngx_rtmp_play_join(s) != NGX_OK) {
         return NGX_ERROR;
     }
