@@ -102,37 +102,6 @@ ngx_module_t  ngx_rtmp_control_module = {
 };
 
 
-static ngx_int_t
-ngx_rtmp_control_output_error(ngx_http_request_t *r, const char *msg)
-{
-    size_t        len;
-    ngx_buf_t    *b;
-    ngx_chain_t   cl;
-
-    len = ngx_strlen(msg);
-
-    r->headers_out.status = NGX_HTTP_BAD_REQUEST;
-    r->headers_out.content_length_n = len;
-
-    b = ngx_calloc_buf(r->pool);
-    if (b == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_memzero(&cl, sizeof(cl));
-    cl.buf = b;
-
-    b->start = b->pos = (u_char *) msg;
-    b->end = b->last = (u_char *) msg + len;
-    b->memory = 1;
-    b->last_buf = 1;
-
-    ngx_http_send_header(r);
-
-    return ngx_http_output_filter(r, &cl);
-}
-
-
 static const char *
 ngx_rtmp_control_record_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s)
 {
@@ -475,6 +444,10 @@ ngx_rtmp_control_record(ngx_http_request_t *r, ngx_str_t *method)
         goto error;
     }
 
+    if (ctx->path.len == 0) {
+        return NGX_HTTP_NO_CONTENT;
+    }
+
     /* output record path */
 
     r->headers_out.status = NGX_HTTP_OK;
@@ -482,7 +455,7 @@ ngx_rtmp_control_record(ngx_http_request_t *r, ngx_str_t *method)
 
     b = ngx_create_temp_buf(r->pool, ctx->path.len);
     if (b == NULL) {
-        return NGX_ERROR;
+        goto error;
     }
 
     ngx_memzero(&cl, sizeof(cl));
@@ -496,7 +469,7 @@ ngx_rtmp_control_record(ngx_http_request_t *r, ngx_str_t *method)
     return ngx_http_output_filter(r, &cl);
 
 error:
-    return ngx_rtmp_control_output_error(r, msg);
+    return NGX_HTTP_INTERNAL_SERVER_ERROR;
 }
 
 
@@ -554,7 +527,7 @@ ngx_rtmp_control_drop(ngx_http_request_t *r, ngx_str_t *method)
 
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
-        return NGX_ERROR;
+        goto error;
     }
 
     b->start = b->pos = p;
@@ -570,7 +543,7 @@ ngx_rtmp_control_drop(ngx_http_request_t *r, ngx_str_t *method)
     return ngx_http_output_filter(r, &cl);
 
 error:
-    return ngx_rtmp_control_output_error(r, msg);
+    return NGX_HTTP_INTERNAL_SERVER_ERROR;
 }
 
 
@@ -618,7 +591,7 @@ ngx_rtmp_control_redirect(ngx_http_request_t *r, ngx_str_t *method)
 
     p = ngx_palloc(r->connection->pool, len);
     if (p == NULL) {
-        return NGX_ERROR;
+        goto error;
     }
 
     len = (size_t) (ngx_snprintf(p, len, "%ui", ctx->count) - p);
@@ -628,7 +601,7 @@ ngx_rtmp_control_redirect(ngx_http_request_t *r, ngx_str_t *method)
 
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
-        return NGX_ERROR;
+        goto error;
     }
 
     b->start = b->pos = p;
@@ -644,7 +617,7 @@ ngx_rtmp_control_redirect(ngx_http_request_t *r, ngx_str_t *method)
     return ngx_http_output_filter(r, &cl);
 
 error:
-    return ngx_rtmp_control_output_error(r, msg);
+    return NGX_HTTP_INTERNAL_SERVER_ERROR;
 }
 
 
