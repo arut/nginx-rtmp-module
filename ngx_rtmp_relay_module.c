@@ -249,6 +249,7 @@ ngx_rtmp_relay_push_reconnect(ngx_event_t *ev)
     ngx_rtmp_relay_app_conf_t      *racf;
     ngx_rtmp_relay_ctx_t           *ctx, *pctx;
     ngx_uint_t                      n;
+    ngx_int_t                       rc;
     ngx_rtmp_relay_target_t        *target, **t;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
@@ -283,15 +284,22 @@ ngx_rtmp_relay_push_reconnect(ngx_event_t *ev)
             continue;
         }
 
-        if (ngx_rtmp_relay_push(s, &ctx->name, target) == NGX_OK) {
+        rc = ngx_rtmp_relay_push(s, &ctx->name, target);
+        if (rc == NGX_OK) {
             continue;
         }
 
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                "relay: push reconnect failed name='%V' app='%V' "
-                "playpath='%V' url='%V'",
-                &ctx->name, &target->app, &target->play_path,
-                &target->url.url);
+        if (rc == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "relay: push reconnect failed name='%V' app='%V' "
+                    "playpath='%V' url='%V'",
+                    &ctx->name, &target->app, &target->play_path,
+                    &target->url.url);
+        }
+
+        if (ctx == NULL) {
+            ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+        }
 
         if (!ctx->push_evt.timer_set) {
             ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
@@ -582,11 +590,6 @@ ngx_rtmp_relay_create(ngx_rtmp_session_t *s, ngx_str_t *name,
         return NGX_ERROR;
     }
 
-    play_ctx = create_play_ctx(s, name, target);
-    if (play_ctx == NULL) {
-        return NGX_ERROR;
-    }
-
     hash = ngx_hash_key(name->data, name->len);
     cctx = &racf->ctx[hash % racf->nbuckets];
     for (; *cctx; cctx = &(*cctx)->next) {
@@ -596,6 +599,33 @@ ngx_rtmp_relay_create(ngx_rtmp_session_t *s, ngx_str_t *name,
         {
             break;
         }
+    }
+
+    if (*cctx && (*cctx)->publish->session != s &&
+        create_play_ctx == ngx_rtmp_relay_create_remote_ctx)
+    {
+        /*
+         * TODO: such sessions remain with active
+         * event scheduled and lead to crash
+         */
+
+        create_publish_ctx(s, name, target);
+
+        /*
+         * push from a duplicate publisher;
+         * schedule reconnect to wait until
+         * old publisher is gone
+         */
+
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "relay: delay push until old publisher is gone");
+
+        return NGX_AGAIN;
+    }
+
+    play_ctx = create_play_ctx(s, name, target);
+    if (play_ctx == NULL) {
+        return NGX_ERROR;
     }
 
     if (*cctx) {
@@ -656,6 +686,7 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_str_t                       name;
     size_t                          n;
     ngx_rtmp_relay_ctx_t           *ctx;
+    ngx_int_t                       rc;
 
     if (s->auto_pushed) {
         goto next;
@@ -684,17 +715,26 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
             continue;
         }
 
-        if (ngx_rtmp_relay_push(s, &name, target) == NGX_OK) {
+        rc = ngx_rtmp_relay_push(s, &name, target);
+        if (rc == NGX_OK) {
             continue;
         }
 
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                "relay: push failed name='%V' app='%V' "
-                "playpath='%V' url='%V'",
-                &name, &target->app, &target->play_path,
-                &target->url.url);
+        if (rc == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "relay: push failed name='%V' app='%V' "
+                    "playpath='%V' url='%V'",
+                    &name, &target->app, &target->play_path,
+                    &target->url.url);
+        }
+
+        if (ctx == NULL) {
+            ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+        }
 
         if (!ctx->push_evt.timer_set) {
+ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+              "relay: schedule reconnect s:%uxi", s);
             ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
         }
     }
