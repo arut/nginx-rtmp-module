@@ -15,15 +15,34 @@ static void ngx_rtmp_proxy_protocol_recv(ngx_event_t *rev);
 void
 ngx_rtmp_proxy_protocol(ngx_rtmp_session_t *s)
 {
+    ngx_event_t       *rev;
     ngx_connection_t  *c;
 
     c = s->connection;
-    c->read->handler =  ngx_rtmp_proxy_protocol_recv;
+    rev = c->read;
+    rev->handler =  ngx_rtmp_proxy_protocol_recv;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "proxy_protocol: start");
 
-    ngx_rtmp_proxy_protocol_recv(c->read);
+    if (rev->ready) {
+        /* the deferred accept(), rtsig, aio, iocp */
+
+        if (ngx_use_accept_mutex) {
+            ngx_post_event(rev, &ngx_posted_events);
+            return;
+        }
+
+        rev->handler(rev);
+        return;
+    }
+
+    ngx_add_timer(rev, s->timeout);
+
+    if (ngx_handle_read_event(rev, 0) != NGX_OK) {
+        ngx_rtmp_finalize_session(s);
+        return;
+    }
 }
 
 
@@ -58,9 +77,11 @@ ngx_rtmp_proxy_protocol_recv(ngx_event_t *rev)
         ngx_del_timer(rev);
     }
 
-    n = recv(c->fd, buf, sizeof(buf), MSG_PEEK);
+    n = recv(c->fd, (char *) buf, sizeof(buf), MSG_PEEK);
 
     err = ngx_socket_errno;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_RTMP, c->log, 0, "recv(): %d", n);
 
     if (n == -1) {
 
@@ -126,7 +147,7 @@ skip:
         }
     }
 
-    if (i + 1 == n) {
+    if (i + 1 >= n) {
         goto bad_header;
     }
 
