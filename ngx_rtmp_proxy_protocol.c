@@ -6,6 +6,7 @@
 
 #include <ngx_config.h>
 #include <ngx_core.h>
+#include <nginx.h>
 #include "ngx_rtmp_proxy_protocol.h"
 
 
@@ -164,8 +165,11 @@ skip:
             goto failed;
         }
 
-        len = ngx_sock_ntop(addr.sockaddr, addr.socklen, text,
-                            NGX_SOCKADDR_STRLEN, 0);
+        len = ngx_sock_ntop(addr.sockaddr,
+#if (nginx_version >= 1005003)
+                            addr.socklen,
+#endif
+                            text, NGX_SOCKADDR_STRLEN, 0);
         if (len == 0) {
             goto failed;
         }
