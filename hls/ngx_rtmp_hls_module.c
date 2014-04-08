@@ -36,6 +36,7 @@ static ngx_int_t ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s,
 typedef struct {
     uint64_t                            id;
     uint64_t                            key_id;
+    ngx_str_t                          *datetime;
     double                              duration;
     unsigned                            active:1;
     unsigned                            discont:1; /* before */
@@ -101,6 +102,7 @@ typedef struct {
     ngx_flag_t                          nested;
     ngx_str_t                           path;
     ngx_uint_t                          naming;
+    ngx_uint_t                          datetime;
     ngx_uint_t                          slicing;
     ngx_uint_t                          type;
     ngx_path_t                         *slot;
@@ -122,6 +124,11 @@ typedef struct {
 #define NGX_RTMP_HLS_NAMING_SYSTEM      3
 
 
+#define NGX_RTMP_HLS_DATETIME_NONE      1
+#define NGX_RTMP_HLS_DATETIME_SYSTEM    2
+#define NGX_RTMP_HLS_DATETIME_TIMESTAMP 3
+
+
 #define NGX_RTMP_HLS_SLICING_PLAIN      1
 #define NGX_RTMP_HLS_SLICING_ALIGNED    2
 
@@ -134,6 +141,14 @@ static ngx_conf_enum_t                  ngx_rtmp_hls_naming_slots[] = {
     { ngx_string("sequential"),         NGX_RTMP_HLS_NAMING_SEQUENTIAL },
     { ngx_string("timestamp"),          NGX_RTMP_HLS_NAMING_TIMESTAMP  },
     { ngx_string("system"),             NGX_RTMP_HLS_NAMING_SYSTEM     },
+    { ngx_null_string,                  0 }
+};
+
+
+static ngx_conf_enum_t                  ngx_rtmp_hls_datetime_slots[] = {
+    { ngx_string("none"),               NGX_RTMP_HLS_DATETIME_NONE      },
+    { ngx_string("system"),             NGX_RTMP_HLS_DATETIME_SYSTEM    },
+    { ngx_string("timestamp"),          NGX_RTMP_HLS_DATETIME_TIMESTAMP },
     { ngx_null_string,                  0 }
 };
 
@@ -223,6 +238,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, naming),
       &ngx_rtmp_hls_naming_slots },
+
+    { ngx_string("hls_datetime"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_enum_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, datetime),
+      &ngx_rtmp_hls_datetime_slots },
 
     { ngx_string("hls_fragment_slicing"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
@@ -533,11 +555,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 
     n = ngx_write_fd(fd, buffer, p - buffer);
     if (n < 0) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: " ngx_write_fd_n " failed: '%V'",
-                      &ctx->playlist_bak);
-        ngx_close_file(fd);
-        return NGX_ERROR;
+        goto write_err;
     }
 
     sep = hacf->nested ? (hacf->base_url.len ? "/" : "") : "-";
@@ -557,6 +575,14 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
+        if (i == 0 && f->datetime && f->datetime->len > 0) {
+            p = ngx_snprintf(buffer, sizeof(buffer), "#EXT-X-PROGRAM-DATE-TIME:%*s\n",
+                f->datetime->len, f->datetime->data);
+            n = ngx_write_fd(fd, buffer, p - buffer);
+            if (n < 0) {
+                goto write_err;
+            }
+        }
 
         p = buffer;
         end = p + sizeof(buffer);
@@ -586,11 +612,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 
         n = ngx_write_fd(fd, buffer, p - buffer);
         if (n < 0) {
-            ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                          "hls: " ngx_write_fd_n " failed '%V'",
-                          &ctx->playlist_bak);
-            ngx_close_file(fd);
-            return NGX_ERROR;
+            goto write_err;
         }
     }
 
@@ -610,6 +632,13 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     }
 
     return NGX_OK;
+
+write_err:
+    ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                    "hls: " ngx_write_fd_n " failed '%V'",
+                    &ctx->playlist_bak);
+    ngx_close_file(fd);
+    return NGX_ERROR;
 }
 
 
@@ -815,6 +844,54 @@ ngx_rtmp_hls_get_fragment_id(ngx_rtmp_session_t *s, uint64_t ts)
 }
 
 
+static ngx_str_t *
+ngx_rtmp_hls_get_fragment_datetime(ngx_rtmp_session_t *s, uint64_t ts)
+{
+    ngx_rtmp_hls_ctx_t         *ctx;
+    ngx_rtmp_hls_app_conf_t    *hacf;
+    ngx_str_t                  *datetime;
+    ngx_tm_t                    tm;
+    uint64_t                    msec;
+
+    datetime = (ngx_str_t *) ngx_pcalloc(s->connection->pool, sizeof(ngx_str_t));
+    datetime->data = NULL;
+    datetime->len = 0;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+
+    switch (hacf->datetime) {
+
+    case NGX_RTMP_HLS_DATETIME_TIMESTAMP:
+        /* Timestamps in RTMP are given as an integer number of milliseconds
+         * relative to an unspecified epoch, so we clear the last 32 bits
+         * from system time, and add the timestamp from RTMP. */
+        msec = ngx_cached_time->sec * 1000 + ngx_cached_time->msec;
+        msec /= 4294967296; //2**32
+        msec *= 4294967296;
+        msec += (ts / 90);
+        ngx_gmtime(msec / 1000, &tm);
+
+        datetime->data = (u_char *) ngx_pcalloc(s->connection->pool, ngx_cached_http_log_iso8601.len * sizeof(u_char));
+        (void) ngx_sprintf(datetime->data, "%4d-%02d-%02dT%02d:%02d:%02d-00:00",
+                           tm.ngx_tm_year, tm.ngx_tm_mon,
+                           tm.ngx_tm_mday, tm.ngx_tm_hour,
+                           tm.ngx_tm_min, tm.ngx_tm_sec);
+        datetime->len = ngx_cached_http_log_iso8601.len;
+        return datetime;
+
+    case NGX_RTMP_HLS_DATETIME_SYSTEM:
+        datetime->data = (u_char *) ngx_pcalloc(s->connection->pool, ngx_cached_http_log_iso8601.len * sizeof(u_char));
+        ngx_cpymem(&datetime->data, (const void *) &ngx_cached_http_log_iso8601.data, ngx_cached_http_log_iso8601.len);
+        datetime->len = ngx_cached_http_log_iso8601.len;
+        return datetime;
+
+    default: /* NGX_RTMP_HLS_DATETIME_NONE */
+        return datetime;
+    }
+}
+
+
 static ngx_int_t
 ngx_rtmp_hls_close_fragment(ngx_rtmp_session_t *s)
 {
@@ -846,6 +923,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 {
     uint64_t                  id;
     ngx_fd_t                  fd;
+    ngx_str_t                *datetime;
     ngx_uint_t                g;
     ngx_rtmp_hls_ctx_t       *ctx;
     ngx_rtmp_hls_frag_t      *f;
@@ -870,6 +948,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     }
 
     id = ngx_rtmp_hls_get_fragment_id(s, ts);
+    datetime = ngx_rtmp_hls_get_fragment_datetime(s, ts);
 
     if (hacf->granularity) {
         g = (ngx_uint_t) hacf->granularity;
@@ -960,6 +1039,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     f->discont = discont;
     f->id = id;
     f->key_id = ctx->key_id;
+    f->datetime = datetime;
 
     ctx->frag_ts = ts;
 
@@ -2292,6 +2372,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->continuous = NGX_CONF_UNSET;
     conf->nested = NGX_CONF_UNSET;
     conf->naming = NGX_CONF_UNSET_UINT;
+    conf->datetime = NGX_CONF_UNSET_UINT;
     conf->slicing = NGX_CONF_UNSET_UINT;
     conf->type = NGX_CONF_UNSET_UINT;
     conf->max_audio_delay = NGX_CONF_UNSET_MSEC;
@@ -2323,6 +2404,8 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->nested, prev->nested, 0);
     ngx_conf_merge_uint_value(conf->naming, prev->naming,
                               NGX_RTMP_HLS_NAMING_SEQUENTIAL);
+    ngx_conf_merge_uint_value(conf->datetime, prev->datetime,
+                              NGX_RTMP_HLS_DATETIME_NONE);
     ngx_conf_merge_uint_value(conf->slicing, prev->slicing,
                               NGX_RTMP_HLS_SLICING_PLAIN);
     ngx_conf_merge_uint_value(conf->type, prev->type,
