@@ -861,7 +861,7 @@ ngx_rtmp_play_next_entry(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
                                      NGX_FILE_DEFAULT_ACCESS);
 
         if (ctx->file.fd == NGX_INVALID_FILE) {
-            ngx_log_debug1(NGX_LOG_ERR, s->connection->log, ngx_errno,
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, ngx_errno,
                            "play: error opening file '%s'", path);
             continue;
         }
