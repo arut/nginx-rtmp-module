@@ -2229,8 +2229,6 @@ ngx_rtmp_mp4_send(ngx_rtmp_session_t *s, ngx_file_t *f, ngx_uint_t *ts)
             }
 
             t->header_sent = 1;
-
-            goto next;
         }
 
         ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
