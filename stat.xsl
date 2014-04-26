@@ -228,8 +228,51 @@
                 </tr>
                 <xsl:apply-templates select="client"/>
             </table>
+            <xsl:apply-templates select="record"/>
         </td>
     </tr>
+</xsl:template>
+
+<xsl:template match="record">
+    <table cellspacing="1" cellpadding="5">
+        <tr>
+            <th>Recorder</th>
+            <th>State</th>
+            <xsl:if test="recording">
+                <th>Epoch</th>
+                <th>Time Shift</th>
+                <th>File Name</th>
+                <th>Length</th>
+                <th>Frames</th>
+            </xsl:if>
+        </tr>
+        <tr>
+            <xsl:attribute name="bgcolor">
+                <xsl:choose>
+                    <xsl:when test="recording">#cccccc</xsl:when>
+                    <xsl:otherwise>#eeeeee</xsl:otherwise>
+                </xsl:choose>
+            </xsl:attribute>
+            <td><xsl:value-of select="recorder"/></td>
+            <td>
+                <xsl:choose>
+                    <xsl:when test="recording">recording</xsl:when>
+                    <xsl:otherwise>idle</xsl:otherwise>
+                </xsl:choose>
+            </td>
+            <xsl:if test="recording">
+                <td><xsl:value-of select="epoch"/></td>
+                <td><xsl:value-of select="time_shift"/></td>
+                <td><xsl:value-of select="file"/></td>
+                <td>
+                    <xsl:call-template name="showtime">
+                       <xsl:with-param name="time" select="length * 1000"/>
+                    </xsl:call-template>
+                </td>
+                <td><xsl:value-of select="nframes"/></td>
+            </xsl:if>
+        </tr>
+    </table>
 </xsl:template>
 
 <xsl:template name="showtime">
