@@ -363,6 +363,14 @@ ngx_rtmp_record_find(ngx_rtmp_record_app_conf_t *racf, ngx_str_t *id)
     return NGX_CONF_UNSET_UINT;
 }
 
+ngx_int_t
+ngx_rtmp_record_get_path(ngx_rtmp_session_t *s,
+                         ngx_rtmp_record_rec_ctx_t *rctx, ngx_str_t *path)
+{
+    ngx_rtmp_record_make_path(s, rctx, path);
+    return NGX_OK;
+}
+
 
 /* This funcion returns pointer to a static buffer */
 static void
