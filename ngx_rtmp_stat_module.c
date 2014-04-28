@@ -415,7 +415,7 @@ ngx_rtmp_stat_live_records(ngx_http_request_t *r, ngx_chain_t ***lll,
 {
     ngx_rtmp_record_ctx_t          *rctx;
     ngx_rtmp_record_rec_ctx_t      *rrctx;
-    ngx_int_t                       i;
+    ngx_uint_t                      i;
     u_char                          buf[NGX_INT_T_LEN];
     ngx_str_t                       filename;
 
