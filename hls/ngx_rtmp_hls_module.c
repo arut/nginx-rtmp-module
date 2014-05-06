@@ -472,6 +472,13 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
+
+        if(f->duration > 60*60*24 /*24 hours*/)
+        {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 32, "found fragment with broken duration (%f seconds > 24 hours)", f->duration);
+            continue;
+        }
+
         if (f->duration > max_frag) {
             max_frag = (ngx_uint_t) (f->duration + .5);
         }
@@ -505,6 +512,12 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
+
+        if(f->duration > 60*60*24 /*24 hours*/)
+        {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 32, "found fragment with broken duration (%f seconds > 24 hours)", f->duration);
+            continue;
+        }
 
         p = ngx_snprintf(buffer, sizeof(buffer),
                          "%s"
