@@ -362,7 +362,7 @@ ngx_rtmp_hds_write_abst(ngx_rtmp_session_t *s, ngx_buf_t *b)
    
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hds_module);
 
-    f = ngx_rtmp_hds_get_frag(s, ctx->nfrags-3);
+    f = ngx_rtmp_hds_get_frag(s, ctx->nfrags);
 
     pos = ngx_rtmp_mp4_start_box(b, "abst");
 
@@ -500,10 +500,6 @@ ngx_rtmp_hds_write_bootstrap(ngx_rtmp_session_t *s)
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hds_module);
     if (!ctx || !hacf) {
         return NGX_ERROR;
-    }
-
-    if (ctx->nfrags < 3) {
-        return NGX_OK;
     }
 
     ngx_memzero(&file, sizeof(file));
