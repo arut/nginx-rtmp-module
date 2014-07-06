@@ -475,7 +475,8 @@ ngx_rtmp_hds_write_manifest(ngx_rtmp_session_t *s)
 
     ngx_close_file(fd);
 
-    if (ngx_rtmp_hds_rename_file(ctx->playlist_bak.data, ctx->playlist.data)) {
+    if (ngx_rtmp_hds_rename_file(ctx->playlist_bak.data, ctx->playlist.data)
+        == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hds: rename failed: '%V'->'%V'", 
                       &playlist_bak, &playlist);
@@ -530,7 +531,8 @@ ngx_rtmp_hds_write_bootstrap(ngx_rtmp_session_t *s)
     }
     ngx_close_file(file.fd);
 
-    if (ngx_rtmp_hds_rename_file(ctx->bootstrap_bak.data, ctx->bootstrap.data)) {
+    if (ngx_rtmp_hds_rename_file(ctx->bootstrap_bak.data, ctx->bootstrap.data)
+        == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hds: rename failed: '%V'->'%V'", 
                       &ctx->bootstrap_bak, &ctx->bootstrap);
