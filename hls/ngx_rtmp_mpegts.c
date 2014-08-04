@@ -75,15 +75,48 @@ static u_char ngx_rtmp_mpegts_header[] = {
 #define NGX_RTMP_HLS_DELAY  63000
 
 
-ngx_int_t
-ngx_rtmp_mpegts_write_header(ngx_file_t *file)
+static ngx_int_t
+ngx_rtmp_mpegts_write_file(ngx_rtmp_mpegts_file_t *file, void *data,
+    size_t size)
 {
-    ssize_t rc;
+    u_char   buf[16];
+    ssize_t  rc;
 
-    rc = ngx_write_file(file, ngx_rtmp_mpegts_header,
-                        sizeof(ngx_rtmp_mpegts_header), 0);
+    if (!file->encrypt) {
+        rc = ngx_write_file(&file->file, data, size, file->file.offset);
+        return rc > 0 ? NGX_OK : rc;
+    }
 
-    return rc > 0 ? NGX_OK : rc;
+    /* encrypt */
+
+    for ( ;; ) {
+        if (file->size + size < 16) {
+            ngx_memcpy(file->buf + file->size, data, size);
+            file->size += size;
+            return NGX_OK;
+        }
+
+        ngx_memcpy(file->buf + file->size, data, 16 - file->size);
+
+        AES_cbc_encrypt(file->buf, buf, 16, &file->key, file->iv, AES_ENCRYPT);
+
+        rc = ngx_write_file(&file->file, buf, 16, file->file.offset);
+        if (rc < 0) {
+            return rc;
+        }
+
+        data = (u_char *) data + (16 - file->size);
+        size -= 16 - file->size;
+        file->size = 0;
+    }
+}
+
+
+static ngx_int_t
+ngx_rtmp_mpegts_write_header(ngx_rtmp_mpegts_file_t *file)
+{
+    return ngx_rtmp_mpegts_write_file(file, ngx_rtmp_mpegts_header,
+                                      sizeof(ngx_rtmp_mpegts_header));
 }
 
 
@@ -122,14 +155,14 @@ ngx_rtmp_mpegts_write_pts(u_char *p, ngx_uint_t fb, uint64_t pts)
 
 
 ngx_int_t
-ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
-    ngx_buf_t *b)
+ngx_rtmp_mpegts_write_frame(ngx_rtmp_mpegts_file_t *file,
+    ngx_rtmp_mpegts_frame_t *f, ngx_buf_t *b)
 {
     ngx_uint_t  pes_size, header_size, body_size, in_size, stuff_size, flags;
     u_char      packet[188], *p, *base;
     ngx_int_t   first, rc;
 
-    ngx_log_debug6(NGX_LOG_DEBUG_HTTP, file->log, 0,
+    ngx_log_debug6(NGX_LOG_DEBUG_HTTP, file->file.log, 0,
                    "mpegts: pid=%ui, sid=%ui, pts=%uL, "
                    "dts=%uL, key=%ui, size=%ui",
                    f->pid, f->sid, f->pts, f->dts,
@@ -238,11 +271,83 @@ ngx_rtmp_mpegts_write_frame(ngx_file_t *file, ngx_rtmp_mpegts_frame_t *f,
             b->pos = b->last;
         }
 
-        rc = ngx_write_file(file, packet, sizeof(packet), file->offset);
+        rc = ngx_rtmp_mpegts_write_file(file, packet, sizeof(packet));
+        if (rc != NGX_OK) {
+            return rc;
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_rtmp_mpegts_init_encryption(ngx_rtmp_mpegts_file_t *file,
+    u_char *key, size_t key_len, uint64_t iv)
+{
+    if (AES_set_encrypt_key(key, key_len * 8, &file->key)) {
+        return NGX_ERROR;
+    }
+
+    ngx_memzero(file->iv, 8);
+    ngx_memcpy(file->iv + 8, &iv, 8);
+
+    file->encrypt = 1;
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_rtmp_mpegts_open_file(ngx_rtmp_mpegts_file_t *file, u_char *path,
+    ngx_log_t *log)
+{
+    ngx_memzero(&file->file, sizeof(ngx_file_t));
+
+    ngx_str_set(&file->file.name, "hls");
+
+    file->file.log = log;
+
+    file->file.fd = ngx_open_file(path, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE,
+                                  NGX_FILE_DEFAULT_ACCESS);
+
+    if (file->file.fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_ERR, log, ngx_errno,
+                      "hls: error creating fragment file");
+        return NGX_ERROR;
+    }
+
+    file->size = 0;
+
+    if (ngx_rtmp_mpegts_write_header(file) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, log, ngx_errno,
+                      "hls: error writing fragment header");
+        ngx_close_file(file->file.fd);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_rtmp_mpegts_close_file(ngx_rtmp_mpegts_file_t *file)
+{
+    u_char   buf[16];
+    ssize_t  rc;
+
+    if (file->encrypt) {
+        ngx_memset(file->buf + file->size, 16 - file->size, 16 - file->size);
+
+        AES_cbc_encrypt(file->buf, buf, 16, &file->key, file->iv, AES_ENCRYPT);
+
+        rc = ngx_write_file(&file->file, buf, 16, file->file.offset);
         if (rc < 0) {
             return rc;
         }
     }
+
+    ngx_close_file(file->file.fd);
 
     return NGX_OK;
 }
