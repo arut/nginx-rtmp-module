@@ -491,6 +491,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
     ngx_str_t                       name_part, key_name_part;
+    uint64_t                        prev_key_id;
     const char                     *sep, *key_sep;
 
 
@@ -552,6 +553,8 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
         key_name_part = ctx->name;
     }
 
+    prev_key_id = 0;
+
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_hls_get_frag(s, i);
 
@@ -562,12 +565,14 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
             p = ngx_slprintf(p, end, "#EXT-X-DISCONTINUITY\n");
         }
 
-        if (hacf->keys && (i == 0 || f->id != f->key_id)) {
+        if (hacf->keys && (i == 0 || f->key_id != prev_key_id)) {
             p = ngx_slprintf(p, end, "#EXT-X-KEY:METHOD=AES-128,"
-                             "URI=\"%V%V%s%uL.key\",IV=0x%032XL",
+                             "URI=\"%V%V%s%uL.key\",IV=0x%032XL\n",
                              &hacf->keys_url, &key_name_part,
                              key_sep, f->key_id, f->key_id);
         }
+
+        prev_key_id = f->key_id;
 
         p = ngx_slprintf(p, end,
                          "#EXTINF:%.3f,\n"
@@ -884,10 +889,10 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
                 return NGX_ERROR;
             }
 
-            ngx_sprintf(ctx->keyfile.data + ctx->keyfile.len, "%uL.ts%Z", id);
+            ngx_sprintf(ctx->keyfile.data + ctx->keyfile.len, "%uL.key%Z", id);
 
-            fd = ngx_open_file(ctx->keyfile.data, NGX_FILE_RDONLY,
-                               NGX_FILE_OPEN, 0);
+            fd = ngx_open_file(ctx->keyfile.data, NGX_FILE_WRONLY,
+                               NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
 
             if (fd == NGX_INVALID_FILE) {
                 ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -969,8 +974,8 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     u_char                         *p, *last, *end, *next, *pa;
     ngx_rtmp_hls_frag_t            *f;
     double                          duration;
-    ngx_int_t                       discont;
-    uint64_t                        mag;
+    ngx_int_t                       discont, key;
+    uint64_t                        mag, key_id;
     static u_char                   buffer[4096];
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
@@ -992,6 +997,8 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     f = NULL;
     duration = 0;
     discont = 0;
+    key_id = 0;
+    key = 0;
 
     for ( ;; ) {
 
@@ -1032,6 +1039,14 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
 
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                                "hls: restore sequence frag=%uL", ctx->frag);
+            }
+
+
+#define NGX_RTMP_XKEY           "#EXT-X-KEY:"
+#define NGX_RTMP_XKEY_LEN       (sizeof(NGX_RTMP_XKEY) - 1)
+
+            if (ngx_memcmp(p, NGX_RTMP_XKEY, NGX_RTMP_XKEY_LEN) == 0) {
+                key = 1;
             }
 
 
@@ -1084,6 +1099,13 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
                     f->id += (*pa - '0') * mag;
                     mag *= 10;
                 }
+
+                if (key) {
+                    key_id = f->id;
+                    key = 0;
+                }
+
+                f->key_id = key_id;
 
                 ngx_rtmp_hls_next_frag(s);
 
