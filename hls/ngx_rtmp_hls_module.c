@@ -25,7 +25,8 @@ static void * ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf,
        void *parent, void *child);
 static ngx_int_t ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s);
-static ngx_int_t ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s);
+static ngx_int_t ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s,
+       ngx_str_t *path);
 
 
 #define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
@@ -846,15 +847,22 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_rtmp_hls_app_conf_t  *hacf;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
     if (ctx->opened) {
         return NGX_OK;
     }
 
-    if (ngx_rtmp_hls_ensure_directory(s) != NGX_OK) {
+    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+
+    if (ngx_rtmp_hls_ensure_directory(s, &hacf->path) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+    if (hacf->keys &&
+        ngx_rtmp_hls_ensure_directory(s, &hacf->keys_path) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
 
     id = ngx_rtmp_hls_get_fragment_id(s, ts);
 
@@ -1096,51 +1104,53 @@ done:
 
 
 static ngx_int_t
-ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s)
+ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s, ngx_str_t *path)
 {
     size_t                    len;
     ngx_file_info_t           fi;
     ngx_rtmp_hls_ctx_t       *ctx;
     ngx_rtmp_hls_app_conf_t  *hacf;
 
-    static u_char              path[NGX_MAX_PATH + 1];
+    static u_char  zpath[NGX_MAX_PATH + 1];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
-    *ngx_snprintf(path, sizeof(path) - 1, "%V", &hacf->path) = 0;
+    if (path->len + 1 > sizeof(zpath)) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0, "hls: too long path");
+        return NGX_ERROR;
+    }
 
-    if (ngx_file_info(path, &fi) == NGX_FILE_ERROR) {
+    ngx_snprintf(zpath, sizeof(zpath), "%V%Z", path);
+
+    if (ngx_file_info(zpath, &fi) == NGX_FILE_ERROR) {
 
         if (ngx_errno != NGX_ENOENT) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                          "hls: " ngx_file_info_n " failed on '%V'",
-                          &hacf->path);
+                          "hls: " ngx_file_info_n " failed on '%V'", path);
             return NGX_ERROR;
         }
 
         /* ENOENT */
 
-        if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
+        if (ngx_create_dir(zpath, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                          "hls: " ngx_create_dir_n " failed on '%V'",
-                          &hacf->path);
+                          "hls: " ngx_create_dir_n " failed on '%V'", path);
             return NGX_ERROR;
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "hls: directory '%V' created", &hacf->path);
+                       "hls: directory '%V' created", path);
 
     } else {
 
         if (!ngx_is_dir(&fi)) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                          "hls: '%V' exists and is not a directory",
-                          &hacf->path);
+                          "hls: '%V' exists and is not a directory", path);
             return  NGX_ERROR;
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "hls: directory '%V' exists", &hacf->path);
+                       "hls: directory '%V' exists", path);
     }
 
     if (!hacf->nested) {
@@ -1149,44 +1159,49 @@ ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s)
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
-    len = hacf->path.len;
-    if (hacf->path.data[len - 1] == '/') {
+    len = path->len;
+    if (path->data[len - 1] == '/') {
         len--;
     }
 
-    *ngx_snprintf(path, sizeof(path) - 1, "%*s/%V", len, hacf->path.data,
-                  &ctx->name) = 0;
+    if (len + 1 + ctx->name.len + 1 > sizeof(zpath)) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0, "hls: too long path");
+        return NGX_ERROR;
+    }
 
-    if (ngx_file_info(path, &fi) != NGX_FILE_ERROR) {
+    ngx_snprintf(zpath, sizeof(zpath) - 1, "%*s/%V%Z", len, path->data,
+                 &ctx->name);
+
+    if (ngx_file_info(zpath, &fi) != NGX_FILE_ERROR) {
 
         if (ngx_is_dir(&fi)) {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                           "hls: directory '%s' exists", path);
+                           "hls: directory '%s' exists", zpath);
             return NGX_OK;
         }
 
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                      "hls: '%s' exists and is not a directory", path);
+                      "hls: '%s' exists and is not a directory", zpath);
 
         return  NGX_ERROR;
     }
 
     if (ngx_errno != NGX_ENOENT) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: " ngx_file_info_n " failed on '%s'", path);
+                      "hls: " ngx_file_info_n " failed on '%s'", zpath);
         return NGX_ERROR;
     }
 
     /* NGX_ENOENT */
 
-    if (ngx_create_dir(path, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
+    if (ngx_create_dir(zpath, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                      "hls: " ngx_create_dir_n " failed on '%s'", path);
+                      "hls: " ngx_create_dir_n " failed on '%s'", zpath);
         return NGX_ERROR;
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls: directory '%s' created", path);
+                   "hls: directory '%s' created", zpath);
 
     return NGX_OK;
 }
