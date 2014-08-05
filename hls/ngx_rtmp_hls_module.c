@@ -518,7 +518,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     p = buffer;
     end = p + sizeof(buffer);
 
-    p = ngx_slprintf(buffer, end,
+    p = ngx_slprintf(p, end,
                      "#EXTM3U\n"
                      "#EXT-X-VERSION:3\n"
                      "#EXT-X-MEDIA-SEQUENCE:%uL\n"
@@ -526,7 +526,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
                      ctx->frag, max_frag);
 
     if (hacf->type == NGX_RTMP_HLS_TYPE_EVENT) {
-        ngx_slprintf(p, end, "#EXT-X-PLAYLIST-TYPE: EVENT\n");
+        p = ngx_slprintf(p, end, "#EXT-X-PLAYLIST-TYPE: EVENT\n");
     }
 
     n = ngx_write_fd(fd, buffer, p - buffer);
@@ -565,7 +565,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
             p = ngx_slprintf(p, end, "#EXT-X-KEY:METHOD=AES-128,"
                              "URI=\"%V%V%s%uL.key\",IV=0x%032XL",
                              &hacf->keys_url, &key_name_part,
-                             key_sep, f->key_id);
+                             key_sep, f->key_id, f->key_id);
         }
 
         p = ngx_slprintf(p, end,
@@ -914,18 +914,19 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
                    ctx->keyfile.data ? ctx->keyfile.data : (u_char *) "",
                    ctx->frag, ctx->nfrags, ts, discont);
 
+    if (hacf->keys &&
+        ngx_rtmp_mpegts_init_encryption(&ctx->file, ctx->key, 16, ctx->key_id)
+        != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "hls: failed to initialize hls encryption");
+        return NGX_ERROR;
+    }
+
     if (ngx_rtmp_mpegts_open_file(&ctx->file, ctx->stream.data,
                                   s->connection->log)
         != NGX_OK)
     {
-        return NGX_ERROR;
-    }
-
-    if (hacf->keys &&
-        ngx_rtmp_mpegts_init_encryption(&ctx->file, ctx->key, 16, id) != NGX_OK)
-    {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                      "hls: failed to initialize hls encryption");
         return NGX_ERROR;
     }
 
@@ -938,6 +939,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     f->active = 1;
     f->discont = discont;
     f->id = id;
+    f->key_id = ctx->key_id;
 
     ctx->frag_ts = ts;
 
@@ -2096,8 +2098,8 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
         {
             max_age = playlen / 1000;
 
-        } else if (name.len >= 4 && name.data[name.len - 3] == '.' &&
-                                    name.data[name.len - 2] == 'k' &&
+        } else if (name.len >= 4 && name.data[name.len - 4] == '.' &&
+                                    name.data[name.len - 3] == 'k' &&
                                     name.data[name.len - 2] == 'e' &&
                                     name.data[name.len - 1] == 'y')
         {
@@ -2296,15 +2298,13 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
-    if (conf->keys_path.len == 0) {
-        conf->keys_path = conf->path;
-    }
+    ngx_conf_merge_str_value(conf->path, prev->path, "");
 
-    if (conf->keys && conf->keys_path.len && conf->cleanup &&
-        ngx_strcmp(conf->keys_path.data, conf->path.data) == 0 &&
+    if (conf->keys && conf->cleanup && conf->keys_path.len &&
+        ngx_strcmp(conf->keys_path.data, conf->path.data) != 0 &&
         conf->type != NGX_RTMP_HLS_TYPE_EVENT)
     {
-        if (conf->keys_path.data[conf->path.len - 1] == '/') {
+        if (conf->keys_path.data[conf->keys_path.len - 1] == '/') {
             conf->keys_path.len--;
         }
 
@@ -2332,7 +2332,11 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     }
 
-    ngx_conf_merge_str_value(conf->path, prev->path, "");
+    ngx_conf_merge_str_value(conf->keys_path, prev->keys_path, "");
+
+    if (conf->keys_path.len == 0) {
+        conf->keys_path = conf->path;
+    }
 
     return NGX_CONF_OK;
 }
