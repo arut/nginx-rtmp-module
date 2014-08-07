@@ -108,6 +108,13 @@ static ngx_command_t  ngx_rtmp_live_commands[] = {
       offsetof(ngx_rtmp_live_app_conf_t, idle_timeout),
       NULL },
 
+    { ngx_string("stream_key"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_live_app_conf_t, stream_key),
+      NULL },
+
       ngx_null_command
 };
 
@@ -191,6 +198,8 @@ ngx_rtmp_live_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     conf->streams = ngx_pcalloc(cf->pool,
             sizeof(ngx_rtmp_live_stream_t *) * conf->nbuckets);
+
+    ngx_conf_merge_str_value(conf->stream_key, prev->stream_key, "");
 
     return NGX_CONF_OK;
 }
@@ -1042,6 +1051,7 @@ ngx_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 {
     ngx_rtmp_live_app_conf_t       *lacf;
     ngx_rtmp_live_ctx_t            *ctx;
+    ngx_str_t                      local_name;
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
 
@@ -1052,6 +1062,21 @@ ngx_rtmp_live_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "live: publish: name='%s' type='%s'",
                    v->name, v->type);
+
+    /* authentication by stream key */
+
+    local_name.data = v->name;
+    local_name.len = ngx_strlen(v->name);
+    
+    if (lacf->stream_key.len > 0 && ngx_strcmp(local_name.data, lacf->stream_key.data) != 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "live: authentication failed");
+
+        ngx_rtmp_send_status(s, "NetStream.Publish.Rejected", "error",
+                             "Authentication Failed");
+        
+        goto next;
+    }
 
     /* join stream as publisher */
 
