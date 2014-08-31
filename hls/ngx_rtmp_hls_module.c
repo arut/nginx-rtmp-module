@@ -2359,7 +2359,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         }
 
         conf->slot->manager = ngx_rtmp_hls_cleanup;
-        conf->slot->name = conf->path;
+        conf->slot->name = conf->keys_path;
         conf->slot->data = cleanup;
         conf->slot->conf_file = cf->conf_file->file.name.data;
         conf->slot->line = cf->conf_file->line;
