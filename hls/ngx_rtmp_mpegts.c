@@ -122,18 +122,19 @@ ngx_rtmp_mpegts_write_file(ngx_rtmp_mpegts_file_t *file, u_char *in,
     for ( ;; ) {
         n = in_size & ~0x0f;
 
-        if (n == 0) {
+        if (n > 0) {
+            if (n > out_size) {
+                n = out_size;
+            }
+
+            AES_cbc_encrypt(in, out, n, &file->key, file->iv, AES_ENCRYPT);
+
+            in += n;
+            in_size -= n;
+
+        } else if (out == buf) {
             break;
         }
-
-        if (n > out_size) {
-            n = out_size;
-        }
-
-        AES_cbc_encrypt(in, out, n, &file->key, file->iv, AES_ENCRYPT);
-
-        in += n;
-        in_size -= n;
 
         rc = ngx_write_fd(file->fd, buf, out - buf + n);
         if (rc < 0) {
