@@ -1438,7 +1438,7 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     /* key path */
 
     if (hacf->keys) {
-        len = hacf->key_path.len + 1 + ctx->name.len + NGX_INT64_LEN
+        len = hacf->key_path.len + 1 + ctx->name.len + 1 + NGX_INT64_LEN
               + sizeof(".key");
 
         ctx->keyfile.data = ngx_palloc(s->connection->pool, len);
