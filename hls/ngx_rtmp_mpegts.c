@@ -94,7 +94,7 @@ ngx_rtmp_mpegts_write_file(ngx_rtmp_mpegts_file_t *file, u_char *in,
             return NGX_ERROR;
         }
 
-        return rc;
+        return NGX_OK;
     }
 
     /* encrypt */
