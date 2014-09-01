@@ -14,7 +14,8 @@
 
 
 typedef struct {
-    ngx_file_t  file;
+    ngx_fd_t    fd;
+    ngx_log_t  *log;
     unsigned    encrypt:1;
     unsigned    size:4;
     u_char      buf[16];

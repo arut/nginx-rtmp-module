@@ -1047,6 +1047,7 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
 
             if (ngx_memcmp(p, NGX_RTMP_XKEY, NGX_RTMP_XKEY_LEN) == 0) {
                 key = 1;
+                /* TODO: parse key_id since it may differ from id */
             }
 
 
