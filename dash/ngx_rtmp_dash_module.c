@@ -412,7 +412,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
         p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_AUDIO,
                          &ctx->name,
                          codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ?
-                         "40.2" : "6b",
+                         (codec_ctx->aac_sbr ? "40.5" : "40.2") : "6b",
                          codec_ctx->sample_rate,
                          (ngx_uint_t) (codec_ctx->audio_data_rate * 1000),
                          name, sep,
