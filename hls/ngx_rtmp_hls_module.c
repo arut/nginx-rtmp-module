@@ -971,11 +971,11 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     ngx_file_t                      file;
     ssize_t                         ret;
     off_t                           offset;
-    u_char                         *p, *last, *end, *next, *pa;
+    u_char                         *p, *last, *end, *next, *pa, *pp, c;
     ngx_rtmp_hls_frag_t            *f;
     double                          duration;
-    ngx_int_t                       discont, key;
-    uint64_t                        mag, key_id;
+    ngx_int_t                       discont;
+    uint64_t                        mag, key_id, base;
     static u_char                   buffer[4096];
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
@@ -998,7 +998,6 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
     duration = 0;
     discont = 0;
     key_id = 0;
-    key = 0;
 
     for ( ;; ) {
 
@@ -1046,8 +1045,47 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
 #define NGX_RTMP_XKEY_LEN       (sizeof(NGX_RTMP_XKEY) - 1)
 
             if (ngx_memcmp(p, NGX_RTMP_XKEY, NGX_RTMP_XKEY_LEN) == 0) {
-                key = 1;
-                /* TODO: parse key_id since it may differ from id */
+
+                /* recover key id from initialization vector */
+
+                key_id = 0;
+                base = 1;
+                pp = last - 1;
+
+                for ( ;; ) {
+                    if (pp < p) {
+                        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                                "hls: failed to read key id");
+                        break;
+                    }
+
+                    c = *pp;
+                    if (c == 'x') {
+                        break;
+                    }
+
+                    if (c >= '0' && c <= '9') {
+                        c -= '0';
+                        goto next;
+                    }
+
+                    c |= 0x20;
+
+                    if (c >= 'a' && c <= 'f') {
+                        c -= 'a' - 10;
+                        goto next;
+                    }
+
+                    ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                                  "hls: bad character in key id");
+                    break;
+
+                next:
+
+                    key_id += base * c;
+                    base *= 0x10;
+                    pp--;
+                }
             }
 
 
@@ -1099,11 +1137,6 @@ ngx_rtmp_hls_restore_stream(ngx_rtmp_session_t *s)
                     }
                     f->id += (*pa - '0') * mag;
                     mag *= 10;
-                }
-
-                if (key) {
-                    key_id = f->id;
-                    key = 0;
                 }
 
                 f->key_id = key_id;
