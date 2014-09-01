@@ -85,7 +85,7 @@ typedef struct {
 typedef struct {
     ngx_str_t                           path;
     ngx_msec_t                          playlen;
-    ngx_int_t                           frags_per_key;
+    ngx_uint_t                          frags_per_key;
 } ngx_rtmp_hls_cleanup_t;
 
 
@@ -113,7 +113,7 @@ typedef struct {
     ngx_flag_t                          keys;
     ngx_str_t                           key_path;
     ngx_str_t                           key_url;
-    ngx_int_t                           frags_per_key;
+    ngx_uint_t                          frags_per_key;
 } ngx_rtmp_hls_app_conf_t;
 
 
@@ -879,8 +879,9 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_sprintf(ctx->stream.data + ctx->stream.len, "%uL.ts%Z", id);
 
     if (hacf->keys) {
-        if (ctx->key_frags-- <= 1) {
-            ctx->key_frags = hacf->frags_per_key;
+        if (ctx->key_frags == 0) {
+
+            ctx->key_frags = hacf->frags_per_key - 1;
             ctx->key_id = id;
 
             if (RAND_bytes(ctx->key, 16) < 0) {
@@ -911,12 +912,18 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
 
             ngx_close_file(fd);
 
-        } else if (ngx_set_file_time(ctx->keyfile.data, 0, ngx_cached_time->sec)
-                   != NGX_OK)
-        {
-            ngx_log_error(NGX_LOG_ALERT, s->connection->log, ngx_errno,
-                          ngx_set_file_time_n " '%s' failed",
-                          ctx->keyfile.data);
+        } else {
+            if (hacf->frags_per_key) {
+                ctx->key_frags--;
+            }
+
+            if (ngx_set_file_time(ctx->keyfile.data, 0, ngx_cached_time->sec)
+                != NGX_OK)
+            {
+                ngx_log_error(NGX_LOG_ALERT, s->connection->log, ngx_errno,
+                              ngx_set_file_time_n " '%s' failed",
+                              ctx->keyfile.data);
+            }
         }
     }
 
@@ -2292,7 +2299,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->cleanup = NGX_CONF_UNSET;
     conf->granularity = NGX_CONF_UNSET;
     conf->keys = NGX_CONF_UNSET;
-    conf->frags_per_key = NGX_CONF_UNSET;
+    conf->frags_per_key = NGX_CONF_UNSET_UINT;
 
     return conf;
 }
@@ -2330,7 +2337,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->keys, prev->keys, 0);
     ngx_conf_merge_str_value(conf->key_path, prev->key_path, "");
     ngx_conf_merge_str_value(conf->key_url, prev->key_url, "");
-    ngx_conf_merge_value(conf->frags_per_key, prev->frags_per_key, 0);
+    ngx_conf_merge_uint_value(conf->frags_per_key, prev->frags_per_key, 0);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
