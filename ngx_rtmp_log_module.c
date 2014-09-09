@@ -920,7 +920,7 @@ ngx_rtmp_log_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_log_app_conf_t    *lacf;
     ngx_rtmp_log_t             *log;
     ngx_rtmp_log_op_t          *op;
-    ngx_uint_t                  n;
+    ngx_uint_t                  n, i;
     u_char                     *line, *p;
     size_t                      len;
 
@@ -934,7 +934,7 @@ ngx_rtmp_log_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     log = lacf->logs->elts;
-    for (n = 0; n < lacf->logs->nelts; ++n, ++log) {
+    for (i = 0; i < lacf->logs->nelts; ++i, ++log) {
 
         if (ngx_time() == log->disk_full_time) {
             /* FreeBSD full disk protection;
