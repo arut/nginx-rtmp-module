@@ -430,7 +430,7 @@ ngx_rtmp_play_do_stop(ngx_rtmp_session_t *s)
         ngx_del_timer(&ctx->send_evt);
     }
 
-    if (ctx->send_evt.prev) {
+    if (ctx->send_evt.posted) {
         ngx_delete_posted_event((&ctx->send_evt));
     }
 

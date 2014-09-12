@@ -198,7 +198,7 @@ typedef struct {
     ngx_str_t              *addr_text;
     int                     connected;
 
-    ngx_event_t            *posted_dry_events;
+    ngx_queue_t             posted_dry_events;
 
     /* client buffer time in msec */
     uint32_t                buflen;
@@ -602,7 +602,7 @@ extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_in;
 
 
 extern ngx_uint_t                           ngx_rtmp_naccepted;
-extern ngx_thread_volatile ngx_event_t     *ngx_rtmp_init_queue;
+extern ngx_thread_volatile ngx_queue_t      ngx_rtmp_init_queue;
 
 extern ngx_uint_t                           ngx_rtmp_max_module;
 extern ngx_module_t                         ngx_rtmp_core_module;
