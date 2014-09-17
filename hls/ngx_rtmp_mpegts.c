@@ -333,14 +333,14 @@ ngx_rtmp_mpegts_init_encryption(ngx_rtmp_mpegts_file_t *file,
 
     ngx_memzero(file->iv, 8);
 
-    file->iv[8]  = iv >> 56;
-    file->iv[9]  = iv >> 48;
-    file->iv[10] = iv >> 40;
-    file->iv[11] = iv >> 32;
-    file->iv[12] = iv >> 24;
-    file->iv[13] = iv >> 16;
-    file->iv[14] = iv >> 8;
-    file->iv[15] = iv;
+    file->iv[8]  = (u_char) (iv >> 56);
+    file->iv[9]  = (u_char) (iv >> 48);
+    file->iv[10] = (u_char) (iv >> 40);
+    file->iv[11] = (u_char) (iv >> 32);
+    file->iv[12] = (u_char) (iv >> 24);
+    file->iv[13] = (u_char) (iv >> 16);
+    file->iv[14] = (u_char) (iv >> 8);
+    file->iv[15] = (u_char) (iv);
 
     file->encrypt = 1;
 

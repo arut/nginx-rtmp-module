@@ -6,6 +6,7 @@
 
 #include <ngx_config.h>
 #include <ngx_core.h>
+#include <nginx.h>
 #include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_cmd_module.h"
 #include "ngx_rtmp_netcall_module.h"
@@ -430,7 +431,12 @@ ngx_rtmp_play_do_stop(ngx_rtmp_session_t *s)
         ngx_del_timer(&ctx->send_evt);
     }
 
-    if (ctx->send_evt.posted) {
+#if (nginx_version >= 1007005)
+    if (ctx->send_evt.posted)
+#else
+    if (ctx->send_evt.prev)
+#endif
+    {
         ngx_delete_posted_event((&ctx->send_evt));
     }
 
