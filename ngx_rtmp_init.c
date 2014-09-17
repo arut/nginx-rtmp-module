@@ -156,6 +156,7 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
         return NULL;
     }
 
+    ngx_queue_init(&s->posted_dry_events);
     s->main_conf = addr_conf->ctx->main_conf;
     s->srv_conf = addr_conf->ctx->srv_conf;
 
