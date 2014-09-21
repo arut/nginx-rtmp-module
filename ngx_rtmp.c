@@ -29,6 +29,7 @@ static ngx_int_t ngx_rtmp_init_event_handlers(ngx_conf_t *cf,
 static char * ngx_rtmp_merge_applications(ngx_conf_t *cf,
         ngx_array_t *applications, void **app_conf, ngx_rtmp_module_t *module,
         ngx_uint_t ctx_index);
+static ngx_int_t ngx_rtmp_init_process(ngx_cycle_t *cycle);
 
 
 #if (nginx_version >= 1007005)
@@ -68,7 +69,7 @@ ngx_module_t  ngx_rtmp_module = {
     NGX_CORE_MODULE,                       /* module type */
     NULL,                                  /* init master */
     NULL,                                  /* init module */
-    NULL,                                  /* init process */
+    ngx_rtmp_init_process,                 /* init process */
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
     NULL,                                  /* exit process */
@@ -830,4 +831,14 @@ ngx_rtmp_rmemcpy(void *dst, const void* src, size_t n)
     }
 
     return dst;
+}
+
+
+static ngx_int_t
+ngx_rtmp_init_process(ngx_cycle_t *cycle)
+{
+#if (nginx_version >= 1007005)
+    ngx_queue_init(&ngx_rtmp_init_queue);
+#endif
+    return NGX_OK;
 }
