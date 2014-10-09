@@ -1007,6 +1007,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
     ngx_rtmp_publish_t         *v = arg;
     ngx_int_t                   rc;
     ngx_str_t                   local_name;
+    ngx_str_t                   local_args;
     ngx_rtmp_relay_target_t     target;
     ngx_url_t                  *u;
     ngx_rtmp_notify_app_conf_t *nacf;
@@ -1054,6 +1055,8 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
 
     local_name.data = v->name;
     local_name.len = ngx_strlen(v->name);
+    local_args.data = v->args;
+    local_args.len = ngx_strlen(v->args);
 
     ngx_memzero(&target, sizeof(target));
 
@@ -1071,7 +1074,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
 
-    ngx_rtmp_relay_push(s, &local_name, &target);
+    ngx_rtmp_relay_push(s, &local_name, &local_args, &target);
 
 next:
 
@@ -1086,6 +1089,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
     ngx_rtmp_play_t            *v = arg;
     ngx_int_t                   rc;
     ngx_str_t                   local_name;
+    ngx_str_t                   local_args;
     ngx_rtmp_relay_target_t     target;
     ngx_url_t                  *u;
     ngx_rtmp_notify_app_conf_t *nacf;
@@ -1133,6 +1137,8 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
 
     local_name.data = v->name;
     local_name.len = ngx_strlen(v->name);
+    local_args.data = v->args;
+    local_args.len = ngx_strlen(v->args);
 
     ngx_memzero(&target, sizeof(target));
 
@@ -1150,7 +1156,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
 
-    ngx_rtmp_relay_pull(s, &local_name, &target);
+    ngx_rtmp_relay_pull(s, &local_name, &local_args, &target);
 
 next:
 
