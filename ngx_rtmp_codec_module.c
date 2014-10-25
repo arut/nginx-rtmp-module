@@ -306,7 +306,7 @@ ngx_rtmp_codec_parse_aac_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
     ctx->aac_chan_conf = (ngx_uint_t) ngx_rtmp_bit_read(&br, 4);
 
     if (ctx->aac_profile == 5 || ctx->aac_profile == 29) {
-        
+
         if (ctx->aac_profile == 29) {
             ctx->aac_ps = 1;
         }
@@ -343,7 +343,7 @@ ngx_rtmp_codec_parse_aac_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
            5 bits: object type
            if (object type == 31)
              6 bits + 32: object type
-             
+
        var bits: AOT Specific Config
      */
 
@@ -413,7 +413,7 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
     {
         /* chroma format idc */
         cf_idc = (ngx_uint_t) ngx_rtmp_bit_read_golomb(&br);
-        
+
         if (cf_idc == 3) {
 
             /* separate color plane */
@@ -637,6 +637,10 @@ ngx_rtmp_codec_reconstruct_meta(ngx_rtmp_session_t *s)
     };
 
     static ngx_rtmp_amf_elt_t       out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          "@setDataFrame", 0 },
 
         { NGX_RTMP_AMF_STRING,
           ngx_null_string,
