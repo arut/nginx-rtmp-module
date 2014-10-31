@@ -1475,18 +1475,25 @@ ngx_rtmp_relay_on_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     /* when we receive onMetaData, the session (s) is our incoming publisher's
      * session, so we need to send the @setDataFrame to our ctx->play->session */
     ngx_rtmp_relay_ctx_t       *ctx;
+    ngx_rtmp_relay_ctx_t       *pctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
-    if (ctx == NULL || !ctx->play->session->relay) {
-        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-          "relay: not sending metadata from @setDataFrame event from publisher");
+    if (ctx == NULL) {
         return NGX_OK;
     }
 
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "relay: sending metadata from @setDataFrame event from publisher");
+            "relay: sending metadata from @setDataFrame invocation from publisher");
 
-    return ngx_rtmp_relay_send_set_data_frame(ctx->play->session);
+    for (pctx = ctx->play; pctx; pctx = pctx->next) {
+        if (!pctx->session->relay) continue;
+        if (ngx_rtmp_relay_send_set_data_frame(pctx->session) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "relay: unable to send @setDataFrame to %V/%V", &pctx->url, &pctx->play_path);
+        }
+    }
+
+    return NGX_OK;
 }
 
 static ngx_int_t
