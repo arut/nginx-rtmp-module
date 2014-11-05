@@ -497,6 +497,7 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
     }
     rs->app_conf = cctx->app_conf;
     rs->relay = 1;
+    rs->ready_for_publish = 0;
     rctx->session = rs;
     ngx_rtmp_set_ctx(rs, rctx, ngx_rtmp_relay_module);
     ngx_str_set(&rs->flashver, "ngx-local-relay");
@@ -1459,6 +1460,8 @@ ngx_rtmp_relay_on_status(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                 "relay: sending metadata from NetStream.Publish.Start from player");
 
+        s->ready_for_publish = 1;
+
         if (ngx_rtmp_relay_send_set_data_frame(s) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                     "relay: unable to send metadata via @setDataFrame");
@@ -1477,16 +1480,19 @@ ngx_rtmp_relay_on_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_relay_ctx_t       *ctx;
     ngx_rtmp_relay_ctx_t       *pctx;
 
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+        "relay: got metadata from @setDataFrame invocation from publisher.");
+
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
     if (ctx == NULL) {
         return NGX_OK;
     }
 
-    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "relay: sending metadata from @setDataFrame invocation from publisher");
-
     for (pctx = ctx->play; pctx; pctx = pctx->next) {
-        if (!pctx->session->relay) continue;
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "relay: %ssending metadata from @setDataFrame invocation from publisher to %V/%V/%V",
+                (pctx->session->relay && pctx->session->ready_for_publish) ? "" : "not ", &pctx->url,  &pctx->app, &pctx->play_path);
+        if (!pctx->session->relay || !pctx->session->ready_for_publish) continue;
         if (ngx_rtmp_relay_send_set_data_frame(pctx->session) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                     "relay: unable to send @setDataFrame to %V/%V", &pctx->url, &pctx->play_path);
