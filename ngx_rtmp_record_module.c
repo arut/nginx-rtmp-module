@@ -45,14 +45,15 @@ static ngx_int_t ngx_rtmp_record_init(ngx_rtmp_session_t *s);
 
 
 static ngx_conf_bitmask_t  ngx_rtmp_record_mask[] = {
-    { ngx_string("off"),                NGX_RTMP_RECORD_OFF         },
-    { ngx_string("all"),                NGX_RTMP_RECORD_AUDIO       |
-                                        NGX_RTMP_RECORD_VIDEO       },
-    { ngx_string("audio"),              NGX_RTMP_RECORD_AUDIO       },
-    { ngx_string("video"),              NGX_RTMP_RECORD_VIDEO       },
-    { ngx_string("keyframes"),          NGX_RTMP_RECORD_KEYFRAMES   },
-    { ngx_string("manual"),             NGX_RTMP_RECORD_MANUAL      },
-    { ngx_null_string,                  0                           }
+    { ngx_string("off"),                NGX_RTMP_RECORD_OFF            },
+    { ngx_string("all"),                NGX_RTMP_RECORD_AUDIO          |
+                                        NGX_RTMP_RECORD_VIDEO          },
+    { ngx_string("audio"),              NGX_RTMP_RECORD_AUDIO          },
+    { ngx_string("video"),              NGX_RTMP_RECORD_VIDEO          },
+    { ngx_string("keyframes"),          NGX_RTMP_RECORD_KEYFRAMES      },
+    { ngx_string("manual"),             NGX_RTMP_RECORD_MANUAL         },
+    { ngx_string("auto_restart"),       NGX_RTMP_RECORD_AUTO_RESTART   },
+    { ngx_null_string,                  0                              }
 };
 
 
@@ -1041,7 +1042,9 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
              ? keyframe
              : (rracf->flags & NGX_RTMP_RECORD_VIDEO) == 0;
 
-    if (brkframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
+    if (brkframe && ((rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0 ||
+       ((rracf->flags & NGX_RTMP_RECORD_AUTO_RESTART) &&
+        rctx->file.fd != NGX_INVALID_FILE))) {
 
         if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
 
@@ -1063,7 +1066,8 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
         }
     }
 
-    if ((rracf->flags & NGX_RTMP_RECORD_MANUAL) &&
+    if (((rracf->flags & NGX_RTMP_RECORD_MANUAL) ||
+        !(rracf->flags & NGX_RTMP_RECORD_AUTO_RESTART)) &&
         !brkframe && rctx->nframes == 0)
     {
         return NGX_OK;

@@ -18,6 +18,7 @@
 #define NGX_RTMP_RECORD_VIDEO           0x04
 #define NGX_RTMP_RECORD_KEYFRAMES       0x08
 #define NGX_RTMP_RECORD_MANUAL          0x10
+#define NGX_RTMP_RECORD_AUTO_RESTART    0x20
 
 
 typedef struct {
