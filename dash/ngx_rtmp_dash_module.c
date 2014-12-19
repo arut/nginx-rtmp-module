@@ -24,7 +24,6 @@ static ngx_int_t ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s);
 #define NGX_RTMP_DASH_BUFSIZE           (1024*1024)
 #define NGX_RTMP_DASH_MAX_MDAT          (10*1024*1024)
 #define NGX_RTMP_DASH_MAX_SAMPLES       1024
-#define NGX_RTMP_DASH_DIR_ACCESS        0744
 
 
 typedef struct {
@@ -226,6 +225,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_codec_ctx_t      *codec_ctx;
     ngx_rtmp_dash_frag_t      *f;
     ngx_rtmp_dash_app_conf_t  *dacf;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
     static u_char              start_time[sizeof("1970-09-28T12:00:00+06:00")];
@@ -234,6 +234,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
     codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (dacf == NULL || ctx == NULL || codec_ctx == NULL) {
         return NGX_ERROR;
@@ -244,7 +245,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     }
 
     fd = ngx_open_file(ctx->playlist_bak.data, NGX_FILE_WRONLY,
-                       NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+                       NGX_FILE_TRUNCATE, cscf->file_access);
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -457,11 +458,12 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 static ngx_int_t
 ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
 {
-    ngx_fd_t               fd;
-    ngx_int_t              rc;
-    ngx_buf_t              b;
-    ngx_rtmp_dash_ctx_t   *ctx;
-    ngx_rtmp_codec_ctx_t  *codec_ctx;
+    ngx_fd_t                   fd;
+    ngx_int_t                  rc;
+    ngx_buf_t                  b;
+    ngx_rtmp_dash_ctx_t       *ctx;
+    ngx_rtmp_codec_ctx_t      *codec_ctx;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     static u_char          buffer[NGX_RTMP_DASH_BUFSIZE];
 
@@ -472,12 +474,14 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
         return NGX_ERROR;
     }
 
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
     /* init video */
 
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "init.m4v") = 0;
 
     fd = ngx_open_file(ctx->stream.data, NGX_FILE_RDWR, NGX_FILE_TRUNCATE,
-                       NGX_FILE_DEFAULT_ACCESS);
+                       cscf->file_access);
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -505,7 +509,7 @@ ngx_rtmp_dash_write_init_segments(ngx_rtmp_session_t *s)
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "init.m4a") = 0;
 
     fd = ngx_open_file(ctx->stream.data, NGX_FILE_RDWR, NGX_FILE_TRUNCATE,
-                       NGX_FILE_DEFAULT_ACCESS);
+                       cscf->file_access);
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -540,6 +544,7 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
     ngx_buf_t                  b;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_dash_frag_t      *f;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
 
@@ -552,6 +557,7 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
                    t->id, t->type, t->earliest_pres_time);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     b.start = buffer;
     b.end = buffer + sizeof(buffer);
@@ -580,7 +586,7 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
                  f->timestamp, t->type) = 0;
 
     fd = ngx_open_file(ctx->stream.data, NGX_FILE_RDWR,
-                       NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+                       NGX_FILE_TRUNCATE, cscf->file_access);
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -667,7 +673,8 @@ static ngx_int_t
 ngx_rtmp_dash_open_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t,
     ngx_uint_t id, char type)
 {
-    ngx_rtmp_dash_ctx_t   *ctx;
+    ngx_rtmp_dash_ctx_t       *ctx;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     if (t->opened) {
         return NGX_OK;
@@ -677,11 +684,12 @@ ngx_rtmp_dash_open_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t,
                    "dash: open fragment id=%ui, type='%c'", id, type);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     *ngx_sprintf(ctx->stream.data + ctx->stream.len, "raw.m4%c", type) = 0;
 
     t->fd = ngx_open_file(ctx->stream.data, NGX_FILE_RDWR,
-                          NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+                          NGX_FILE_TRUNCATE, cscf->file_access);
 
     if (t->fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -742,10 +750,12 @@ ngx_rtmp_dash_ensure_directory(ngx_rtmp_session_t *s)
     ngx_file_info_t            fi;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_dash_app_conf_t  *dacf;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     static u_char              path[NGX_MAX_PATH + 1];
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     *ngx_snprintf(path, sizeof(path) - 1, "%V", &dacf->path) = 0;
 
@@ -760,7 +770,8 @@ ngx_rtmp_dash_ensure_directory(ngx_rtmp_session_t *s)
 
         /* ENOENT */
 
-        if (ngx_create_dir(path, NGX_RTMP_DASH_DIR_ACCESS) == NGX_FILE_ERROR) {
+        if (ngx_create_dir(path, ngx_dir_access(cscf->file_access))
+            == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                           "dash: " ngx_create_dir_n " failed on '%V'",
                           &dacf->path);
@@ -819,7 +830,8 @@ ngx_rtmp_dash_ensure_directory(ngx_rtmp_session_t *s)
 
     /* NGX_ENOENT */
 
-    if (ngx_create_dir(path, NGX_RTMP_DASH_DIR_ACCESS) == NGX_FILE_ERROR) {
+    if (ngx_create_dir(path, ngx_dir_access(cscf->file_access))
+        == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "dash: " ngx_create_dir_n " failed on '%s'", path);
         return NGX_ERROR;
