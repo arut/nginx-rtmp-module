@@ -1001,7 +1001,8 @@ ngx_rtmp_notify_set_name(u_char *dst, size_t dst_len, u_char *src,
 
 
 static ngx_int_t
-ngx_rtmp_notify_parse_relay_str(ngx_rtmp_relay_target_t *target)
+ngx_rtmp_notify_parse_relay_str(ngx_rtmp_session_t *s,
+        ngx_rtmp_relay_target_t *target)
 {
     ngx_str_t    v, n;
     u_char      *b, *m, *e, *last;
@@ -1050,7 +1051,7 @@ ngx_rtmp_notify_parse_relay_str(ngx_rtmp_relay_target_t *target)
             n.len  = m - b;
 
             v.data = m + 1;
-            v.len  = e - m - 1;
+            v.len  = e - m;
         }
 
 #define NGX_RTMP_RELAY_STR_PAR(name, var)                                     \
@@ -1060,7 +1061,7 @@ ngx_rtmp_notify_parse_relay_str(ngx_rtmp_relay_target_t *target)
             target->var.data = v.data;                                        \
             target->var.len = v.len;                                          \
             b = e + 1;                                                        \
-            continue; \
+            continue;                                                         \
         }
 
 #define NGX_RTMP_RELAY_NUM_PAR(name, var)                                     \
@@ -1164,7 +1165,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
 
-    if (u->uri.len > 0 && ngx_rtmp_notify_parse_relay_str(&target) != NGX_OK)
+    if (u->uri.len > 0 && ngx_rtmp_notify_parse_relay_str(s, &target) != NGX_OK)
     {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: push failed with args '%V'", &u->uri);
@@ -1250,7 +1251,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
 
-    if (u->uri.len > 0 && ngx_rtmp_notify_parse_relay_str(&target) != NGX_OK)
+    if (u->uri.len > 0 && ngx_rtmp_notify_parse_relay_str(s, &target) != NGX_OK)
     {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: pull failed with args '%V'", &u->uri);
