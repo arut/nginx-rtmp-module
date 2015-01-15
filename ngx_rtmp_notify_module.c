@@ -1004,16 +1004,17 @@ static ngx_int_t
 ngx_rtmp_notify_parse_relay_str(ngx_rtmp_session_t *s,
         ngx_rtmp_relay_target_t *target)
 {
-    ngx_str_t    v, n;
-    u_char      *b, *m, *e, *last;
+    ngx_str_t                     parts, v, n;
+    u_char                       *b, *m, *e, *last, *dst, *src;
 
-    last = target->url.uri.data + target->url.uri.len - 1;
-    b = ngx_strlchr(target->url.uri.data, last + 1, '?');
-
-    if (b != NULL) {
-        *b = '\0';
-        target->url.uri.len = last - b - 1;
+    parts.len = target->url.uri.len;
+    parts.data = ngx_pstrdup(s->connection->pool, &target->url.uri);
+    if (parts.data == NULL) {
+        return NGX_ERROR;
     }
+
+    last = parts.data + parts.len - 1;
+    b = ngx_strlchr(parts.data, last + 1, '?');
 
     while (b != NULL && ++b < last) {
         e = ngx_strlchr(b + 1, last + 1, '&');
@@ -1058,8 +1059,14 @@ ngx_rtmp_notify_parse_relay_str(ngx_rtmp_session_t *s,
         if (n.len == sizeof(name) - 1                                         \
             && ngx_strncasecmp(n.data, (u_char *) name, n.len) == 0)          \
         {                                                                     \
-            target->var.data = v.data;                                        \
-            target->var.len = v.len;                                          \
+            src = v.data;                                                     \
+            dst = ngx_pnalloc(s->connection->pool, v.len);                    \
+            if (dst == NULL) {                                                \
+                return NGX_ERROR;                                             \
+            }                                                                 \
+            target->var.data = dst;                                           \
+            ngx_unescape_uri(&dst, &src, v.len, 0);                           \
+            target->var.len = dst - target->var.data;                         \
             b = e + 1;                                                        \
             continue;                                                         \
         }

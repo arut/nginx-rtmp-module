@@ -850,7 +850,7 @@ ngx_rtmp_relay_send_connect(ngx_rtmp_session_t *s)
     ngx_rtmp_relay_ctx_t       *ctx;
     ngx_rtmp_header_t           h;
     size_t                      len, url_len;
-    u_char                     *p, *url_end;
+    u_char                     *p, *url_end, *alt_end;
 
 
     cacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_core_module);
@@ -887,6 +887,10 @@ ngx_rtmp_relay_send_connect(ngx_rtmp_session_t *s)
         url_end = ngx_strlchr(ctx->url.data, ctx->url.data + ctx->url.len, '/');
         if (url_end) {
             url_len = (size_t) (url_end - ctx->url.data);
+        }
+        alt_end = ngx_strlchr(ctx->url.data, ctx->url.data + ctx->url.len, '?');
+        if (alt_end && (!url_end || alt_end < url_end)) {
+            url_len = (size_t) (alt_end - ctx->url.data);
         }
 
         p = ngx_cpymem(p, ctx->url.data, url_len);
