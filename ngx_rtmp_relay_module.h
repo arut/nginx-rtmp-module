@@ -60,13 +60,39 @@ struct ngx_rtmp_relay_ctx_s {
 };
 
 
+typedef struct {
+    ngx_array_t                 pulls;         /* ngx_rtmp_relay_target_t * */
+    ngx_array_t                 pushes;        /* ngx_rtmp_relay_target_t * */
+    ngx_array_t                 static_pulls;  /* ngx_rtmp_relay_target_t * */
+    ngx_array_t                 static_events; /* ngx_event_t * */
+    ngx_log_t                  *log;
+    ngx_uint_t                  nbuckets;
+    ngx_msec_t                  buflen;
+    ngx_flag_t                  session_relay;
+    ngx_msec_t                  push_reconnect;
+    ngx_msec_t                  pull_reconnect;
+    ngx_rtmp_relay_ctx_t        **ctx;
+} ngx_rtmp_relay_app_conf_t;
+
+
+
+typedef struct {
+    ngx_rtmp_conf_ctx_t         cctx;
+    ngx_rtmp_relay_target_t    *target;
+} ngx_rtmp_relay_static_t;
+
+
 extern ngx_module_t                 ngx_rtmp_relay_module;
 
 
+ngx_int_t ngx_rtmp_parse_relay_str(ngx_pool_t *pool,
+                                   ngx_rtmp_relay_target_t *target,
+                                   ngx_flag_t *is_static);
 ngx_int_t ngx_rtmp_relay_pull(ngx_rtmp_session_t *s, ngx_str_t *name,
                               ngx_rtmp_relay_target_t *target);
 ngx_int_t ngx_rtmp_relay_push(ngx_rtmp_session_t *s, ngx_str_t *name,
                               ngx_rtmp_relay_target_t *target);
+void ngx_rtmp_relay_static_pull_reconnect(ngx_event_t *ev);
 
 
 #endif /* _NGX_RTMP_RELAY_H_INCLUDED_ */
