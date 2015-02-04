@@ -270,6 +270,12 @@ ngx_rtmp_relay_push_reconnect(ngx_event_t *ev)
             continue;
         }
 
+        if (target->args.len && (ctx->args.len != target->args.len ||
+            ngx_memcmp(ctx->args.data, target->args.data, ctx->args.len)))
+        {
+            continue;
+        }
+
         for (pctx = ctx->play; pctx; pctx = pctx->next) {
             if (pctx->tag == &ngx_rtmp_relay_module &&
                 pctx->data == target)
@@ -281,6 +287,12 @@ ngx_rtmp_relay_push_reconnect(ngx_event_t *ev)
         if (pctx) {
             continue;
         }
+
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "relay: push reconnect name='%V' args='%V' "
+                "app='%V' playpath='%V' url='%V'",
+                &ctx->name, &ctx->args, &target->app, &target->play_path,
+                &target->url.url);
 
         if (ngx_rtmp_relay_push(s, &ctx->name, &ctx->args, target) == NGX_OK) {
             continue;
@@ -584,6 +596,12 @@ ngx_rtmp_relay_create_local_ctx(ngx_rtmp_session_t *s, ngx_str_t *name,
         return NULL;
     }
 
+    if (ngx_rtmp_relay_copy_str(s->connection->pool, &ctx->args, args)
+            != NGX_OK)
+    {
+        return NULL;
+    }
+
     return ctx;
 }
 
@@ -798,6 +816,9 @@ ngx_rtmp_relay_play_local(ngx_rtmp_session_t *s)
     *(ngx_cpymem(v.name, ctx->name.data,
             ngx_min(sizeof(v.name) - 1, ctx->name.len))) = 0;
 
+    *(ngx_cpymem(v.args, ctx->args.data,
+            ngx_min(sizeof(v.args) - 1, ctx->args.len))) = 0;
+
     return ngx_rtmp_play(s, &v);
 }
 
@@ -817,6 +838,9 @@ ngx_rtmp_relay_publish_local(ngx_rtmp_session_t *s)
     v.silent = 1;
     *(ngx_cpymem(v.name, ctx->name.data,
             ngx_min(sizeof(v.name) - 1, ctx->name.len))) = 0;
+
+    *(ngx_cpymem(v.args, ctx->args.data,
+            ngx_min(sizeof(v.args) - 1, ctx->args.len))) = 0;
 
     return ngx_rtmp_publish(s, &v);
 }
