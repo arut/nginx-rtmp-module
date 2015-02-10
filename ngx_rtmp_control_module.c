@@ -162,6 +162,7 @@ ngx_rtmp_control_drop_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
 
     ctx = ngx_http_get_module_ctx(r, ngx_rtmp_control_module);
 
+    s->static_relay = 0;
     ngx_rtmp_finalize_session(s);
 
     ++ctx->count;
@@ -244,7 +245,7 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     ngx_rtmp_relay_target_t     *target, **t;
     u_char                      *dst;
     ngx_rtmp_relay_app_conf_t   *racf;
-    ngx_int_t                    is_pull, is_static = 0;
+    ngx_int_t                    is_pull, is_static = 1;
     ngx_event_t                **ee, *e = NULL;
     ngx_rtmp_relay_static_t     *rs;
 
@@ -288,12 +289,6 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
                      &name) == NGX_OK)
     {
         target->name = name;
-    }
-
-    if (ngx_http_arg(r, (u_char *) "static", sizeof("static") - 1,
-                     &name) == NGX_OK)
-    {
-        is_static = ngx_atoi(name.data, name.len);
     }
 
     if (ngx_strncasecmp(decoded.data, (u_char *) "rtmp://", 7)) {
@@ -380,29 +375,26 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
             e->log = r->connection->log;//&cscf->cycle->new_log;
             e->handler = ngx_rtmp_relay_static_pull_reconnect;
 
-            t = ngx_array_push(&racf->static_pulls);
+            ngx_rtmp_relay_static_pull_reconnect(e);
 
         } else if (is_pull) {
             t = ngx_array_push(&racf->pulls);
 
+            if (t == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            *t = target;
+
         } else {
             t = ngx_array_push(&racf->pushes);
+
+            if (t == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            *t = target;
         }
-
-        if (t == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        *t = target;
-
-        if (is_static) {
-            ngx_rtmp_relay_static_pull_reconnect(e);
-        }
-
-    } else if (ctx->method.len == sizeof("stop") - 1 &&
-               ngx_strncmp(ctx->method.data, "stop", ctx->method.len) == 0)
-    {
-        ;//rc = ngx_rtmp_relay_close(r, s, name.data);
 
     } else {
         return "Undefined method";
