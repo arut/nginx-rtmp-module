@@ -5,6 +5,7 @@ i.e "`u1cam1 3031 2.5 1423724678`"
 
 ### Configuration
 change these variables as per requirement in hls/ngx_rtmp_hls_module.c:858
+
     hostname = "localhost";
     int port = 5672;
     exchange = "exchangename";
