@@ -1,4 +1,4 @@
-## modified nginx-rtmp-module using [rabbit-c](https://github.com/alanxz/rabbitmq-c) for HLS
+## modified [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module) using [rabbit-c](https://github.com/alanxz/rabbitmq-c) for HLS
 adds new message on each HLS file creation for further processing
 it pushes message with these details "`Application Name` `filename (without application token)` `duration` `filecreation time in UNIX`"
 i.e "`u1cam1 3031 2.5 1423724678`"
