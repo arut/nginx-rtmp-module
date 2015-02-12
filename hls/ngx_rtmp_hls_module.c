@@ -10,8 +10,16 @@
 #include <ngx_rtmp_cmd_module.h>
 #include <ngx_rtmp_codec_module.h>
 #include "ngx_rtmp_mpegts.h"
-
-
+/* Junaid 11-Feb-2015 */
+#include <stdlib.h>
+#include <time.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include "../librabbitmq/amqp_tcp_socket.h"
+#include "../librabbitmq/amqp_framing.h"
+#include "../librabbitmq/utils.h"
+/*End Edit*/
 static ngx_rtmp_publish_pt              next_publish;
 static ngx_rtmp_close_stream_pt         next_close_stream;
 static ngx_rtmp_stream_begin_pt         next_stream_begin;
@@ -27,7 +35,9 @@ static char * ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf,
 static ngx_int_t ngx_rtmp_hls_flush_audio(ngx_rtmp_session_t *s);
 static ngx_int_t ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s,
        ngx_str_t *path);
-
+// added 18-oct-2014 by Junaid Nasir
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
 #define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
 #define NGX_RTMP_HLS_DIR_ACCESS         0744
@@ -79,6 +89,7 @@ typedef struct {
     uint64_t                            aframe_pts;
 
     ngx_rtmp_hls_variant_t             *var;
+    unsigned int                        bashtime; /* Junaid Nasir 2-Feb-2015 */
 } ngx_rtmp_hls_ctx_t;
 
 
@@ -402,7 +413,7 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-
+    
     fd = ngx_open_file(ctx->var_playlist_bak.data, NGX_FILE_WRONLY,
                        NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
 
@@ -814,12 +825,14 @@ ngx_rtmp_hls_get_fragment_id(ngx_rtmp_session_t *s, uint64_t ts)
     }
 }
 
-
 static ngx_int_t
 ngx_rtmp_hls_close_fragment(ngx_rtmp_session_t *s)
 {
     ngx_rtmp_hls_ctx_t         *ctx;
-
+    // Edit NitroCam Sat 2-Feb-2015 Junaid Nasir
+    ngx_str_t                  name_part;
+    ngx_rtmp_hls_frag_t            *f;
+    // End Edit
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
     if (ctx == NULL || !ctx->opened) {
         return NGX_OK;
@@ -828,6 +841,57 @@ ngx_rtmp_hls_close_fragment(ngx_rtmp_session_t *s)
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: close fragment n=%uL", ctx->frag);
 
+    // Edit NitroCam Sat 2-Feb-2015 Junaid Nasir
+    /* Junaid : for Rabbit on 11 February 2015 (Wednesday)*/
+    name_part.len = 0;
+    name_part = ctx->name;
+    f = ngx_rtmp_hls_get_frag(s, ctx->nfrags-1);
+    char const *hostname;
+    int port = 5672;
+    unsigned int status;
+    char const *exchange;
+    char const *routingkey;
+    char const *messagebody;
+    amqp_socket_t *socket;
+    amqp_connection_state_t conn;
+    char outdata [300];
+    
+    hostname = "localhost";
+    exchange = "amq.direct";
+    routingkey = "jobqueue";
+    sprintf (outdata, "%s %" PRIu64 " %.3f %u",name_part.data,f->id,f->duration,ctx->bashtime);
+    messagebody=outdata;
+    conn = amqp_new_connection();
+    socket = amqp_tcp_socket_new(conn);
+    
+    if (!socket) {
+        // Failed
+    }
+    status = amqp_socket_open(socket, hostname, port);
+    if (status) {
+      // die("opening SSL/TLS connection");
+    }
+    amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+    amqp_channel_open(conn, 1);
+    amqp_get_rpc_reply(conn);
+    {
+      amqp_basic_properties_t props;
+      props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
+      props.content_type = amqp_cstring_bytes("text/plain");
+      props.delivery_mode = 2; /* persistent delivery mode */
+      amqp_basic_publish(conn,
+                              1,
+                              amqp_cstring_bytes(exchange),
+                              amqp_cstring_bytes(routingkey),
+                              0,
+                              0,
+                              &props,
+                              amqp_cstring_bytes(messagebody));
+    }
+    amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
+    amqp_connection_close(conn, AMQP_REPLY_SUCCESS);
+    amqp_destroy_connection(conn);
+    // End Edit
     ngx_rtmp_mpegts_close_file(&ctx->file);
 
     ctx->opened = 0;
@@ -852,7 +916,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_rtmp_hls_app_conf_t  *hacf;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-
+    ctx->bashtime=(unsigned int)time(NULL); /* Junaid 2-Feb-2015 */
     if (ctx->opened) {
         return NGX_OK;
     }
