@@ -47,6 +47,15 @@ NGX_ADDON_DEPS="$NGX_ADDON_DEPS                             \
                 $ngx_addon_dir/ngx_rtmp_proxy_protocol.h    \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.h        \
                 $ngx_addon_dir/dash/ngx_rtmp_mp4.h          \
+                $ngx_addon_dir/rabbit/utils.h               \
+                $ngx_addon_dir/rabbit/amqp_ssl_socket.h     \
+                $ngx_addon_dir/rabbit/amqp_framing.h        \
+                $ngx_addon_dir/rabbit/amqp.h                \
+                $ngx_addon_dir/rabbit/amqp_hostcheck.h      \
+                $ngx_addon_dir/rabbit/amqp_private.h        \
+                $ngx_addon_dir/rabbit/amqp_socket.h         \
+                $ngx_addon_dir/rabbit/amqp_tcp_socket.h     \
+                $ngx_addon_dir/rabbit/amqp_timer.h          \
                 "
 
 
@@ -81,12 +90,12 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_limit_module.c      \
                 $ngx_addon_dir/ngx_rtmp_bitop.c             \
                 $ngx_addon_dir/ngx_rtmp_proxy_protocol.c    \
+                $ngx_addon_dir/rabbit/utils.c               \
                 $ngx_addon_dir/hls/ngx_rtmp_hls_module.c    \
                 $ngx_addon_dir/dash/ngx_rtmp_dash_module.c  \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.c        \
                 $ngx_addon_dir/dash/ngx_rtmp_mp4.c          \
                 "
-CFLAGS="$CFLAGS -I$ngx_addon_dir"
+CFLAGS="$CFLAGS -I$ngx_addon_dir -I$ngx_addon_dir/librabbitmq/ -L$ngx_addon_dir/librabbitmq/ -lrabbitmq"
 
 USE_OPENSSL=YES
-
