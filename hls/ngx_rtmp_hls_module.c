@@ -2144,6 +2144,11 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 
         if (ngx_de_is_dir(&dir)) {
 
+            mtime = ngx_de_mtime(&spath);
+            if (mtime + playlen / 1000 > ngx_cached_time->sec) {
+                continue;
+            }
+
             if (ngx_rtmp_hls_cleanup_dir(&spath, playlen) == 0) {
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
                                "hls: cleanup dir '%V'", &name);
