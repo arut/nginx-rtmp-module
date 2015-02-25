@@ -288,7 +288,9 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     if (ngx_http_arg(r, (u_char *) "name", sizeof("name") - 1,
                      &name) == NGX_OK)
     {
-        target->name = name;
+        target->name.data = ngx_pnalloc(cscf->pool, name.len + 1);
+        target->name.len = name.len;
+        ngx_memcpy(target->name.data, name.data, name.len);
     }
 
     if (ngx_strncasecmp(decoded.data, (u_char *) "rtmp://", 7)) {
