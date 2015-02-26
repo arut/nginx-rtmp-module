@@ -2097,7 +2097,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     nentries = 0;
     nerased = 0;
 
-    if (ngx_de_mtime(&dir) + playlen / 1000 > ngx_cached_time->sec) {
+    if ((time_t)ngx_de_mtime(&dir) + playlen / 1000 > ngx_cached_time->sec) {
         dir_mod = 1;
     }
 

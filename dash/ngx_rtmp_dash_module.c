@@ -1246,6 +1246,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     time_t           mtime, max_age;
     u_char          *p;
     u_char           path[NGX_MAX_PATH + 1], mpd_path[NGX_MAX_PATH + 1];
+    u_char           dir_mod;
     ngx_dir_t        dir;
     ngx_err_t        err;
     ngx_str_t        name, spath, mpd;
@@ -1264,7 +1265,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     nentries = 0;
     nerased = 0;
 
-    if (ngx_de_mtime(&dir) + playlen / 1000 > ngx_cached_time->sec) {
+    if ((time_t)(ngx_de_mtime(&dir) + playlen / 1000) > ngx_cached_time->sec) {
         dir_mod = 1;
     }
 
