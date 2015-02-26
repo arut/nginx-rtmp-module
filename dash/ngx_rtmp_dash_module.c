@@ -1264,6 +1264,10 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     nentries = 0;
     nerased = 0;
 
+    if (ngx_de_mtime(&dir) + playlen / 1000 > ngx_cached_time->sec) {
+        dir_mod = 1;
+    }
+
     for ( ;; ) {
         ngx_set_errno(0);
 
@@ -1277,7 +1281,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
             }
 
             if (err == NGX_ENOMOREFILES) {
-                return nentries - nerased;
+                return nentries - nerased + dir_mod;
             }
 
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, err,

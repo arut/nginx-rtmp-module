@@ -2080,7 +2080,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     time_t                  mtime, max_age;
     ngx_err_t               err;
     ngx_str_t               name, spath;
-    u_char                 *p;
+    u_char                 *p, dir_mod = 0;
     ngx_int_t               nentries, nerased;
     u_char                  path[NGX_MAX_PATH + 1];
 
@@ -2097,6 +2097,10 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     nentries = 0;
     nerased = 0;
 
+    if (ngx_de_mtime(&dir) + playlen / 1000 > ngx_cached_time->sec) {
+        dir_mod = 1;
+    }
+
     for ( ;; ) {
         ngx_set_errno(0);
 
@@ -2110,7 +2114,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
             }
 
             if (err == NGX_ENOMOREFILES) {
-                return nentries - nerased;
+                return nentries - nerased + dir_mod;
             }
 
             ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, err,
@@ -2143,11 +2147,6 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
         }
 
         if (ngx_de_is_dir(&dir)) {
-
-            mtime = ngx_de_mtime(&spath);
-            if (mtime + playlen / 1000 > ngx_cached_time->sec) {
-                continue;
-            }
 
             if (ngx_rtmp_hls_cleanup_dir(&spath, playlen) == 0) {
                 ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
