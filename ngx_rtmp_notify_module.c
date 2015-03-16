@@ -799,7 +799,7 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
 
 static ngx_int_t
 ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s,
-        ngx_chain_t *in)
+        ngx_chain_t *in, u_char strict)
 {
     ngx_buf_t      *b;
     ngx_int_t       n;
@@ -821,6 +821,9 @@ ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s,
                     case (u_char) '3':
                         return NGX_AGAIN;
                     default:
+                        if (strict == 1) {
+                            return NGX_DECLINED;
+                        }
                         return NGX_ERROR;
                 }
             }
@@ -962,7 +965,7 @@ ngx_rtmp_notify_connect_handle(ngx_rtmp_session_t *s,
 
     static ngx_str_t    location = ngx_string("location");
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 0);
     if (rc == NGX_ERROR) {
         return NGX_ERROR;
     }
@@ -1014,7 +1017,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
 
     static ngx_str_t    location = ngx_string("location");
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 0);
     if (rc == NGX_ERROR) {
         ngx_rtmp_notify_clear_flag(s, NGX_RTMP_NOTIFY_PUBLISHING);
         return NGX_ERROR;
@@ -1093,7 +1096,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
 
     static ngx_str_t            location = ngx_string("location");
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 0);
     if (rc == NGX_ERROR) {
         ngx_rtmp_notify_clear_flag(s, NGX_RTMP_NOTIFY_PLAYING);
         return NGX_ERROR;
@@ -1168,10 +1171,9 @@ ngx_rtmp_notify_update_handle(ngx_rtmp_session_t *s,
 
     nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 1);
 
-    if ((!nacf->update_strict && rc == NGX_ERROR) ||
-         (nacf->update_strict && rc != NGX_OK))
+    if (rc != NGX_OK && (nacf->update_strict == 1 || rc != NGX_ERROR))
     {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: update failed");
