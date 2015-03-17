@@ -2010,7 +2010,9 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
 
         if (ngx_rtmp_hls_copy(s, out.last, &p, len - 1, &in) != NGX_OK) {
-            return NGX_ERROR;
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                          "hls: not enough data for NAL");
+            return NGX_OK;
         }
 
         out.last += (len - 1);
