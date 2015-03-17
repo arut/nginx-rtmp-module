@@ -87,7 +87,7 @@ extern ngx_module_t                 ngx_rtmp_relay_module;
 
 ngx_int_t ngx_rtmp_parse_relay_str(ngx_pool_t *pool,
                                    ngx_rtmp_relay_target_t *target,
-                                   ngx_flag_t *is_static);
+                                   u_char *is_static);
 ngx_int_t ngx_rtmp_relay_pull(ngx_rtmp_session_t *s, ngx_str_t *name,
                               ngx_rtmp_relay_target_t *target);
 ngx_int_t ngx_rtmp_relay_push(ngx_rtmp_session_t *s, ngx_str_t *name,
