@@ -52,6 +52,12 @@ typedef struct {
 } ngx_rtmp_control_loc_conf_t;
 
 
+typedef struct ngx_rtmp_control_event_chain_t {
+    ngx_event_t                             event;
+    struct ngx_rtmp_control_event_chain_t  *next;
+} ngx_rtmp_control_event_chain_t;
+
+
 static ngx_conf_bitmask_t           ngx_rtmp_control_masks[] = {
     { ngx_string("all"),            NGX_RTMP_CONTROL_ALL       },
     { ngx_string("record"),         NGX_RTMP_CONTROL_RECORD    },
@@ -162,6 +168,10 @@ ngx_rtmp_control_drop_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
 
     ctx = ngx_http_get_module_ctx(r, ngx_rtmp_control_module);
 
+    ngx_log_debug(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+            "control: drop static_relay='%d'",
+            s->static_relay);
+
     s->static_relay = 0;
     ngx_rtmp_finalize_session(s);
 
@@ -245,9 +255,22 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     ngx_rtmp_relay_target_t     *target, **t;
     u_char                      *dst;
     ngx_rtmp_relay_app_conf_t   *racf;
-    ngx_int_t                    is_pull, is_static = 1;
-    ngx_event_t                **ee, *e = NULL;
+    u_char                       is_pull, is_static = 1, start;
+    ngx_event_t                 *e;
     ngx_rtmp_relay_static_t     *rs;
+
+    static ngx_rtmp_control_event_chain_t  *evt_chain = NULL, *evt_last;
+    ngx_rtmp_control_event_chain_t  *evt_cur, *evt_prv;
+
+    if (evt_chain == NULL) {
+        evt_chain = ngx_pcalloc(cscf->pool, sizeof(*evt_chain));
+        if (evt_chain == NULL) {
+            return "unable to allocate memory";
+        }
+
+        ngx_memzero(evt_chain, sizeof(*evt_chain));
+        evt_last = evt_chain;
+    }
 
     racf = (*cacf)->app_conf[ngx_rtmp_relay_module.ctx_index];
 
@@ -262,6 +285,70 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     target->data = target;
 
     ctx = ngx_http_get_module_ctx(r, ngx_rtmp_control_module);
+
+    if (ctx->method.len == sizeof("start") - 1 &&
+        ngx_strncmp(ctx->method.data, "start", ctx->method.len) == 0)
+    {
+        start = 1;
+
+    } else if (ctx->method.len == sizeof("stop") - 1 &&
+             ngx_strncmp(ctx->method.data, "stop", ctx->method.len) == 0)
+    {
+        start = 0;
+
+    } else {
+        return "Undefined method";
+    }
+
+    if (ngx_http_arg(r, (u_char *) "name", sizeof("name") - 1,
+                     &name) == NGX_OK)
+    {
+        target->name.data = ngx_pnalloc(cscf->pool, name.len + 1);
+        target->name.len = name.len;
+        ngx_memcpy(target->name.data, name.data, name.len);
+    }
+
+    if (start == 0) {
+
+        evt_prv = evt_chain;
+
+        for (evt_cur = evt_chain; evt_cur; evt_cur = evt_cur->next) {
+            e = &evt_cur->event;
+            rs = e->data;
+
+            if(!rs) {
+                evt_prv->next = evt_cur->next;
+                ngx_pfree(cscf->pool, evt_cur);
+                evt_cur = evt_prv;
+                continue;
+            }
+
+            if (rs->cctx.main_conf == (void **)cscf->ctx->main_conf &&
+                rs->cctx.srv_conf  == (void **)cscf->ctx->srv_conf &&
+                rs->cctx.app_conf  == (void **)cacf &&
+                rs->target->name.len == target->name.len &&
+                ngx_strncmp(rs->target->name.data, target->name.data,
+                            target->name.len) == 0)
+            {
+                ngx_log_debug(NGX_LOG_DEBUG_RTMP, r->connection->log, 0,
+                               "control: stopped url='%*s'",
+                               rs->target->url.url.len,
+                               rs->target->url.url.data);
+
+                ngx_pfree(cscf->pool, e->data);
+                e->data = NULL;
+
+                evt_prv->next = evt_cur->next;
+                ngx_pfree(cscf->pool, evt_cur);
+                evt_cur = evt_prv;
+                continue;
+            }
+
+            evt_prv = evt_cur;
+        }
+
+        return NGX_CONF_OK;
+    }
 
     if (ngx_http_arg(r, (u_char *) "push", sizeof("push") - 1,
                      &name) == NGX_OK)
@@ -281,125 +368,110 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     if (dst == NULL) {
         return "unable to allocate memory";
     }
+
     decoded.data = dst;
     ngx_unescape_uri(&dst, &name.data, name.len, 0);
     decoded.len = dst - decoded.data;
 
-    if (ngx_http_arg(r, (u_char *) "name", sizeof("name") - 1,
-                     &name) == NGX_OK)
-    {
-        target->name.data = ngx_pnalloc(cscf->pool, name.len + 1);
-        target->name.len = name.len;
-        ngx_memcpy(target->name.data, name.data, name.len);
-    }
-
     if (ngx_strncasecmp(decoded.data, (u_char *) "rtmp://", 7)) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                      "control: relay %s '%s'",
-                      (is_pull ? "from" : "to" ), decoded.data);
+                      "control: relay %s '%*s'",
+                      (is_pull ? "from" : "to" ), decoded.len, decoded.data);
         return "invalid relay url";
     }
 
-    if (ctx->method.len == sizeof("start") - 1 &&
-        ngx_strncmp(ctx->method.data, "start", ctx->method.len) == 0)
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                  "control: %*s relay from '%*s'",
+                  ctx->method.len, ctx->method.data, decoded.len, decoded.data);
+
+    u = &target->url;
+    u->url.data = decoded.data + 7;
+    u->url.len = decoded.len - 7;
+    u->default_port = 1935;
+    u->uri_part = 1;
+
+    if (ngx_parse_url(cscf->pool, u) != NGX_OK) {
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "control: %s failed '%*s'",
+                      (is_pull ? "pull" : "push" ), decoded.len, decoded.data);
+        return "invalid relay url";
+    }
+
+    if (u->uri.len > 0 &&
+        ngx_rtmp_parse_relay_str(cscf->pool, target, &is_static) != NGX_OK)
     {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "control: relay from '%*s'", decoded.len, decoded.data);
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "control: %s failed with args '%*s'",
+                      (is_pull ? "pull" : "push" ), &u->uri.len, &u->uri.data);
+        return "invalid relay args";
+    }
 
-        u = &target->url;
-        u->url.data = decoded.data + 7;
-        u->url.len = decoded.len - 7;
-        u->default_port = 1935;
-        u->uri_part = 1;
+    if (u->uri.len == 0)
+    {
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "control: %s has no remote url '%*s'",
+                      (is_pull ? "pull" : "push" ), decoded.len, decoded.data);
+        return "no relay url";
+    }
 
-        if (ngx_parse_url(cscf->pool, u) != NGX_OK) {
-            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                          "control: %s failed '%V'",
-                          (is_pull ? "pull" : "push" ), decoded.data);
-            return "invalid relay url";
+    if (is_static) {
+
+        if (!is_pull) {
+            ngx_log_error(NGX_LOG_EMERG, s->connection->log, 0,
+                               "static push is not allowed");
+            return NGX_CONF_ERROR;
         }
 
-        if (u->uri.len > 0 &&
-            ngx_rtmp_parse_relay_str(cscf->pool, target, &is_static) != NGX_OK)
-        {
-            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                          "control: %s failed with args '%V'",
-                          (is_pull ? "pull" : "push" ), &u->uri);
-            return "invalid relay args";
+        if (target->name.len == 0) {
+            ngx_log_error(NGX_LOG_EMERG, s->connection->log, 0,
+                               "stream name missing in static pull "
+                               "declaration");
+            return NGX_CONF_ERROR;
         }
 
-        if (u->uri.len == 0)
-        {
-            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                          "control: %s has no remote url '%V'",
-                          (is_pull ? "pull" : "push" ), decoded.data);
-            return "no relay url";
+        evt_last->next = ngx_pcalloc(cscf->pool, sizeof(*evt_chain));
+        if (evt_last->next == NULL) {
+            return "unable to allocate memory";
         }
 
-        if (is_static) {
+        ngx_memzero(evt_last->next, sizeof(*evt_chain));
+        e = &evt_last->event;
 
-            if (!is_pull) {
-                ngx_log_error(NGX_LOG_EMERG, s->connection->log, 0,
-                                   "static push is not allowed");
-                return NGX_CONF_ERROR;
-            }
-
-            if (target->name.len == 0) {
-                ngx_log_error(NGX_LOG_EMERG, s->connection->log, 0,
-                                   "stream name missing in static pull "
-                                   "declaration");
-                return NGX_CONF_ERROR;
-            }
-
-            ee = ngx_array_push(&racf->static_events);
-            if (ee == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            e = ngx_pcalloc(cscf->pool, sizeof(ngx_event_t));
-            if (e == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            *ee = e;
-
-            rs = ngx_pcalloc(cscf->pool, sizeof(ngx_rtmp_relay_static_t));
-            if (rs == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            rs->target = target;
-            rs->cctx.main_conf = (void **)cscf->ctx->main_conf;
-            rs->cctx.srv_conf  = (void **)cscf->ctx->srv_conf;
-            rs->cctx.app_conf  = (void **)cacf;
-
-            e->data = rs;
-            e->log = r->connection->log;//&cscf->cycle->new_log;
-            e->handler = ngx_rtmp_relay_static_pull_reconnect;
-
-            ngx_rtmp_relay_static_pull_reconnect(e);
-
-        } else if (is_pull) {
-            t = ngx_array_push(&racf->pulls);
-
-            if (t == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            *t = target;
-
-        } else {
-            t = ngx_array_push(&racf->pushes);
-
-            if (t == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            *t = target;
+        rs = ngx_pcalloc(cscf->pool, sizeof(ngx_rtmp_relay_static_t));
+        if (rs == NULL) {
+            return NGX_CONF_ERROR;
         }
+
+        rs->target = target;
+        rs->cctx.main_conf = (void **)cscf->ctx->main_conf;
+        rs->cctx.srv_conf  = (void **)cscf->ctx->srv_conf;
+        rs->cctx.app_conf  = (void **)cacf;
+
+        e->data = rs;
+        e->log = r->connection->log;
+        e->handler = ngx_rtmp_relay_static_pull_reconnect;
+
+        ngx_rtmp_relay_static_pull_reconnect(e);
+
+        evt_last = evt_last->next;
+
+    } else if (is_pull) {
+        t = ngx_array_push(&racf->pulls);
+
+        if (t == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        *t = target;
 
     } else {
-        return "Undefined method";
+        t = ngx_array_push(&racf->pushes);
+
+        if (t == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        *t = target;
     }
 
     return NGX_CONF_OK;

@@ -200,6 +200,10 @@ ngx_rtmp_relay_static_pull_reconnect(ngx_event_t *ev)
 {
     ngx_rtmp_relay_static_t    *rs = ev->data;
 
+    if(!rs) {
+        return;
+    }
+
     ngx_rtmp_relay_ctx_t       *ctx;
     ngx_rtmp_relay_app_conf_t  *racf;
 
@@ -602,7 +606,7 @@ ngx_rtmp_relay_create(ngx_rtmp_session_t *s, ngx_str_t *name,
 
 ngx_int_t
 ngx_rtmp_parse_relay_str(ngx_pool_t *pool, ngx_rtmp_relay_target_t *target,
-    ngx_flag_t *is_static)
+    u_char *is_static)
 {
     ngx_str_t                     parts, v, n;
     u_char                       *b, *m, *e, *last, *dst, *src;
@@ -1426,7 +1430,12 @@ ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
         return;
     }
 
-    if (s->static_relay) {
+    ngx_log_debug3(NGX_LOG_DEBUG_RTMP, ctx->session->connection->log, 0,
+            "relay: close app='%V' name='%V' static_relay='%d'",
+            &ctx->app, &ctx->name, s->static_relay);
+
+    if (s->static_relay && ctx->static_evt)
+    {
         ngx_add_timer(ctx->static_evt, racf->pull_reconnect);
     }
 
@@ -1535,10 +1544,9 @@ ngx_rtmp_relay_push_pull(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_rtmp_relay_target_t            *target, **t;
     ngx_url_t                          *u;
     ngx_uint_t                          i;
-    ngx_int_t                           is_pull, is_static;
     ngx_event_t                       **ee, *e;
     ngx_rtmp_relay_static_t            *rs;
-    u_char                             *p;
+    u_char                             *p, is_pull, is_static;
 
     value = cf->args->elts;
 
