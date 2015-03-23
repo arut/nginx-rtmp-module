@@ -607,7 +607,9 @@ extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_in;
 
 
 extern ngx_uint_t                           ngx_rtmp_naccepted;
-#if (nginx_version >= 1007005)
+#if (nginx_version >= 1007011)
+extern ngx_queue_t                          ngx_rtmp_init_queue;
+#elif (nginx_version >= 1007005)
 extern ngx_thread_volatile ngx_queue_t      ngx_rtmp_init_queue;
 #else
 extern ngx_thread_volatile ngx_event_t     *ngx_rtmp_init_queue;
