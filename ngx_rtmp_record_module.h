@@ -25,7 +25,7 @@ typedef struct {
     ngx_uint_t                          flags;
     ngx_str_t                           path;
     size_t                              max_size;
-	size_t 								interval_size;
+    size_t 				interval_size;
     size_t                              max_frames;
     ngx_msec_t                          interval;
     ngx_str_t                           suffix;

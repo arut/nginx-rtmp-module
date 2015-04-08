@@ -105,14 +105,14 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, lock_file),
       NULL },
-	
-	{ ngx_string("record_interval_size"),
-	  NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
-	  					 NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
-	  ngx_conf_set_size_slot,
-	  NGX_RTMP_APP_CONF_OFFSET,
-	  offsetof(ngx_rtmp_record_app_conf_t, interval_size),
-	  NULL },
+
+    { ngx_string("record_interval_size"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+			NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, interval_size),
+      NULL },
 
     { ngx_string("record_max_size"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
@@ -198,7 +198,7 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     }
 
     racf->max_size = NGX_CONF_UNSET_SIZE;
-	racf->interval_size = NGX_CONF_UNSET_SIZE;
+    racf->interval_size = NGX_CONF_UNSET_SIZE;
     racf->max_frames = NGX_CONF_UNSET_SIZE;
     racf->interval = NGX_CONF_UNSET_MSEC;
     racf->unique = NGX_CONF_UNSET;
@@ -225,7 +225,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->path, prev->path, "");
     ngx_conf_merge_str_value(conf->suffix, prev->suffix, ".flv");
     ngx_conf_merge_size_value(conf->max_size, prev->max_size, 0);
-	ngx_conf_merge_size_value(conf->interval_size, prev->interval_size, 0);
+    ngx_conf_merge_size_value(conf->interval_size, prev->interval_size, 0);
     ngx_conf_merge_size_value(conf->max_frames, prev->max_frames, 0);
     ngx_conf_merge_value(conf->unique, prev->unique, 0);
     ngx_conf_merge_value(conf->append, prev->append, 0);
@@ -985,13 +985,13 @@ ngx_rtmp_record_write_frame(ngx_rtmp_session_t *s,
         ngx_rtmp_record_node_close(s, rctx);
     }
 
-	/* watch size interval */
-	if ((rracf->interval_size && rctx->file.offset >= (ngx_int_t) rracf->interval_size) ||
-		(rracf->max_frames && rctx->nframes >= rracf->max_frames))
-	{
-		ngx_rtmp_record_node_close(s, rctx);
-		ngx_rtmp_record_node_open(s, rctx);
-	}
+    /* watch size interval */
+    if ((rracf->interval_size && rctx->file.offset >= (ngx_int_t) rracf->interval_size) ||
+        (rracf->max_frames && rctx->nframes >= rracf->max_frames))
+    {
+	ngx_rtmp_record_node_close(s, rctx);
+	ngx_rtmp_record_node_open(s, rctx);
+    }
 
     return NGX_OK;
 }
