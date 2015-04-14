@@ -310,6 +310,10 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
 
     if (start == 0) {
 
+        if (s) {
+            ngx_rtmp_control_drop_handler(r, s, cscf, cacf);
+        }
+
         evt_prv = evt_chain;
 
         for (evt_cur = evt_chain; evt_cur; evt_cur = evt_cur->next) {
