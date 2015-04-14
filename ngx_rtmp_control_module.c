@@ -901,16 +901,10 @@ ngx_rtmp_control_relay(ngx_http_request_t *r, ngx_str_t *method)
     if (ctx->method.len == sizeof("stop") - 1 &&
              ngx_strncmp(ctx->method.data, "stop", ctx->method.len) == 0)
     {
-        msg = ngx_rtmp_control_walk(r, ngx_rtmp_control_relay_handler, 1);
-        if (msg != NGX_CONF_OK) {
-            msg = ngx_rtmp_control_walk(r, ngx_rtmp_control_relay_handler, 0);
-        }
-    }
-    else
-    {
-        msg = ngx_rtmp_control_walk(r, ngx_rtmp_control_relay_handler, 0);
+        ngx_rtmp_control_walk(r, ngx_rtmp_control_drop_handler, 1);
     }
 
+    msg = ngx_rtmp_control_walk(r, ngx_rtmp_control_relay_handler, 0);
     if (msg != NGX_CONF_OK) {
         goto error;
     }
