@@ -2097,7 +2097,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     nentries = 0;
     nerased = 0;
 
-    if ((time_t)(ngx_de_mtime(&dir) + playlen / 1000) > ngx_cached_time->sec) {
+    if ((time_t)(ngx_de_mtime(&dir) + playlen / 500) > ngx_cached_time->sec) {
         dir_mod = 1;
     }
 
@@ -2179,7 +2179,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                              name.data[name.len - 2] == 't' &&
                              name.data[name.len - 1] == 's')
         {
-            max_age = playlen / 500;
+            max_age = playlen / 250;
 
         } else if (name.len >= 5 && name.data[name.len - 5] == '.' &&
                                     name.data[name.len - 4] == 'm' &&
@@ -2187,7 +2187,7 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                                     name.data[name.len - 2] == 'u' &&
                                     name.data[name.len - 1] == '8')
         {
-            max_age = playlen / 1000;
+            max_age = playlen / 500;
 
         } else if (name.len >= 4 && name.data[name.len - 4] == '.' &&
                                     name.data[name.len - 3] == 'k' &&
