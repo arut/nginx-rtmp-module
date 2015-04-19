@@ -1295,7 +1295,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
     nentries = 0;
     nerased = 0;
 
-    if ((time_t)(ngx_de_mtime(&dir) + playlen / 1000) > ngx_cached_time->sec) {
+    if ((time_t)(ngx_de_mtime(&dir) + playlen / 500) > ngx_cached_time->sec) {
         dir_mod = 1;
     }
 
@@ -1405,14 +1405,14 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                                     name.data[name.len - 2] == '4' &&
                                     name.data[name.len - 1] == 'v')
         {
-            max_age = playlen / 500;
+            max_age = playlen / 250;
 
         } else if (name.len >= 4 && name.data[name.len - 4] == '.' &&
                                     name.data[name.len - 3] == 'm' &&
                                     name.data[name.len - 2] == '4' &&
                                     name.data[name.len - 1] == 'a')
         {
-            max_age = playlen / 500;
+            max_age = playlen / 250;
 
         } else if (name.len >= 4 && name.data[name.len - 4] == '.' &&
                                     name.data[name.len - 3] == 'm' &&
@@ -1426,7 +1426,7 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
                                     name.data[name.len - 2] == 'a' &&
                                     name.data[name.len - 1] == 'w')
         {
-            max_age = playlen / 1000;
+            max_age = playlen / 500;
 
         } else {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, ngx_cycle->log, 0,
