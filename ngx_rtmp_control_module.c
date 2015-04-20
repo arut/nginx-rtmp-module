@@ -262,16 +262,6 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     static ngx_rtmp_control_event_chain_t  *evt_chain = NULL, *evt_last;
     ngx_rtmp_control_event_chain_t  *evt_cur, *evt_prv;
 
-    if (evt_chain == NULL) {
-        evt_chain = ngx_pcalloc(cscf->pool, sizeof(*evt_chain));
-        if (evt_chain == NULL) {
-            return "unable to allocate memory";
-        }
-
-        ngx_memzero(evt_chain, sizeof(*evt_chain));
-        evt_last = evt_chain;
-    }
-
     racf = (*cacf)->app_conf[ngx_rtmp_relay_module.ctx_index];
 
     target = ngx_pcalloc(cscf->pool, sizeof(*target));
@@ -318,10 +308,13 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
 
         for (evt_cur = evt_chain; evt_cur; evt_cur = evt_cur->next) {
             e = &evt_cur->event;
-            rs = e->data;
+            rs = e ? e->data : NULL;
 
             if(!rs) {
-                evt_prv->next = evt_cur->next;
+                if(evt_prv) {
+                    evt_prv->next = evt_cur->next;
+                }
+
                 ngx_pfree(cscf->pool, evt_cur);
                 evt_cur = evt_prv;
                 continue;
@@ -342,7 +335,10 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
                 ngx_pfree(cscf->pool, e->data);
                 e->data = NULL;
 
-                evt_prv->next = evt_cur->next;
+                if(evt_prv) {
+                    evt_prv->next = evt_cur->next;
+                }
+
                 ngx_pfree(cscf->pool, evt_cur);
                 evt_cur = evt_prv;
                 continue;
@@ -421,29 +417,42 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     if (is_static) {
 
         if (!is_pull) {
-            ngx_log_error(NGX_LOG_EMERG, s->connection->log, 0,
+            ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0,
                                "static push is not allowed");
             return NGX_CONF_ERROR;
         }
 
         if (target->name.len == 0) {
-            ngx_log_error(NGX_LOG_EMERG, s->connection->log, 0,
+            ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0,
                                "stream name missing in static pull "
                                "declaration");
             return NGX_CONF_ERROR;
         }
 
-        evt_last->next = ngx_pcalloc(cscf->pool, sizeof(*evt_chain));
-        if (evt_last->next == NULL) {
-            return "unable to allocate memory";
+        if (evt_chain == NULL) {
+            evt_chain = ngx_pcalloc(cscf->pool, sizeof(*evt_chain));
+            if (evt_chain == NULL) {
+                return "unable to allocate memory";
+            }
+
+            ngx_memzero(evt_chain, sizeof(*evt_chain));
+            evt_last = evt_chain;
+        }
+        else {
+            evt_last->next = ngx_pcalloc(cscf->pool, sizeof(*evt_chain));
+            if (evt_last->next == NULL) {
+                return "unable to allocate memory";
+            }
+
+            ngx_memzero(evt_last->next, sizeof(*evt_chain));
+            evt_last = evt_last->next;
         }
 
-        ngx_memzero(evt_last->next, sizeof(*evt_chain));
         e = &evt_last->event;
 
         rs = ngx_pcalloc(cscf->pool, sizeof(ngx_rtmp_relay_static_t));
         if (rs == NULL) {
-            return NGX_CONF_ERROR;
+            return "unable to allocate memory";
         }
 
         rs->target = target;
@@ -456,8 +465,6 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
         e->handler = ngx_rtmp_relay_static_pull_reconnect;
 
         ngx_rtmp_relay_static_pull_reconnect(e);
-
-        evt_last = evt_last->next;
 
     } else if (is_pull) {
         t = ngx_array_push(&racf->pulls);
