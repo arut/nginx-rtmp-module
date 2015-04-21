@@ -304,19 +304,31 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
             ngx_rtmp_control_drop_handler(r, s, cscf, cacf);
         }
 
-        evt_prv = evt_chain;
-
-        for (evt_cur = evt_chain; evt_cur; evt_cur = evt_cur->next) {
+        for (evt_prv = NULL, evt_cur = evt_chain; evt_cur;) {
             e = &evt_cur->event;
             rs = e ? e->data : NULL;
+
+            ngx_log_debug(NGX_LOG_DEBUG_RTMP, r->connection->log, 0,
+                           "control: matching name='%*s' candidate='%*s'",
+                           target->name.len, target->name.data,
+                           rs && rs->target ? rs->target->name.len : 0,
+                           rs && rs->target ? rs->target->name.data : NULL);
 
             if(!rs) {
                 if(evt_prv) {
                     evt_prv->next = evt_cur->next;
+                } else {
+                    evt_chain = evt_cur->next;
                 }
 
+                if(!evt_cur->next) {
+                    evt_last = evt_prv;
+                }
+
+                evt_prv = evt_cur->next;
                 ngx_pfree(cscf->pool, evt_cur);
                 evt_cur = evt_prv;
+
                 continue;
             }
 
@@ -337,14 +349,23 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
 
                 if(evt_prv) {
                     evt_prv->next = evt_cur->next;
+                } else {
+                    evt_chain = evt_cur->next;
                 }
 
+                if(!evt_cur->next) {
+                    evt_last = evt_prv;
+                }
+
+                evt_prv = evt_cur->next;
                 ngx_pfree(cscf->pool, evt_cur);
                 evt_cur = evt_prv;
+
                 continue;
             }
 
             evt_prv = evt_cur;
+            evt_cur = evt_cur->next;
         }
 
         return NGX_CONF_OK;
