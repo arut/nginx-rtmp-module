@@ -218,6 +218,7 @@
                     <th>Id</th>
                     <th>State</th>
                     <th>Address</th>
+		    <th>Port</th>
                     <th>Flash version</th>
                     <th>Page URL</th>
                     <th>SWF URL</th>
@@ -319,6 +320,7 @@
                 <xsl:value-of select="address"/>
             </a>
         </td>
+	<td><xsl:value-of select="port"/></td>
         <td><xsl:value-of select="flashver"/></td>
         <td>
             <a target="_blank">
