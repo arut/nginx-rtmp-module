@@ -957,7 +957,7 @@ ngx_rtmp_dash_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ctx->stream.len = p - ctx->playlist.data + 1;
     ctx->stream.data = ngx_palloc(s->connection->pool,
-                                  ctx->stream.len + NGX_INT32_LEN +
+                                  ctx->stream.len + NGX_INT64_LEN +
                                   sizeof(".m4x"));
 
     ngx_memcpy(ctx->stream.data, ctx->playlist.data, ctx->stream.len - 1);
