@@ -564,7 +564,7 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
 {
     u_char                    *pos, *pos1;
     size_t                     left;
-    ssize_t                    n;
+    ssize_t                    n, nret;
     ngx_fd_t                   fd;
     ngx_buf_t                  b;
     ngx_rtmp_dash_ctx_t       *ctx;
@@ -646,8 +646,8 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
             break;
         }
 
-        n = ngx_write_fd(fd, buffer, (size_t) n);
-        if (n == NGX_ERROR) {
+        nret = ngx_write_fd(fd, buffer, (size_t) n);
+        if (n != nret) {
             break;
         }
 
