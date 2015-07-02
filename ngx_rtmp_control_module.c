@@ -258,6 +258,7 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     u_char                       is_pull, is_static = 1, start;
     ngx_event_t                 *e;
     ngx_rtmp_relay_static_t     *rs;
+    ngx_rtmp_session_t          **sessions;
 
     static ngx_rtmp_control_event_chain_t  *evt_chain = NULL, *evt_last;
     ngx_rtmp_control_event_chain_t  *evt_cur, *evt_prv;
@@ -410,6 +411,22 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     u->url.len = decoded.len - 7;
     u->default_port = 1935;
     u->uri_part = 1;
+
+
+    /*
+     * make sure we don't have an active relay session for the same
+     * source.
+     */
+    sessions = ctx->sessions.elts;
+    for (int n = 0; n < ctx->sessions.nelts; n++) {
+        if(!ngx_strncmp(sessions[n]->connection->addr_text.data, u->url.data, u->url.len))
+        {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "relay: failed addr_text='%V'", u->url);
+            return "attempt to establish duplicate relay session";
+        }
+    }
+
 
     if (ngx_parse_url(cscf->pool, u) != NGX_OK) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
