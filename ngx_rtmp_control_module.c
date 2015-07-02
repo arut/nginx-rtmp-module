@@ -418,11 +418,12 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
      * source.
      */
     sessions = ctx->sessions.elts;
-    for (int n = 0; n < ctx->sessions.nelts; n++) {
+    ngx_uint_t n = 0;
+    for (; n < ctx->sessions.nelts; n++) {
         if(!ngx_strncmp(sessions[n]->connection->addr_text.data, u->url.data, u->url.len))
         {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "relay: failed addr_text='%V'", u->url);
+                "relay: failed. attempt to establish duplicate relay session addr_text='%V'", &u->url);
             return "attempt to establish duplicate relay session";
         }
     }
