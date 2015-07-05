@@ -1041,28 +1041,6 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
              ? keyframe
              : (rracf->flags & NGX_RTMP_RECORD_VIDEO) == 0;
 
-    if (brkframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
-
-        if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
-
-            next = rctx->last;
-            next.msec += rracf->interval;
-            next.sec  += (next.msec / 1000);
-            next.msec %= 1000;
-
-            if (ngx_cached_time->sec  > next.sec ||
-               (ngx_cached_time->sec == next.sec &&
-                ngx_cached_time->msec > next.msec))
-            {
-                ngx_rtmp_record_node_close(s, rctx);
-                ngx_rtmp_record_node_open(s, rctx);
-            }
-
-        } else if (!rctx->failed) {
-            ngx_rtmp_record_node_open(s, rctx);
-        }
-    }
-
     if ((rracf->flags & NGX_RTMP_RECORD_MANUAL) &&
         !brkframe && rctx->nframes == 0)
     {
@@ -1084,6 +1062,26 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
        ((rracf->flags & NGX_RTMP_RECORD_KEYFRAMES) == 0 || !keyframe))
     {
         return NGX_OK;
+    }
+
+    // record interval should work if set, manual mode or not
+    if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
+
+        next = rctx->last;
+        next.msec += rracf->interval;
+        next.sec  += (next.msec / 1000);
+        next.msec %= 1000;
+
+        if (ngx_cached_time->sec  > next.sec ||
+           (ngx_cached_time->sec == next.sec &&
+           ngx_cached_time->msec > next.msec))
+        {
+            ngx_rtmp_record_node_close(s, rctx);
+            ngx_rtmp_record_node_open(s, rctx);
+        }
+
+    } else if (!rctx->failed) {
+        ngx_rtmp_record_node_open(s, rctx);
     }
 
     if (!rctx->initialized) {
