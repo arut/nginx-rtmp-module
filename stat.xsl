@@ -38,6 +38,7 @@
             <th>In bits/s</th>
             <th>Out bits/s</th>
             <th>State</th>
+            <th>Record</th>
             <th>Time</th>
         </tr>
         <tr>
@@ -74,6 +75,7 @@
                     <xsl:with-param name="persec" select="1"/>
                 </xsl:call-template>
             </td>
+            <td/>
             <td/>
             <td>
                 <xsl:call-template name="showtime">
@@ -202,6 +204,7 @@
             </xsl:call-template>
         </td>
         <td><xsl:call-template name="streamstate"/></td>
+        <td><xsl:call-template name="recordstate"/></td>
         <td>
             <xsl:call-template name="showtime">
                <xsl:with-param name="time" select="time"/>
@@ -217,6 +220,7 @@
                 <tr>
                     <th>Id</th>
                     <th>State</th>
+                    <th>Recording</th>
                     <th>Address</th>
                     <th>Flash version</th>
                     <th>Page URL</th>
@@ -299,6 +303,13 @@
     </xsl:choose>
 </xsl:template>
 
+<xsl:template name="recordstate">
+    <xsl:choose>
+        <xsl:when test="recording">yes</xsl:when>
+        <xsl:otherwise>no</xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
 
 <xsl:template match="client">
     <tr>
@@ -310,6 +321,7 @@
         </xsl:attribute>
         <td><xsl:value-of select="id"/></td>
         <td><xsl:call-template name="clientstate"/></td>
+        <td><xsl:call-template name="recordstate"/></td>
         <td>
             <a target="_blank">
                 <xsl:attribute name="href">
@@ -346,6 +358,10 @@
 
 <xsl:template match="active">
     active
+</xsl:template>
+
+<xsl:template match="recording">
+    recording
 </xsl:template>
 
 <xsl:template match="width">

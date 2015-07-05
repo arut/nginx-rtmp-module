@@ -13,6 +13,7 @@
 #include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_play_module.h"
 #include "ngx_rtmp_codec_module.h"
+#include "ngx_rtmp_record_module.h"
 
 
 static ngx_int_t ngx_rtmp_stat_init_process(ngx_cycle_t *cycle);
@@ -414,6 +415,8 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     ngx_rtmp_live_stream_t         *stream;
     ngx_rtmp_codec_ctx_t           *codec;
     ngx_rtmp_live_ctx_t            *ctx;
+    ngx_rtmp_record_ctx_t          *rctx;
+    ngx_rtmp_record_rec_ctx_t      *recctx;
     ngx_rtmp_session_t             *s;
     ngx_int_t                       n;
     ngx_uint_t                      nclients, total_nclients;
@@ -421,6 +424,9 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     u_char                          bbuf[NGX_INT32_LEN];
     ngx_rtmp_stat_loc_conf_t       *slcf;
     u_char                         *cname;
+
+    // Is any of stream clients (publisher) recording now
+    u_char                          is_recording = 0;
 
     if (!lacf->live) {
         return;
@@ -434,6 +440,8 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
     for (n = 0; n < lacf->nbuckets; ++n) {
         for (stream = lacf->streams[n]; stream; stream = stream->next) {
             NGX_RTMP_STAT_L("<stream>\r\n");
+
+            is_recording = 0;
 
             NGX_RTMP_STAT_L("<name>");
             NGX_RTMP_STAT_ECS(stream->name);
@@ -487,6 +495,18 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
 
                     if (ctx->active) {
                         NGX_RTMP_STAT_L("<active/>");
+                    }
+
+                    rctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_record_module);
+                    if (rctx) {
+                        recctx = rctx->rec.elts;
+                        for (rn = 0; rn < rctx->rec.nelts; ++rn, ++recctx) {
+                            if (recctx->initialized) {
+                                NGX_RTMP_STAT_L("<recording/>");
+                                is_recording = 1;
+                                break;
+                            }
+                        }
                     }
 
                     NGX_RTMP_STAT_L("</client>\r\n");
@@ -586,6 +606,10 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
 
             if (stream->active) {
                 NGX_RTMP_STAT_L("<active/>\r\n");
+            }
+
+            if (is_recording) {
+                NGX_RTMP_STAT_L("<recording/>\r\n");
             }
 
             NGX_RTMP_STAT_L("</stream>\r\n");
