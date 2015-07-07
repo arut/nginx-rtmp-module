@@ -258,6 +258,7 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     u_char                       is_pull, is_static = 1, start;
     ngx_event_t                 *e;
     ngx_rtmp_relay_static_t     *rs;
+    ngx_rtmp_session_t          **sessions;
 
     static ngx_rtmp_control_event_chain_t  *evt_chain = NULL, *evt_last;
     ngx_rtmp_control_event_chain_t  *evt_cur, *evt_prv;
@@ -411,6 +412,24 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
     u->default_port = 1935;
     u->uri_part = 1;
 
+
+    /*
+     * make sure we don't have an active relay session for the same
+     * source.
+     */
+    sessions = ctx->sessions.elts;
+    ngx_uint_t n = 0;
+    for (; n < ctx->sessions.nelts; n++) {
+        if(sessions[n]->connection && sessions[n]->connection->addr_text.len &&
+        		!ngx_strncmp(sessions[n]->connection->addr_text.data, u->url.data, u->url.len))
+        {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                "relay: failed. attempt to establish duplicate relay session addr_text='%V'", &u->url);
+            return "attempt to establish duplicate relay session";
+        }
+    }
+
+
     if (ngx_parse_url(cscf->pool, u) != NGX_OK) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                       "control: %s failed '%*s'",
@@ -460,6 +479,22 @@ ngx_rtmp_control_relay_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s,
             evt_last = evt_chain;
         }
         else {
+            /* make sure there are no pending relay events for the same URI*/
+            for(evt_cur = evt_chain;evt_cur;evt_cur = evt_cur->next)
+            {
+                if(evt_cur->event.data != NULL)
+                {
+                    rs = evt_cur->event.data;
+                    if(rs->target && rs->target->url.url.len == u->url.len &&
+                        !ngx_strncmp(rs->target->url.url.data, u->url.data, u->url.len))
+                    {
+                        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                            "relay: failed. attempt to establish duplicate relay session addr_text='%V'", &u->url);
+                        return "attempt to establish duplicate relay session";
+                    }
+                }
+            }
+
             evt_last->next = ngx_pcalloc(cscf->pool, sizeof(*evt_chain));
             if (evt_last->next == NULL) {
                 return "unable to allocate memory";
