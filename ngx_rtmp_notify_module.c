@@ -73,6 +73,7 @@ typedef struct {
     ngx_msec_t                                  update_timeout;
     ngx_flag_t                                  update_strict;
     ngx_flag_t                                  relay_redirect;
+    ngx_flag_t                                  send_redirect;
 } ngx_rtmp_notify_app_conf_t;
 
 
