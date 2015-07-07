@@ -653,9 +653,9 @@ ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
     };
 
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "create: status code='%s' level='%s' description='%s' "
+                   "create: status code='%s' level='%s' "
                    "ex.code='%s' redirect='%s'",
-                   "NetConnection.Connect.Rejected", "Error", desc, "302", to_url);
+                   "NetConnection.Connect.Rejected", "Error", "302", to_url);
 
     out_inf[0].data = "NetConnection.Connect.Rejected";
     out_inf[1].data = "Error";
