@@ -594,6 +594,96 @@ ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code, char* level,
 }
 
 
+// ----------- Based on Adobe FMS 3 application.redirectConnection description --------- //
+
+ngx_chain_t *
+ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
+{
+    ngx_rtmp_header_t               h;
+    static double                   trans;
+
+    static ngx_rtmp_amf_elt_t       out_inf_ex[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("code"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("redirect"),
+          NULL, 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t       out_inf[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("code"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("level"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("description"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_string("ex"),
+          NULL, 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t       out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          "onStatus", 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          &trans, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          out_inf,
+          sizeof(out_inf) },
+    };
+
+    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "create: status code='%s' level='%s' description='%s' "
+                   "ex.code='%s' redirect='%s'",
+                   "NetConnection.Connect.Rejected", "Error", desc, "302", to_url);
+
+    out_inf[0].data = "NetConnection.Connect.Rejected";
+    out_inf[1].data = "Error";
+    out_inf[2].data = desc;
+    out_inf_ex[0].data = "302";
+    out_inf_ex[1].data = to_url;
+    out_inf[3].data = &out_inf_ex;
+
+    memset(&h, 0, sizeof(h));
+
+    h.type = NGX_RTMP_MSG_AMF_META;
+    h.csid = NGX_RTMP_CSID_AMF;
+    h.msid = NGX_RTMP_MSID;
+
+    return ngx_rtmp_create_amf(s, &h, out_elts,
+                               sizeof(out_elts) / sizeof(out_elts[0]));
+}
+
+
+ngx_int_t
+ngx_rtmp_send_redirect_status(ngx_rtmp_session_t *s,
+                          char *desc, char *to_url)
+{
+    return ngx_rtmp_send_shared_packet(s,
+           ngx_rtmp_create_redirect_status(s, desc, to_url));
+}
+
+
 ngx_chain_t *
 ngx_rtmp_create_sample_access(ngx_rtmp_session_t *s)
 {
