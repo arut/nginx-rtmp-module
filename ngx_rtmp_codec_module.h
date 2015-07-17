@@ -75,7 +75,7 @@ typedef struct {
 
     ngx_chain_t                *avc_header;
     ngx_chain_t                *aac_header;
-
+    
     ngx_chain_t                *meta;
     ngx_uint_t                  meta_version;
 } ngx_rtmp_codec_ctx_t;

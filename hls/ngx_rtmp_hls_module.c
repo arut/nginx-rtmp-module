@@ -10,6 +10,7 @@
 #include <ngx_rtmp_cmd_module.h>
 #include <ngx_rtmp_codec_module.h>
 #include "ngx_rtmp_mpegts.h"
+#include "ngx_rtmp_bitop.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
@@ -854,8 +855,10 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_rtmp_hls_frag_t       *f;
     ngx_rtmp_hls_app_conf_t   *hacf;
     ngx_rtmp_core_srv_conf_t  *cscf;
+    ngx_rtmp_codec_ctx_t      *codec_ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
 
     if (ctx->opened) {
         return NGX_OK;
@@ -949,7 +952,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     }
 
     if (ngx_rtmp_mpegts_open_file(&ctx->file, ctx->stream.data,
-                                  cscf->file_access, s->connection->log)
+                                  cscf->file_access, s->connection->log, codec_ctx->audio_codec_id)
         != NGX_OK)
     {
         return NGX_ERROR;
@@ -1506,6 +1509,24 @@ next:
     return next_close_stream(s, v);
 }
 
+static ngx_int_t
+ngx_rtmp_hls_parse_mp3_header(ngx_rtmp_session_t *s,  ngx_chain_t *in)
+{
+    ngx_rtmp_bit_reader_t   br;
+    ngx_uint_t header1, header2, header3, header4, header5;
+    ngx_rtmp_bit_init_reader(&br, in->buf->pos, in->buf->last);
+
+    header1 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
+    header2 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
+    header3 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
+    header4 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
+    header5 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
+
+    ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls parse header1=%d header2=%d header3=%d header4=%d header5=%d",
+                    header1, header2, header3, header4, header5);
+    return NGX_OK;
+}
 
 static ngx_int_t
 ngx_rtmp_hls_parse_aac_header(ngx_rtmp_session_t *s, ngx_uint_t *objtype,
@@ -1709,9 +1730,10 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     {
         return NGX_OK;
     }
-
-    if (codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_AAC ||
-        codec_ctx->aac_header == NULL || ngx_rtmp_is_codec_header(in))
+    
+    if ( !((codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC &&
+        codec_ctx->aac_header != NULL) || codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3)
+         || ngx_rtmp_is_codec_header(in))
     {
         return NGX_OK;
     }
@@ -1736,7 +1758,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         b->pos = b->last = b->start;
     }
 
-    size = h->mlen - 2 + 7;
+    size = h->mlen - 2 + 7; // why? AAC specific?
     pts = (uint64_t) h->timestamp * 90;
 
     if (b->start + size > b->end) {
@@ -1745,6 +1767,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
+    
     /*
      * start new fragment here if
      * there's no video at all, otherwise
@@ -1752,6 +1775,24 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
      */
 
     ngx_rtmp_hls_update_fragment(s, pts, codec_ctx->avc_header == NULL, 2);
+
+    if( codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 ) {
+        ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                   "hls: audio mp3 timestamp=%d mlen=%d type=%d ", h->timestamp, h->mlen, h->type);
+        ngx_rtmp_hls_parse_mp3_header(s, in);
+
+        
+        for (; in && b->last < b->end; in = in->next) {
+            bsize = in->buf->last - in->buf->pos;
+            if (b->last + bsize > b->end) {
+                bsize = b->end - b->last;
+            }
+
+            b->last = ngx_cpymem(b->last, in->buf->pos, bsize);
+        }
+
+        return NGX_OK;
+    }
 
     if (b->last + size > b->end) {
         ngx_rtmp_hls_flush_audio(s);
