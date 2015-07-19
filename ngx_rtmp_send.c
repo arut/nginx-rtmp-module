@@ -629,7 +629,8 @@ ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
 
         { NGX_RTMP_AMF_OBJECT,
           ngx_string("ex"),
-          NULL, 0 },
+          out_inf_ex,
+          sizeof(out_inf_ex) },
     };
 
     static ngx_rtmp_amf_elt_t       out_elts[] = {
@@ -654,7 +655,7 @@ ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
 
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "create: status code='%s' level='%s' "
-                   "ex.code='%s' redirect='%s'",
+                   "ex.code='%s' ex.redirect='%s'",
                    "NetConnection.Connect.Rejected", "Error", "302", to_url);
 
     out_inf[0].data = "NetConnection.Connect.Rejected";
@@ -662,7 +663,6 @@ ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
     out_inf[2].data = desc;
     out_inf_ex[0].data = "302";
     out_inf_ex[1].data = to_url;
-    out_inf[3].data = &out_inf_ex;
 
     memset(&h, 0, sizeof(h));
 
