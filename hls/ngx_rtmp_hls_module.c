@@ -1491,9 +1491,7 @@ ngx_rtmp_hls_update_endlist(ngx_rtmp_session_t *s)
     u_char                         *p;
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
-    ngx_rtmp_hls_app_conf_t        *hacf;
 
-    hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
     fd = ngx_open_file(ctx->playlist.data, NGX_FILE_WRONLY,
