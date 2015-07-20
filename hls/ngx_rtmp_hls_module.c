@@ -1509,24 +1509,6 @@ next:
     return next_close_stream(s, v);
 }
 
-static ngx_int_t
-ngx_rtmp_hls_parse_mp3_header(ngx_rtmp_session_t *s,  ngx_chain_t *in)
-{
-    ngx_rtmp_bit_reader_t   br;
-    ngx_uint_t header1, header2, header3, header4, header5;
-    ngx_rtmp_bit_init_reader(&br, in->buf->pos, in->buf->last);
-
-    header1 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
-    header2 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
-    header3 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
-    header4 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
-    header5 = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
-
-    ngx_log_debug5(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "hls parse header1=%d header2=%d header3=%d header4=%d header5=%d",
-                    header1, header2, header3, header4, header5);
-    return NGX_OK;
-}
 
 static ngx_int_t
 ngx_rtmp_hls_parse_aac_header(ngx_rtmp_session_t *s, ngx_uint_t *objtype,
@@ -1779,8 +1761,9 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     if( codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 ) {
         ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: audio mp3 timestamp=%d mlen=%d type=%d ", h->timestamp, h->mlen, h->type);
-        ngx_rtmp_hls_parse_mp3_header(s, in);
-
+        if( ngx_rtmp_codec_parse_mp3_frame_header(s, in) != NGX_OK ) {
+            return NGX_OK;
+        }
         
         for (; in && b->last < b->end; in = in->next) {
             bsize = in->buf->last - in->buf->pos;

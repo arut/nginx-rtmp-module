@@ -47,7 +47,8 @@ enum {
 
 u_char * ngx_rtmp_get_audio_codec_name(ngx_uint_t id);
 u_char * ngx_rtmp_get_video_codec_name(ngx_uint_t id);
-
+ngx_int_t ngx_rtmp_codec_parse_mp3_frame_header(ngx_rtmp_session_t *s,
+       ngx_chain_t *in);
 
 typedef struct {
     ngx_uint_t                  width;
