@@ -10,7 +10,6 @@
 #include <ngx_rtmp_cmd_module.h>
 #include <ngx_rtmp_codec_module.h>
 #include "ngx_rtmp_mpegts.h"
-#include "ngx_rtmp_bitop.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
