@@ -28,6 +28,7 @@ static ngx_int_t ngx_rtmp_codec_prepare_meta(ngx_rtmp_session_t *s,
        uint32_t timestamp);
 static void ngx_rtmp_codec_parse_aac_header(ngx_rtmp_session_t *s,
        ngx_chain_t *in);
+
 static void ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s,
        ngx_chain_t *in);
 #if (NGX_DEBUG)
@@ -124,6 +125,64 @@ video_codecs[] = {
     "H264",
 };
 
+enum {
+    AUDIO_CODEC_MP3_VERSION_MPEG_VERSION25,
+    AUDIO_CODEC_MP3_VERSION_MPEG_RESERVED,
+    AUDIO_CODEC_MP3_VERSION_MPEG_VERSION2,
+    AUDIO_CODEC_MP3_VERSION_MPEG_VERSION1
+};
+
+enum {
+    AUDIO_CODEC_MP3_LAYER_RESERVED,
+    AUDIO_CODEC_MP3_LAYER_III,
+    AUDIO_CODEC_MP3_LAYER_II,
+    AUDIO_CODEC_MP3_LAYER_I
+};
+
+static ngx_uint_t      
+mp3_sample_rates[4][4] = {
+  {11025, 12000, 8000, 0},
+  {0, 0, 0, 0},
+  {22050, 24000, 16000, 0},
+  {44100, 48000, 32000, 0}
+};
+
+static ngx_uint_t
+mp3_bitrates[4][4][16] = {
+    {
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0},
+        {0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0},
+        {0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256, 0}
+    },
+    {
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+    },
+    {
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0},
+        {0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0},
+        {0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256, 0}
+    },
+    {
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0},
+        {0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 0},
+        {0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 0}
+    }
+};
+
+static ngx_uint_t 
+mp3_samples[4][4] = {
+  {0, 576, 1152, 384},
+  {0, 0, 0, 0},
+  {0, 576, 1152, 384},
+  {0, 1152, 1152, 384}    
+};       
+
 
 u_char *
 ngx_rtmp_get_audio_codec_name(ngx_uint_t id)
@@ -141,6 +200,130 @@ ngx_rtmp_get_video_codec_name(ngx_uint_t id)
         ? video_codecs[id]
         : "");
 }
+
+
+ngx_int_t
+ngx_rtmp_codec_parse_mp3_frame_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
+{
+    ngx_rtmp_bit_reader_t   br;
+    ngx_uint_t              version;
+    ngx_uint_t              layeridx, bitrateidx, samplingidx;
+    ngx_uint_t              samples, bitrate, samplingrate, paddingsize;
+    ngx_uint_t              bufsize, framesize;
+
+    bufsize = in->buf->last - in->buf->pos;
+
+    ngx_rtmp_bit_init_reader(&br, in->buf->pos, in->buf->last);
+    
+    ngx_uint_t t;
+    ngx_uint_t offset = 0;
+    // http://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header
+    // trying to find the sync parts of the header
+    for (;;offset++) {
+        t = (ngx_uint_t)ngx_rtmp_bit_read(&br, 8);
+        if (br.err) {
+#if (NGX_DEBUG)
+            ngx_log_debug0( NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "hls: mp3 cannot find sync header");     
+#endif
+            return NGX_ERROR;
+        }
+      // first 8 bits set, let check if the next 3 bits being set or not
+        if ( t == 255 ) {
+            t = (ngx_uint_t)ngx_rtmp_bit_read(&br, 3);
+
+            if (br.err) {
+
+#if (NGX_DEBUG)
+            ngx_log_debug0( NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "hls: mp3 cannot find sync header");      
+#endif
+                return NGX_ERROR;
+            }
+            if( t == 7 ) {
+                break;
+            }
+            // not found, ignore the next 5 bits so the for loop can work
+            // on a byte base
+            ngx_rtmp_bit_read( &br, 5);
+            if (br.err) {
+
+#if (NGX_DEBUG)
+            ngx_log_debug0( NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "hls: mp3 cannot find sync header");      
+#endif
+                return NGX_ERROR;
+            }
+         }
+    }
+    // next 2 bits, version number
+    version = (ngx_uint_t)ngx_rtmp_bit_read(&br, 2);
+    // next 2 bits, layer index
+    layeridx = (ngx_uint_t)ngx_rtmp_bit_read(&br, 2);
+    // next 1 bit, protection, we don't need it here yet, skip
+    ngx_rtmp_bit_read(&br, 1);
+    // next 4 bits, bit rate
+    bitrateidx = (ngx_uint_t)ngx_rtmp_bit_read(&br, 4);
+    // next 2 bits, sampling rate index
+    samplingidx = (ngx_uint_t)ngx_rtmp_bit_read(&br, 2);
+    // next 1 bit
+    paddingsize = (ngx_uint_t)ngx_rtmp_bit_read(&br, 1);
+    if ( br.err) {
+
+#if (NGX_DEBUG)
+            ngx_log_debug0( NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "hls: mp3 no more bits after sync bits");     
+#endif
+        return NGX_ERROR;
+    }
+
+    if (version == AUDIO_CODEC_MP3_VERSION_MPEG_RESERVED) {
+
+#if (NGX_DEBUG)
+            ngx_log_debug1( NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "hls: mp3 wrong version number %d", version);     
+#endif
+        return NGX_ERROR;    
+    }
+
+    // maybe unnecessary check
+    if (version > AUDIO_CODEC_MP3_VERSION_MPEG_VERSION1 ||
+        layeridx > AUDIO_CODEC_MP3_LAYER_I ||
+        bitrateidx > 15 ||
+        samplingidx > 3
+       ) {
+#if (NGX_DEBUG)
+        ngx_log_debug4( NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+          "hls: mp3 wrong header version=%d layeridx=%d, bitrateidx=%d samplingidx=",
+          version, layeridx, bitrateidx, samplingidx);      
+#endif
+        return NGX_ERROR;
+    }
+     
+    samples = mp3_samples[version][layeridx];
+    bitrate = mp3_bitrates[version][layeridx][bitrateidx];
+    samplingrate = mp3_sample_rates[version][samplingidx];
+
+    // we have gotten what we need so far 
+    // 
+    framesize = (ngx_uint_t)samples * bitrate * 1000 / 8 / samplingrate + paddingsize;
+
+    if( framesize + offset < bufsize) {
+        ngx_log_error( NGX_LOG_ERR, s->connection->log, 0,
+            "hls: mp3 frame not enough space for one frame framesize %d + offset %d < bufsize %d",
+            framesize, offset, bufsize
+            );
+        return NGX_ERROR;
+    }
+    #if (NGX_DEBUG)
+      ngx_log_debug8( NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+        "hls: mp3 frame version=%d bitrate=%d samples=%d sampling=%d padding=%d framesize=%d bufsize=%d offset=%d",
+         version, bitrate, samples, samplingrate, paddingsize, framesize, bufsize, offset );      
+    #endif
+  
+    return NGX_OK;
+}
+
 
 
 static ngx_uint_t
@@ -210,7 +393,6 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_codec_ctx_t));
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_codec_module);
     }
-
     /* save codec */
     if (in->buf->last - in->buf->pos < 1) {
         return NGX_OK;
@@ -230,7 +412,7 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     /* save AVC/AAC header */
-    if (in->buf->last - in->buf->pos < 3) {
+    if (in->buf->last - in->buf->pos < 3) {                   
         return NGX_OK;
     }
 
@@ -242,11 +424,14 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
     header = NULL;
 
+   
     if (h->type == NGX_RTMP_MSG_AUDIO) {
+        //mp3 doesn't have file header
         if (ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
             header = &ctx->aac_header;
             ngx_rtmp_codec_parse_aac_header(s, in);
         }
+       
     } else {
         if (ctx->video_codec_id == NGX_RTMP_VIDEO_H264) {
             header = &ctx->avc_header;
@@ -266,7 +451,6 @@ ngx_rtmp_codec_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     return NGX_OK;
 }
-
 
 static void
 ngx_rtmp_codec_parse_aac_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
@@ -870,7 +1054,7 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "codec: data frame: "
             "width=%ui height=%ui duration=%ui frame_rate=%ui "
-            "video=%s (%ui) audio=%s (%ui)",
+            "video=%s (%ui) myaudio=%s (%ui)",
             ctx->width, ctx->height, ctx->duration, ctx->frame_rate,
             ngx_rtmp_get_video_codec_name(ctx->video_codec_id),
             ctx->video_codec_id,
