@@ -1059,10 +1059,22 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
     if (nacf->send_redirect) {
         // Send 302 redirect and go next
 
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "notify: send 302 redirect for stream '%s' to new location '%*s'", v->name, rc, name);
 
-        ngx_rtmp_send_redirect_status("Publish here", name);
+        local_name.data = ngx_palloc(s->connection->pool, rc);
+        local_name.len = rc;
+        *ngx_cpymem(local_name.data, name, rc) = 0;
+
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: check redirect to location: '%s'", local_name.data);
+
+        ngx_rtmp_send_redirect_status(s, "Publish here", local_name);
+
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: release location memory");
+
+        ngx_pfree(s->connection->pool, local_name.data);
 
         goto next;
 
@@ -1072,7 +1084,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         ngx_rtmp_notify_set_name(v->name, NGX_RTMP_MAX_NAME, name, (size_t) rc);
     }
 
-    ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                   "notify: push '%s' to '%*s'", v->name, rc, name);
 
     local_name.data = v->name;

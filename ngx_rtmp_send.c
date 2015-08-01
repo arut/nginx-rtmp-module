@@ -491,7 +491,7 @@ ngx_rtmp_create_status(ngx_rtmp_session_t *s, char *code, char* level,
           NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          ngx_null_string,
+          ngx_string("info"),
           out_inf,
           sizeof(out_inf) },
     };
@@ -597,16 +597,24 @@ ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code, char* level,
 // ----------- Based on Adobe FMS 3 application.redirectConnection description --------- //
 
 ngx_chain_t *
-ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
+ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, ngx_str_t to_url)
 {
     ngx_rtmp_header_t               h;
     static double                   trans;
+    static double                   dcode;
 
-    static ngx_rtmp_amf_elt_t       out_inf_ex[] = {
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                   "create redirect status: got data");
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                   "create redirect status: status code='%s' level='%s' "
+                   "ex.code=%ui ex.redirect='%s'",
+                   "NetConnection.Connect.Rejected", "Error", 302, to_url.data);
 
-        { NGX_RTMP_AMF_STRING,
+    static ngx_rtmp_amf_elt_t       out_inf_ex_data[] = {
+
+        { NGX_RTMP_AMF_NUMBER,
           ngx_string("code"),
-          NULL, 0 },
+          &dcode, 0 },
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("redirect"),
@@ -629,8 +637,8 @@ ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
 
         { NGX_RTMP_AMF_OBJECT,
           ngx_string("ex"),
-          out_inf_ex,
-          sizeof(out_inf_ex) },
+          out_inf_ex_data,
+          sizeof(out_inf_ex_data) },
     };
 
     static ngx_rtmp_amf_elt_t       out_elts[] = {
@@ -648,21 +656,19 @@ ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
           NULL, 0 },
 
         { NGX_RTMP_AMF_OBJECT,
-          ngx_null_string,
+          ngx_string("info"),
           out_inf,
           sizeof(out_inf) },
     };
 
-    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                   "create: status code='%s' level='%s' "
-                   "ex.code='%s' ex.redirect='%s'",
-                   "NetConnection.Connect.Rejected", "Error", "302", to_url);
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                   "create redirect status: set structure data");
 
     out_inf[0].data = "NetConnection.Connect.Rejected";
     out_inf[1].data = "Error";
     out_inf[2].data = desc;
-    out_inf_ex[0].data = "302";
-    out_inf_ex[1].data = to_url;
+    dcode = 302;
+    out_inf_ex_data[1].data = to_url.data;
 
     memset(&h, 0, sizeof(h));
 
@@ -677,7 +683,7 @@ ngx_rtmp_create_redirect_status(ngx_rtmp_session_t *s, char *desc, char *to_url)
 
 ngx_int_t
 ngx_rtmp_send_redirect_status(ngx_rtmp_session_t *s,
-                          char *desc, char *to_url)
+                          char *desc, ngx_str_t to_url)
 {
     return ngx_rtmp_send_shared_packet(s,
            ngx_rtmp_create_redirect_status(s, desc, to_url));
