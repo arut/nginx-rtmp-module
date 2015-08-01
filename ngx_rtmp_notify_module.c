@@ -28,6 +28,8 @@ static char *ngx_rtmp_notify_on_app_event(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
 static char *ngx_rtmp_notify_method(ngx_conf_t *cf, ngx_command_t *cmd,
        void *conf);
+static char *ngx_rtmp_notify_send_redirect(ngx_conf_t *cf, ngx_command_t *cmd,
+       void *conf);
 static ngx_int_t ngx_rtmp_notify_postconfiguration(ngx_conf_t *cf);
 static void * ngx_rtmp_notify_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_notify_merge_app_conf(ngx_conf_t *cf,
@@ -70,16 +72,17 @@ typedef struct {
     ngx_url_t                                  *url[NGX_RTMP_NOTIFY_APP_MAX];
     ngx_flag_t                                  active;
     ngx_uint_t                                  method;
+    ngx_flag_t                                  send_redirect;
     ngx_msec_t                                  update_timeout;
     ngx_flag_t                                  update_strict;
     ngx_flag_t                                  relay_redirect;
-    ngx_flag_t                                  send_redirect;
 } ngx_rtmp_notify_app_conf_t;
 
 
 typedef struct {
     ngx_url_t                                  *url[NGX_RTMP_NOTIFY_SRV_MAX];
     ngx_uint_t                                  method;
+    ngx_flag_t                                  send_redirect;
 } ngx_rtmp_notify_srv_conf_t;
 
 
@@ -194,9 +197,9 @@ static ngx_command_t  ngx_rtmp_notify_commands[] = {
 
     { ngx_string("notify_send_redirect"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_flag_slot,
+      ngx_rtmp_notify_send_redirect,
       NGX_RTMP_APP_CONF_OFFSET,
-      offsetof(ngx_rtmp_notify_app_conf_t, send_redirect),
+      0,
       NULL },
 
       ngx_null_command
@@ -247,10 +250,10 @@ ngx_rtmp_notify_create_app_conf(ngx_conf_t *cf)
     }
 
     nacf->method = NGX_CONF_UNSET_UINT;
+    nacf->send_redirect = NGX_CONF_UNSET;
     nacf->update_timeout = NGX_CONF_UNSET_MSEC;
     nacf->update_strict = NGX_CONF_UNSET;
     nacf->relay_redirect = NGX_CONF_UNSET;
-    nacf->send_redirect = NGX_CONF_UNSET;
 
     return nacf;
 }
@@ -276,11 +279,11 @@ ngx_rtmp_notify_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->method, prev->method,
                               NGX_RTMP_NETCALL_HTTP_POST);
+    ngx_conf_merge_value(conf->send_redirect, prev->send_redirect, 0);
     ngx_conf_merge_msec_value(conf->update_timeout, prev->update_timeout,
                               30000);
     ngx_conf_merge_value(conf->update_strict, prev->update_strict, 0);
     ngx_conf_merge_value(conf->relay_redirect, prev->relay_redirect, 0);
-    ngx_conf_merge_value(conf->send_redirect, prev->send_redirect, 0);
 
     return NGX_CONF_OK;
 }
@@ -302,6 +305,7 @@ ngx_rtmp_notify_create_srv_conf(ngx_conf_t *cf)
     }
 
     nscf->method = NGX_CONF_UNSET_UINT;
+    nscf->send_redirect = NGX_CONF_UNSET;
 
     return nscf;
 }
@@ -320,6 +324,7 @@ ngx_rtmp_notify_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->method, prev->method,
                               NGX_RTMP_NETCALL_HTTP_POST);
+    ngx_conf_merge_value(conf->send_redirect, prev->send_redirect, 0);
 
     return NGX_CONF_OK;
 }
@@ -967,7 +972,9 @@ ngx_rtmp_notify_connect_handle(ngx_rtmp_session_t *s,
         void *arg, ngx_chain_t *in)
 {
     ngx_rtmp_connect_t *v = arg;
-    ngx_int_t           rc;
+    ngx_int_t           rc, send;
+    ngx_str_t                   local_name;
+    ngx_rtmp_notify_srv_conf_t *nscf;
     u_char              app[NGX_RTMP_MAX_NAME];
 
     static ngx_str_t    location = ngx_string("location");
@@ -977,18 +984,80 @@ ngx_rtmp_notify_connect_handle(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
 
-    if (rc == NGX_AGAIN) {
-        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                       "notify: connect redirect received");
-
-        rc = ngx_rtmp_notify_parse_http_header(s, in, &location, app,
-                                               sizeof(app) - 1);
-        if (rc > 0) {
-            *ngx_cpymem(v->app, app, rc) = 0;
-            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                          "notify: connect redirect to '%s'", v->app);
-        }
+    if (rc != NGX_AGAIN) {
+        goto next;
     }
+
+    /* HTTP 3xx */
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                   "notify: connect redirect received");
+
+    rc = ngx_rtmp_notify_parse_http_header(s, in, &location, app,
+                                           sizeof(app) - 1);
+    if (rc <= 0) {
+        goto next;
+    }
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                 "notify: parsed location '%*s'", rc, app);
+
+    /* switch app */
+
+    if (ngx_strncasecmp(app, (u_char *) "rtmp://", 7)) {
+        *ngx_cpymem(v->app, app, rc) = 0;
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: connect redirect to '%s'", v->app);
+        goto next;
+    }
+
+    /* redirect */
+
+    nscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_notify_module);
+
+    if (nscf->send_redirect) {
+        // Send 302 redirect and go next
+
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: connect send 302 redirect");
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: -- for app '%s' to new location '%*s'", v->app, rc, app);
+
+        local_name.data = ngx_palloc(s->connection->pool, rc+1);
+        local_name.len = rc;
+        *ngx_cpymem(local_name.data, app, rc) = 0;
+
+        /* MAGICK HERE */
+
+        if (!ngx_strncasecmp(s->flashver.data, (u_char *) "FMLE/", 5)) {
+            // Official method, by FMS SDK
+            send = ngx_rtmp_send_redirect_status(s, "onStatus", "Connect here", local_name);
+            send &= ngx_rtmp_send_redirect_status(s, "netStatus", "Connect here", local_name);
+
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: connect send(o) status = '%ui'", send == NGX_OK);
+        } else {
+            // Something by rtmpdump lib
+            send = ngx_rtmp_send_redirect_status(s, "_error", "Connect here", local_name);
+
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: connect send(e) status = '%ui'", send == NGX_OK);
+        }
+
+        ngx_pfree(s->connection->pool, local_name.data);
+
+        // Something by rtmpdump lib
+        send = ngx_rtmp_send_close_method(s, "close");
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "notify: connect send(e) close method = '%ui'", send == NGX_OK);
+
+        return send;
+//        return next_disconnect(s);
+//        Don't close connection here! Client must catch message and do it by itself.
+//        goto next;
+    }
+
+next:
 
     return next_connect(s, v);
 }
@@ -1015,7 +1084,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         void *arg, ngx_chain_t *in)
 {
     ngx_rtmp_publish_t         *v = arg;
-    ngx_int_t                   rc;
+    ngx_int_t                   rc, send;
     ngx_str_t                   local_name;
     ngx_rtmp_relay_target_t     target;
     ngx_url_t                  *u;
@@ -1036,7 +1105,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
 
     /* HTTP 3xx */
 
-    ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                    "notify: publish redirect received");
 
     rc = ngx_rtmp_notify_parse_http_header(s, in, &location, name,
@@ -1060,23 +1129,46 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         // Send 302 redirect and go next
 
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                  "notify: send 302 redirect for stream '%s' to new location '%*s'", v->name, rc, name);
+                  "notify: publish send 302 redirect");
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                  "notify: -- for stream '%s' to new location '%*s'", v->name, rc, name);
 
-        local_name.data = ngx_palloc(s->connection->pool, rc);
+        local_name.data = ngx_palloc(s->connection->pool, rc+1);
         local_name.len = rc;
         *ngx_cpymem(local_name.data, name, rc) = 0;
 
-        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                      "notify: check redirect to location: '%s'", local_name.data);
+        /* MAGICK HERE */
 
-        ngx_rtmp_send_redirect_status(s, "Publish here", local_name);
+        if (!ngx_strncasecmp(s->flashver.data, (u_char *) "FMLE/", 5)) {
+            // Official method, by FMS SDK
+            send = ngx_rtmp_send_redirect_status(s, "onStatus", "Connect here", local_name);
+            send &= ngx_rtmp_send_redirect_status(s, "netStatus", "Connect here", local_name);
 
-        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                      "notify: release location memory");
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: publish send(o) status = '%ui'", send == NGX_OK);
+        } else {
+
+            // Something by rtmpdump lib
+            send = ngx_rtmp_send_redirect_status(s, "_error", "Connect here", local_name);
+
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: publish send(e) status = '%ui'", send == NGX_OK);
+        }
 
         ngx_pfree(s->connection->pool, local_name.data);
 
-        goto next;
+        ngx_rtmp_notify_clear_flag(s, NGX_RTMP_NOTIFY_PUBLISHING);
+//        return send;
+
+        // Something by rtmpdump lib
+        send = ngx_rtmp_send_close_method(s);
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "notify: publish send(e) close method = '%ui'", send == NGX_OK);
+
+        return send;
+//        return next_disconnect(s);
+//        Don't close connection here! Client must catch message and do it by itself.
+//        goto next;
 
     } else if (nacf->relay_redirect) {
         // Relay local streams, change name
@@ -1733,6 +1825,37 @@ ngx_rtmp_notify_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     nscf = ngx_rtmp_conf_get_module_srv_conf(cf, ngx_rtmp_notify_module);
     nscf->method = nacf->method;
+
+    return NGX_CONF_OK;
+}
+
+static char *
+ngx_rtmp_notify_send_redirect(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_rtmp_notify_app_conf_t     *nacf = conf;
+
+    ngx_rtmp_notify_srv_conf_t     *nscf;
+    ngx_str_t                      *value;
+
+    value = cf->args->elts;
+    value++;
+
+    if (value->len == sizeof("on") - 1 &&
+        ngx_strncasecmp(value->data, (u_char *) "on", value->len) == 0)
+    {
+        nacf->send_redirect = 1;
+
+    } else if (value->len == sizeof("off") - 1 &&
+               ngx_strncasecmp(value->data, (u_char *) "off", value->len) == 0)
+    {
+        nacf->send_redirect = 0;
+
+    } else {
+        return "got unexpected send_redirect value";
+    }
+
+    nscf = ngx_rtmp_conf_get_module_srv_conf(cf, ngx_rtmp_notify_module);
+    nscf->send_redirect = nacf->send_redirect;
 
     return NGX_CONF_OK;
 }
