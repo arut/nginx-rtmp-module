@@ -1775,7 +1775,11 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: not enough buffer for audio header");
         return NGX_OK;
-    }
+    } else if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 && b->last > b->end) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: not enough buffer for mp3 audio");
+        return NGX_OK;
+   }
 
     p = b->last;
     if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
