@@ -854,8 +854,10 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_rtmp_hls_frag_t       *f;
     ngx_rtmp_hls_app_conf_t   *hacf;
     ngx_rtmp_core_srv_conf_t  *cscf;
+    ngx_rtmp_codec_ctx_t      *codec_ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    codec_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
 
     if (ctx->opened) {
         return NGX_OK;
@@ -949,7 +951,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     }
 
     if (ngx_rtmp_mpegts_open_file(&ctx->file, ctx->stream.data,
-                                  cscf->file_access, s->connection->log)
+                                  cscf->file_access, s->connection->log, codec_ctx->audio_codec_id)
         != NGX_OK)
     {
         return NGX_ERROR;
@@ -1482,40 +1484,6 @@ next:
     return next_publish(s, v);
 }
 
-//add function, append string "#EXT-X-ENDLIST\r\n" to m3u8 file.
-static void
-ngx_rtmp_hls_update_endlist(ngx_rtmp_session_t *s)
-{
-    static u_char                   buffer[1024];
-    int                             fd;
-    u_char                         *p;
-    ngx_rtmp_hls_ctx_t             *ctx;
-    ssize_t                         n;
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
-
-    fd = ngx_open_file(ctx->playlist.data, NGX_FILE_WRONLY,
-            NGX_FILE_APPEND, NGX_FILE_DEFAULT_ACCESS);
-    if (fd == NGX_INVALID_FILE) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                "hls: open failed: '%V'",
-                &ctx->playlist);
-        return;
-    }
-    p = ngx_snprintf(buffer, sizeof(buffer),
-            "#EXT-X-ENDLIST\r\n");
-    n = write(fd, buffer, p - buffer);
-    if (n < 0) {
-        ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
-                "hls: write endlist failed: '%V'",
-                &ctx->playlist);
-        ngx_close_file(fd);
-        return;
-    }
-
-    ngx_close_file(fd);
-}
-
 
 static ngx_int_t
 ngx_rtmp_hls_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
@@ -1535,8 +1503,6 @@ ngx_rtmp_hls_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
                    "hls: close stream");
 
     ngx_rtmp_hls_close_fragment(s);
-
-    ngx_rtmp_hls_update_endlist(s);
 
 next:
     return next_close_stream(s, v);
@@ -1745,13 +1711,15 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     {
         return NGX_OK;
     }
-
-    if (codec_ctx->audio_codec_id != NGX_RTMP_AUDIO_AAC ||
-        codec_ctx->aac_header == NULL || ngx_rtmp_is_codec_header(in))
+    
+    if ( !((codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC &&
+        codec_ctx->aac_header != NULL) || codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3)
+         || ngx_rtmp_is_codec_header(in))
     {
         return NGX_OK;
     }
 
+    
     b = ctx->aframe;
 
     if (b == NULL) {
@@ -1772,7 +1740,12 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         b->pos = b->last = b->start;
     }
 
-    size = h->mlen - 2 + 7;
+    if ( codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ) {
+      size = h->mlen - 2 + 7; // AAC specific
+    }
+    else {
+      size = h->mlen;
+    }
     pts = (uint64_t) h->timestamp * 90;
 
     if (b->start + size > b->end) {
@@ -1781,6 +1754,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
+    
     /*
      * start new fragment here if
      * there's no video at all, otherwise
@@ -1789,39 +1763,68 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_rtmp_hls_update_fragment(s, pts, codec_ctx->avc_header == NULL, 2);
 
-    if (b->last + size > b->end) {
+   if (b->last + size > b->end) {
         ngx_rtmp_hls_flush_audio(s);
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: audio pts=%uL", pts);
 
-    if (b->last + 7 > b->end) {
+    /* 7 is the ADTS header to pack AAC */
+    if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC && b->last + 7 > b->end) {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "hls: not enough buffer for audio header");
         return NGX_OK;
-    }
+    } else if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 && b->last > b->end) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: not enough buffer for mp3 audio");
+        return NGX_OK;
+   }
 
     p = b->last;
-    b->last += 5;
-
-    /* copy payload */
-
-    for (; in && b->last < b->end; in = in->next) {
-
-        bsize = in->buf->last - in->buf->pos;
-        if (b->last + bsize > b->end) {
-            bsize = b->end - b->last;
-        }
-
-        b->last = ngx_cpymem(b->last, in->buf->pos, bsize);
+    if (codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC) {
+      b->last += 5;
     }
 
+    /* copy payload */
+    if( codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_MP3 ) {
+        if( ngx_rtmp_codec_parse_mp3_frame_header(s, in) != NGX_OK ) {
+            return NGX_OK;
+        }
+        
+        for (; in && b->last < b->end; in = in->next) {
+            bsize = in->buf->last - in->buf->pos;
+            if (b->last + bsize > b->end) {
+                bsize = b->end - b->last;
+            }
+
+            b->last = ngx_cpymem(b->last, in->buf->pos, bsize);
+        }
+
+        if (p != b->start) {
+            ctx->aframe_num++;
+            return NGX_OK;
+        }
+
+        ctx->aframe_pts = pts;
+
+        return NGX_OK;
+    }
+    else {
+        for (; in && b->last < b->end; in = in->next) {
+
+            bsize = in->buf->last - in->buf->pos;
+            if (b->last + bsize > b->end) {
+                bsize = b->end - b->last;
+            }
+
+            b->last = ngx_cpymem(b->last, in->buf->pos, bsize);
+        }
+    }
     /* make up ADTS header */
 
-    if (ngx_rtmp_hls_parse_aac_header(s, &objtype, &srindex, &chconf)
-        != NGX_OK)
-    {
+    if( ngx_rtmp_hls_parse_aac_header(s, &objtype, &srindex, &chconf) != NGX_OK) {
+
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                       "hls: aac header error");
         return NGX_OK;
