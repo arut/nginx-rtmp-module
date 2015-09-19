@@ -306,6 +306,8 @@ ngx_rtmp_record_open(ngx_rtmp_session_t *s, ngx_uint_t n, ngx_str_t *path)
         return rc;
     }
 
+    rctx->started = 1;
+
     if (path) {
         ngx_rtmp_record_make_path(s, rctx, path);
     }
@@ -328,6 +330,8 @@ ngx_rtmp_record_close(ngx_rtmp_session_t *s, ngx_uint_t n, ngx_str_t *path)
     if (rctx == NULL) {
         return NGX_ERROR;
     }
+
+    rctx->started = 0;
 
     rc = ngx_rtmp_record_node_close(s, rctx);
     if (rc != NGX_OK) {
@@ -442,6 +446,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     u_char                      buf[8], *p;
     off_t                       file_size;
     uint32_t                    tag_size, mlen, timestamp;
+    ngx_int_t                   started;
 
     rracf = rctx->conf;
     tag_size = 0;
@@ -453,10 +458,12 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "record: %V opening", &rracf->id);
 
+    started = rctx->started;
     ngx_memzero(rctx, sizeof(*rctx));
     rctx->conf = rracf;
     rctx->last = *ngx_cached_time;
     rctx->timestamp = ngx_cached_time->sec;
+    rctx->started = started;
 
     ngx_rtmp_record_make_path(s, rctx, &path);
 
@@ -481,7 +488,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
 
         ngx_rtmp_record_notify_error(s, rctx);
 
-        return NGX_OK;
+        return NGX_ERROR;
     }
 
 #if !(NGX_WIN32)
@@ -666,6 +673,7 @@ ngx_rtmp_record_start(ngx_rtmp_session_t *s)
         if (rctx->conf->flags & (NGX_RTMP_RECORD_OFF|NGX_RTMP_RECORD_MANUAL)) {
             continue;
         }
+        rctx->started = 1;
         ngx_rtmp_record_node_open(s, rctx);
     }
 }
@@ -1041,7 +1049,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
              ? keyframe
              : (rracf->flags & NGX_RTMP_RECORD_VIDEO) == 0;
 
-    if (brkframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
+    if (brkframe && rctx->started) {
 
         if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
 
@@ -1058,13 +1066,12 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
                 ngx_rtmp_record_node_open(s, rctx);
             }
 
-        } else if (!rctx->failed) {
+        } else if (!rctx->failed && !(rracf->flags & NGX_RTMP_RECORD_MANUAL)) {
             ngx_rtmp_record_node_open(s, rctx);
         }
     }
 
-    if ((rracf->flags & NGX_RTMP_RECORD_MANUAL) &&
-        !brkframe && rctx->nframes == 0)
+    if (!brkframe && rctx->nframes == 0)
     {
         return NGX_OK;
     }
