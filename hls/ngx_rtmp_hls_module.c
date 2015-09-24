@@ -2044,7 +2044,11 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         if (out.end - out.last < (ngx_int_t) len) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                          "hls: not enough buffer for NAL");
+                    "hls: not enough buffer for NAL "
+                    "fmt=0x%Xd ftype=0x%Xd htype=0x%Xd nal_type=0x%Xd "
+                    "src_nal_type=0x%Xd rlen=0x%Xd len=0x%Xd buf_size=0x%Xd",
+                    fmt, ftype,htype,nal_type,src_nal_type,rlen,len,(out.end - out.last));
+
             return NGX_OK;
         }
 
