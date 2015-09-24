@@ -643,11 +643,34 @@ ngx_rtmp_dash_close_fragment(ngx_rtmp_session_t *s, ngx_rtmp_dash_track_t *t)
 
         n = ngx_read_fd(t->fd, buffer, ngx_min(sizeof(buffer), left));
         if (n == NGX_ERROR) {
+        	ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "dash: read error in close fragment");
+            break;
+        }
+
+        if (n == 0) {
+        	ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+        	    "dash: read returned zero bytes in close fragment");
             break;
         }
 
         nret = ngx_write_fd(fd, buffer, (size_t) n);
+
+        if (nret == NGX_ERROR) {
+        	ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "dash: write error in close fragment");
+            break;
+        }
+
+        if (nret == 0) {
+        	ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "dash: write returned zero bytes in close fragment");
+            break;
+        }
+
         if (n != nret) {
+        	ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                "dash: n != nret in close fragment");
             break;
         }
 
