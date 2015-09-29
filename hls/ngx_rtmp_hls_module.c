@@ -1899,7 +1899,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_mpegts_frame_t         frame;
     ngx_uint_t                      nal_bytes;
     ngx_int_t                       aud_sent, sps_pps_sent, boundary;
-    static u_char                   buffer[NGX_RTMP_HLS_BUFSIZE];
+    static u_char                   *buffer;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
@@ -1952,8 +1952,17 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_memzero(&out, sizeof(out));
 
+    buffer = ngx_palloc(s->connection->pool, 20*1024*1024);
+    if(buffer == NULL){
+    	ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+    			"hls: error fail to allocate out buffer. out of memory");
+
+    	return NGX_OK;
+    }
+
+
     out.start = buffer;
-    out.end = buffer + sizeof(buffer);
+    out.end = buffer + 20*1024*1024;
     out.pos = out.start;
     out.last = out.pos;
 
@@ -1963,6 +1972,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     while (in) {
         if (ngx_rtmp_hls_copy(s, &rlen, &p, nal_bytes, &in) != NGX_OK) {
+        	ngx_pfree(s->connection->pool, buffer);
             return NGX_OK;
         }
 
@@ -1974,6 +1984,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         }
 
         if (ngx_rtmp_hls_copy(s, &src_nal_type, &p, 1, &in) != NGX_OK) {
+        	ngx_pfree(s->connection->pool, buffer);
             return NGX_OK;
         }
 
@@ -1985,6 +1996,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
         if (nal_type >= 7 && nal_type <= 9) {
             if (ngx_rtmp_hls_copy(s, NULL, &p, len - 1, &in) != NGX_OK) {
+            	ngx_pfree(s->connection->pool, buffer);
                 return NGX_ERROR;
             }
             continue;
@@ -2026,6 +2038,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         if (out.end - out.last < 5) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "hls: not enough buffer for AnnexB prefix");
+            ngx_pfree(s->connection->pool, buffer);
             return NGX_OK;
         }
 
@@ -2049,12 +2062,14 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                     "src_nal_type=0x%Xd rlen=0x%Xd len=0x%Xd buf_size=0x%Xd",
                     fmt, ftype,htype,nal_type,src_nal_type,rlen,len,(out.end - out.last));
 
+            ngx_pfree(s->connection->pool, buffer);
             return NGX_OK;
         }
 
         if (ngx_rtmp_hls_copy(s, out.last, &p, len - 1, &in) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                           "hls: not enough data for NAL");
+            ngx_pfree(s->connection->pool, buffer);
             return NGX_OK;
         }
 
@@ -2083,6 +2098,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_rtmp_hls_update_fragment(s, frame.dts, boundary, 1);
 
     if (!ctx->opened) {
+    	ngx_pfree(s->connection->pool, buffer);
         return NGX_OK;
     }
 
@@ -2096,6 +2112,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx->video_cc = frame.cc;
 
+    ngx_pfree(s->connection->pool, buffer);
     return NGX_OK;
 }
 
