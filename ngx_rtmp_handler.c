@@ -419,7 +419,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 }
             }
 
-            ngx_log_debug8(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
                     "RTMP mheader fmt=%d %s (%d) "
                     "time=%uD+%uD mlen=%D len=%D msid=%D",
                     (int)fmt, ngx_rtmp_message_type(h->type), (int)h->type,
