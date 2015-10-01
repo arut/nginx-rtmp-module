@@ -725,7 +725,7 @@ ngx_rtmp_notify_update_create(ngx_rtmp_session_t *s, void *arg,
 
     b->last = ngx_cpymem(b->last, (u_char *) "&csid=",
                              sizeof("&csid=") - 1);
-    b->last = ngx_sprintf(b->last, "%d", s->in_csid);
+    b->last = ngx_sprintf(b->last, "%d", s->current_time_csid);
 
     if (name_len) {
         b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);

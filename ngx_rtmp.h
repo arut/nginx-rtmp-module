@@ -230,6 +230,7 @@ typedef struct {
     ngx_msec_t              peer_epoch;
     ngx_msec_t              base_time;
     uint32_t                current_time;
+    uint32_t                current_time_csid; // the channel id that used for setting latest current_time
 
     /* ping */
     ngx_event_t             ping_evt;

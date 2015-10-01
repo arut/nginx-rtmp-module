@@ -751,6 +751,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                    type_s, h->timestamp);
 
     s->current_time = h->timestamp;
+    s->current_time_csid = h->csid;
 
     peers = 0;
     apkt = NULL;
