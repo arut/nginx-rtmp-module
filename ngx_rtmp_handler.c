@@ -443,13 +443,10 @@ ngx_rtmp_recv(ngx_event_t *rev)
             	h->timestamp += st->dtime;
             }
 
-            const char                     *type_s;
-            type_s = (h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio");
-
-            ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
-                    "RTMP mheader fmt=%d %s (%d) "
-                    "time=%uD+%uD mlen=%D len=%D msid=%D",
-                    (int)fmt, type_s, (int)h->type,
+            ngx_log_debug8(NGX_LOG_DEBUG_RTMP, c->log, 0,
+            		"RTMP mheader fmt=%d %s (%d) "
+            		"time=%uD+%uD mlen=%D len=%D msid=%D",
+            		(int)fmt, ngx_rtmp_message_type(h->type), (int)h->type,
                     h->timestamp, st->dtime, h->mlen, st->len, h->msid);
 
             /* header done */

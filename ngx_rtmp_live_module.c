@@ -712,9 +712,10 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     uint32_t                        delta;
     ngx_rtmp_live_chunk_stream_t   *cs;
 
+#ifdef NGX_DEBUG
     const char                     *type_s;
-
     type_s = (h->type == NGX_RTMP_MSG_VIDEO ? "video" : "audio");
+#endif
 
 
     lacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_live_module);
@@ -745,7 +746,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_add_timer(&ctx->idle_evt, lacf->idle_timeout);
     }
 
-    ngx_log_error(NGX_LOG_DEBUG, s->connection->log, 0,
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "live: %s packet timestamp=%uD",
                    type_s, h->timestamp);
 
