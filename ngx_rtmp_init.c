@@ -197,6 +197,10 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
         return NULL;
     }
 
+#if (nginx_version >= 1007005)
+    ngx_queue_init(&s->posted_dry_events);
+#endif
+
     s->epoch = ngx_current_msec;
     s->timeout = cscf->timeout;
     s->buflen = cscf->buflen;

@@ -12,6 +12,7 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 #include <ngx_event_connect.h>
+#include <nginx.h>
 
 #include "ngx_rtmp_amf.h"
 #include "ngx_rtmp_bandwidth.h"
@@ -198,7 +199,11 @@ typedef struct {
     ngx_str_t              *addr_text;
     int                     connected;
 
+#if (nginx_version >= 1007005)
+    ngx_queue_t             posted_dry_events;
+#else
     ngx_event_t            *posted_dry_events;
+#endif
 
     /* client buffer time in msec */
     uint32_t                buflen;
@@ -602,7 +607,13 @@ extern ngx_rtmp_bandwidth_t                 ngx_rtmp_bw_in;
 
 
 extern ngx_uint_t                           ngx_rtmp_naccepted;
+#if (nginx_version >= 1007011)
+extern ngx_queue_t                          ngx_rtmp_init_queue;
+#elif (nginx_version >= 1007005)
+extern ngx_thread_volatile ngx_queue_t      ngx_rtmp_init_queue;
+#else
 extern ngx_thread_volatile ngx_event_t     *ngx_rtmp_init_queue;
+#endif
 
 extern ngx_uint_t                           ngx_rtmp_max_module;
 extern ngx_module_t                         ngx_rtmp_core_module;
