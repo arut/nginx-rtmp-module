@@ -1224,21 +1224,24 @@ ngx_rtmp_notify_update(ngx_event_t *e)
     c = e->data;
     s = c->data;
 
-    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
+    // avoid update notifications before the session start
+    if(s->current_time > 0){
+    	nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
-    url = nacf->url[NGX_RTMP_NOTIFY_UPDATE];
+    	url = nacf->url[NGX_RTMP_NOTIFY_UPDATE];
 
-    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                  "notify: update '%V'", &url->url);
+    	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+    			"notify: update '%V'", &url->url);
 
-    ngx_memzero(&ci, sizeof(ci));
+    	ngx_memzero(&ci, sizeof(ci));
 
-    ci.url = url;
-    ci.create = ngx_rtmp_notify_update_create;
-    ci.handle = ngx_rtmp_notify_update_handle;
+    	ci.url = url;
+    	ci.create = ngx_rtmp_notify_update_create;
+    	ci.handle = ngx_rtmp_notify_update_handle;
 
-    if (ngx_rtmp_netcall_create(s, &ci) == NGX_OK) {
-        return;
+    	if (ngx_rtmp_netcall_create(s, &ci) == NGX_OK) {
+    		return;
+    	}
     }
 
     /* schedule next update on connection error */
