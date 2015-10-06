@@ -411,37 +411,46 @@ ngx_rtmp_recv(ngx_event_t *rev)
                  * However that's not always the case
                  * in real life */
                 st->ext = (ext && cscf->publish_time_fix);
+
+                 // original code
+//                if (fmt) {
+//                	st->dtime = timestamp;
+//                } else {
+//                	h->timestamp = timestamp;
+//                	st->dtime = 0;
+//                }
+
+                // DEV-21800 originally the parser did not calculate the time stamp correctly
+                // in case two messages of type 0 were followed by type 3
+                // in this case, the delta between n+1 and n should be concluded based on n-1 and n
+                switch(fmt){
+                // absolute time stamp
+                case 0:
+                	// we have to store the delta in case the following
+                	// message will be of type 3 i.e. implied delta and time stamp
+                	if(timestamp >= h->timestamp){
+                		st->dtime = timestamp - h->timestamp;
+                	}
+                	else{
+                		ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                				"RTMP invalid timestamp last timestamp=%d current timestamp=%d "
+                				"fmt=%d type=%d", h->timestamp, timestamp, fmt, h->type);
+                		st->dtime = 0;
+                	}
+                	h->timestamp = timestamp;
+                	break;
+                	// declared delta
+                case 1:
+                case 2:
+                	st->dtime = timestamp;
+                	h->timestamp += timestamp;
+                	break;
+                	// implied delta and time stamp
+                case 3:
+                	h->timestamp += st->dtime;
+                }
             }
 
-            // DEV-21800 originally the parser did not calculate the time stamp correctly
-            // in case two messages of type 0 were followed by type 3
-            // in this case, the delta between n+1 and n should be concluded based on n-1 and n
-            switch(fmt){
-            // absolute time stamp
-            case 0:
-            	// we have to store the delta in case the following
-            	// message will be of type 3 i.e. implied delta and time stamp
-            	if(timestamp >= h->timestamp){
-            		st->dtime = timestamp - h->timestamp;
-            	}
-            	else{
-            		ngx_log_error(NGX_LOG_ERR, c->log, 0,
-            				"RTMP invalid timestamp last timestamp=%d current timestamp=%d "
-            				"fmt=%d type=%d", h->timestamp, timestamp, fmt, h->type);
-            		st->dtime = 0;
-            	}
-                h->timestamp = timestamp;
-            	break;
-            // declared delta
-            case 1:
-            case 2:
-            	st->dtime = timestamp;
-            	h->timestamp += timestamp;
-            	break;
-            // implied delta and time stamp
-            case 3:
-            	h->timestamp += st->dtime;
-            }
 
             ngx_log_debug8(NGX_LOG_DEBUG_RTMP, c->log, 0,
             		"RTMP mheader fmt=%d %s (%d) "
@@ -483,6 +492,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             old_pos = b->last;
             old_size = size - fsize;
             st->len = 0;
+            //h->timestamp += st->dtime;
 
             if (ngx_rtmp_receive_message(s, h, head) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
