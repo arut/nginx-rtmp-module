@@ -1242,11 +1242,11 @@ ngx_rtmp_notify_update(ngx_event_t *e)
     	if (ngx_rtmp_netcall_create(s, &ci) == NGX_OK) {
     		return;
     	}
+
+    	/* schedule next update on connection error */
+
+    	ngx_rtmp_notify_update_handle(s, NULL, NULL);
     }
-
-    /* schedule next update on connection error */
-
-    ngx_rtmp_notify_update_handle(s, NULL, NULL);
 }
 
 
