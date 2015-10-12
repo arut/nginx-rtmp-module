@@ -16,15 +16,16 @@
 #define NGX_RTMP_RECORD_OFF             0x01
 #define NGX_RTMP_RECORD_AUDIO           0x02
 #define NGX_RTMP_RECORD_VIDEO           0x04
-#define NGX_RTMP_RECORD_KEYFRAMES       0x08
-#define NGX_RTMP_RECORD_MANUAL          0x10
-
+#define NGX_RTMP_RECORD_DATA            0x08
+#define NGX_RTMP_RECORD_KEYFRAMES       0x10
+#define NGX_RTMP_RECORD_MANUAL          0x20
 
 typedef struct {
     ngx_str_t                           id;
     ngx_uint_t                          flags;
     ngx_str_t                           path;
     size_t                              max_size;
+    size_t                              interval_size;
     size_t                              max_frames;
     ngx_msec_t                          interval;
     ngx_str_t                           suffix;

@@ -86,7 +86,9 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.c        \
                 $ngx_addon_dir/dash/ngx_rtmp_mp4.c          \
                 "
+
 CFLAGS="$CFLAGS -I$ngx_addon_dir"
+# Debug build with all warnings as errors
+# CFLAGS="$CFLAGS -I$ngx_addon_dir -Wall -Wpointer-arith -Wno-unused-parameter -Werror"
 
 USE_OPENSSL=YES
-
