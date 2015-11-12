@@ -60,16 +60,16 @@ typedef struct {
 } ngx_rtmp_addr_conf_t;
 
 typedef struct {
-    in_addr_t               addr;
     ngx_rtmp_addr_conf_t    conf;
+    in_addr_t               addr;
 } ngx_rtmp_in_addr_t;
 
 
 #if (NGX_HAVE_INET6)
 
 typedef struct {
-    struct in6_addr         addr6;
     ngx_rtmp_addr_conf_t    conf;
+    struct in6_addr         addr6;
 } ngx_rtmp_in6_addr_t;
 
 #endif
@@ -230,6 +230,9 @@ typedef struct {
     ngx_msec_t              peer_epoch;
     ngx_msec_t              base_time;
     uint32_t                current_time;
+
+    /* ready for publishing? */
+    unsigned                ready_for_publish:1;
 
     /* ping */
     ngx_event_t             ping_evt;
@@ -580,6 +583,11 @@ ngx_int_t ngx_rtmp_send_status(ngx_rtmp_session_t *s, char *code,
 ngx_int_t ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code,
         char* level, ngx_uint_t duration, ngx_uint_t bytes);
 ngx_int_t ngx_rtmp_send_sample_access(ngx_rtmp_session_t *s);
+ngx_int_t ngx_rtmp_send_redirect_status(ngx_rtmp_session_t *s,
+        char *callMethod, char *desc, ngx_str_t to_url);
+ngx_int_t ngx_rtmp_send_close_method(ngx_rtmp_session_t *s, char *methodName);
+ngx_int_t ngx_rtmp_send_fcpublish(ngx_rtmp_session_t *s, char *desc);
+ngx_int_t ngx_rtmp_send_fcunpublish(ngx_rtmp_session_t *s, char *desc);
 
 
 /* Frame types */

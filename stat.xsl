@@ -38,6 +38,7 @@
             <th>In bits/s</th>
             <th>Out bits/s</th>
             <th>State</th>
+            <th>Record</th>
             <th>Time</th>
         </tr>
         <tr>
@@ -74,6 +75,7 @@
                     <xsl:with-param name="persec" select="1"/>
                 </xsl:call-template>
             </td>
+            <td/>
             <td/>
             <td>
                 <xsl:call-template name="showtime">
@@ -202,6 +204,7 @@
             </xsl:call-template>
         </td>
         <td><xsl:call-template name="streamstate"/></td>
+        <td><xsl:call-template name="recordstate"/></td>
         <td>
             <xsl:call-template name="showtime">
                <xsl:with-param name="time" select="time"/>
@@ -217,7 +220,9 @@
                 <tr>
                     <th>Id</th>
                     <th>State</th>
+                    <th>Recording</th>
                     <th>Address</th>
+		    <th>Port</th>
                     <th>Flash version</th>
                     <th>Page URL</th>
                     <th>SWF URL</th>
@@ -299,6 +304,13 @@
     </xsl:choose>
 </xsl:template>
 
+<xsl:template name="recordstate">
+    <xsl:choose>
+        <xsl:when test="recording">yes</xsl:when>
+        <xsl:otherwise>no</xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
 
 <xsl:template match="client">
     <tr>
@@ -310,15 +322,17 @@
         </xsl:attribute>
         <td><xsl:value-of select="id"/></td>
         <td><xsl:call-template name="clientstate"/></td>
+        <td><xsl:call-template name="recordstate"/></td>
         <td>
             <a target="_blank">
                 <xsl:attribute name="href">
                     http://apps.db.ripe.net/search/query.html&#63;searchtext=<xsl:value-of select="address"/>
                 </xsl:attribute>
                 <xsl:attribute name="title">whois</xsl:attribute>
-                <xsl:value-of select="address"/>
+                <xsl:value-of select="address"/>:<xsl:value-of select="port"/>
             </a>
         </td>
+	<td><xsl:value-of select="port"/></td>
         <td><xsl:value-of select="flashver"/></td>
         <td>
             <a target="_blank">
@@ -346,6 +360,10 @@
 
 <xsl:template match="active">
     active
+</xsl:template>
+
+<xsl:template match="recording">
+    recording
 </xsl:template>
 
 <xsl:template match="width">
