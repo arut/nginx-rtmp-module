@@ -819,11 +819,6 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     };
 
     static ngx_rtmp_amf_elt_t       in_elts[] = {
-
-        { NGX_RTMP_AMF_STRING,
-          ngx_null_string,
-          NULL, 0 },
-
         { NGX_RTMP_AMF_OBJECT,
           ngx_null_string,
           in_inf, sizeof(in_inf) },
