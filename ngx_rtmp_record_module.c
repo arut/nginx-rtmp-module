@@ -302,7 +302,7 @@ ngx_rtmp_record_open(ngx_rtmp_session_t *s, ngx_uint_t n, ngx_str_t *path)
     }
 
     rc = ngx_rtmp_record_node_open(s, rctx);
-    if (rc != NGX_OK) {
+    if (rc != NGX_OK && rc != NGX_AGAIN) {
         return rc;
     }
 
