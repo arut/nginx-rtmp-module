@@ -332,6 +332,7 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     void                       *mconf;
     ngx_uint_t                  m;
     ngx_conf_t                  pcf;
+    ngx_module_t              **modules;
     ngx_rtmp_module_t          *module;
     ngx_rtmp_conf_ctx_t        *ctx, *rtmp_ctx;
     ngx_rtmp_core_srv_conf_t   *cscf, **cscfp;
@@ -357,12 +358,18 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+#if defined(nginx_version) && nginx_version >= 1009011
+    modules = cf->cycle->modules;
+#else
+    modules = ngx_modules;
+#endif
+
+    for (m = 0; modules[m]; m++) {
+        if (modules[m]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[m]->ctx;
+        module = modules[m]->ctx;
 
         if (module->create_srv_conf) {
             mconf = module->create_srv_conf(cf);
@@ -370,7 +377,7 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 return NGX_CONF_ERROR;
             }
 
-            ctx->srv_conf[ngx_modules[m]->ctx_index] = mconf;
+            ctx->srv_conf[modules[m]->ctx_index] = mconf;
         }
 
         if (module->create_app_conf) {
@@ -379,7 +386,7 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 return NGX_CONF_ERROR;
             }
 
-            ctx->app_conf[ngx_modules[m]->ctx_index] = mconf;
+            ctx->app_conf[modules[m]->ctx_index] = mconf;
         }
     }
 
@@ -419,6 +426,7 @@ ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_int_t                   i;
     ngx_str_t                  *value;
     ngx_conf_t                  save;
+    ngx_module_t              **modules;
     ngx_rtmp_module_t          *module;
     ngx_rtmp_conf_ctx_t        *ctx, *pctx;
     ngx_rtmp_core_srv_conf_t   *cscf;
@@ -438,17 +446,23 @@ ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_RTMP_MODULE) {
+#if defined(nginx_version) && nginx_version >= 1009011
+    modules = cf->cycle->modules;
+#else
+    modules = ngx_modules;
+#endif
+
+    for (i = 0; modules[i]; i++) {
+        if (modules[i]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[i]->ctx;
+        module = modules[i]->ctx;
 
         if (module->create_app_conf) {
-            ctx->app_conf[ngx_modules[i]->ctx_index] =
+            ctx->app_conf[modules[i]->ctx_index] =
                                 module->create_app_conf(cf);
-            if (ctx->app_conf[ngx_modules[i]->ctx_index] == NULL) {
+            if (ctx->app_conf[modules[i]->ctx_index] == NULL) {
                 return NGX_CONF_ERROR;
             }
         }
@@ -489,6 +503,7 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                  *value;
     ngx_url_t                   u;
     ngx_uint_t                  i, m;
+    ngx_module_t              **modules;
     struct sockaddr            *sa;
     ngx_rtmp_listen_t          *ls;
     struct sockaddr_in         *sin;
@@ -571,8 +586,14 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ls->wildcard = u.wildcard;
     ls->ctx = cf->ctx;
 
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+#if defined(nginx_version) && nginx_version >= 1009011
+    modules = cf->cycle->modules;
+#else
+    modules = ngx_modules;
+#endif
+
+    for (m = 0; modules[m]; m++) {
+        if (modules[m]->type != NGX_RTMP_MODULE) {
             continue;
         }
     }
