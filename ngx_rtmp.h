@@ -45,6 +45,7 @@ typedef struct {
 #endif
     unsigned                so_keepalive:2;
     unsigned                proxy_protocol:1;
+    unsigned                ssl:1;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                     tcp_keepidle;
     int                     tcp_keepintvl;
@@ -57,6 +58,7 @@ typedef struct {
     ngx_rtmp_conf_ctx_t    *ctx;
     ngx_str_t               addr_text;
     unsigned                proxy_protocol:1;
+    unsigned                ssl:1;
 } ngx_rtmp_addr_conf_t;
 
 typedef struct {
@@ -101,6 +103,7 @@ typedef struct {
 #endif
     unsigned                so_keepalive:2;
     unsigned                proxy_protocol:1;
+    unsigned                ssl:1;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                     tcp_keepidle;
     int                     tcp_keepintvl;
@@ -240,6 +243,9 @@ typedef struct {
     unsigned                auto_pushed:1;
     unsigned                relay:1;
     unsigned                static_relay:1;
+
+    /* RTMPS */
+    unsigned                ssl:1;
 
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */

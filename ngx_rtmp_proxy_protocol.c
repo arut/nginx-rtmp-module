@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include <nginx.h>
 #include "ngx_rtmp_proxy_protocol.h"
+#include "ngx_rtmp_ssl_module.h"
 
 
 static void ngx_rtmp_proxy_protocol_recv(ngx_event_t *rev);
@@ -183,7 +184,11 @@ skip:
                        "proxy_protocol: remote_addr:'%V'", &c->addr_text);
     }
 
-    ngx_rtmp_handshake(s);
+    if (s->ssl) {
+        ngx_rtmp_ssl_handshake(s);
+    } else {
+        ngx_rtmp_handshake(s);
+    }
 
     return;
 

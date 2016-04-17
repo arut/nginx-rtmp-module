@@ -552,6 +552,7 @@ found:
     addr->wildcard = listen->wildcard;
     addr->so_keepalive = listen->so_keepalive;
     addr->proxy_protocol = listen->proxy_protocol;
+    addr->ssl = listen->ssl;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     addr->tcp_keepidle = listen->tcp_keepidle;
     addr->tcp_keepintvl = listen->tcp_keepintvl;
@@ -711,6 +712,7 @@ ngx_rtmp_add_addrs(ngx_conf_t *cf, ngx_rtmp_port_t *mport,
         addrs[i].conf.addr_text.len = len;
         addrs[i].conf.addr_text.data = p;
         addrs[i].conf.proxy_protocol = addr->proxy_protocol;
+        addrs[i].conf.ssl = addr->ssl;
     }
 
     return NGX_OK;
