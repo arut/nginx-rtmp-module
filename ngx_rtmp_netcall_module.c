@@ -426,8 +426,9 @@ ngx_rtmp_netcall_recv(ngx_event_t *rev)
                 ngx_rtmp_netcall_close(cc);
                 return;
             }
-
-            ngx_add_timer(rev, cs->timeout);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(rev, cs->timeout);
+            }
             if (ngx_handle_read_event(rev, 0) != NGX_OK) {
                 ngx_rtmp_netcall_close(cc);
             }
@@ -476,7 +477,9 @@ ngx_rtmp_netcall_send(ngx_event_t *wev)
 
     /* more data to send? */
     if (cl) {
-        ngx_add_timer(wev, cs->timeout);
+        if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+            ngx_add_timer(wev, cs->timeout);
+        }
         if (ngx_handle_write_event(wev, 0) != NGX_OK) {
             ngx_rtmp_netcall_close(cc);
         }

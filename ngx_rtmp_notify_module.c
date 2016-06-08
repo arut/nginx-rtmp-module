@@ -1184,8 +1184,9 @@ ngx_rtmp_notify_update_handle(ngx_rtmp_session_t *s,
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "notify: schedule update %Mms",
                    nacf->update_timeout);
-
-    ngx_add_timer(&ctx->update_evt, nacf->update_timeout);
+    if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+      ngx_add_timer(&ctx->update_evt, nacf->update_timeout);
+    }
 
     return NGX_OK;
 }
@@ -1273,9 +1274,9 @@ ngx_rtmp_notify_init(ngx_rtmp_session_t *s,
     e->data = s->connection;
     e->log = s->connection->log;
     e->handler = ngx_rtmp_notify_update;
-
-    ngx_add_timer(e, nacf->update_timeout);
-
+    if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+      ngx_add_timer(e, nacf->update_timeout);
+    }
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "notify: schedule initial update %Mms",
                    nacf->update_timeout);

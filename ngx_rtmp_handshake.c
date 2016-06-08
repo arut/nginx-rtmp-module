@@ -403,7 +403,9 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
         }
 
         if (n == NGX_AGAIN) {
-            ngx_add_timer(rev, s->timeout);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(rev, s->timeout);
+            }
             if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
             }
@@ -518,7 +520,9 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
         }
 
         if (n == NGX_AGAIN || n == 0) {
-            ngx_add_timer(c->write, s->timeout);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(c->write, s->timeout);
+            }
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
             }
@@ -612,7 +616,9 @@ ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async)
     }
 
     if (async) {
-        ngx_add_timer(c->write, s->timeout);
+        if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+            ngx_add_timer(c->write, s->timeout);
+        }
         if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
             ngx_rtmp_finalize_session(s);
         }

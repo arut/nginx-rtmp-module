@@ -37,9 +37,9 @@ ngx_rtmp_proxy_protocol(ngx_rtmp_session_t *s)
         rev->handler(rev);
         return;
     }
-
-    ngx_add_timer(rev, s->timeout);
-
+    if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+        ngx_add_timer(rev, s->timeout);
+    }
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
         ngx_rtmp_finalize_session(s);
         return;
@@ -87,7 +87,9 @@ ngx_rtmp_proxy_protocol_recv(ngx_event_t *rev)
     if (n == -1) {
 
         if (err == NGX_EAGAIN) {
-            ngx_add_timer(rev, s->timeout);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(rev, s->timeout);
+            }
 
             if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);

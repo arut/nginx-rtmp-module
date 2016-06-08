@@ -282,8 +282,9 @@ ngx_rtmp_play_send(ngx_event_t *e)
     if (rc > 0) {
         ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "play: send schedule %i", rc);
-
-        ngx_add_timer(e, rc);
+        if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+            ngx_add_timer(e, rc);
+        }
         return;
     }
 

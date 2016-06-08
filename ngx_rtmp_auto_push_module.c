@@ -440,7 +440,9 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
     }
 
     if (!ctx->push_evt.timer_set) {
-        ngx_add_timer(&ctx->push_evt, apcf->push_reconnect);
+        if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+            ngx_add_timer(&ctx->push_evt, apcf->push_reconnect);
+        }
     }
 }
 
@@ -541,7 +543,9 @@ ngx_rtmp_auto_push_delete_stream(ngx_rtmp_session_t *s,
 
     /* push reconnect */
     if (!pctx->push_evt.timer_set) {
-        ngx_add_timer(&pctx->push_evt, apcf->push_reconnect);
+        if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+            ngx_add_timer(&pctx->push_evt, apcf->push_reconnect);
+        }
     }
 
 next:

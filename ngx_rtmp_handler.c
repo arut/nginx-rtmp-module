@@ -137,7 +137,9 @@ ngx_rtmp_reset_ping(ngx_rtmp_session_t *s)
 
     s->ping_active = 0;
     s->ping_reset = 0;
-    ngx_add_timer(&s->ping_evt, cscf->ping);
+    if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+        ngx_add_timer(&s->ping_evt, cscf->ping);
+    }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "ping: wait %Mms", cscf->ping);
@@ -185,7 +187,9 @@ ngx_rtmp_ping(ngx_event_t *pev)
     }
 
     s->ping_active = 1;
-    ngx_add_timer(pev, cscf->ping_timeout);
+    if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+        ngx_add_timer(pev, cscf->ping_timeout);
+    }
 }
 
 
@@ -522,7 +526,9 @@ ngx_rtmp_send(ngx_event_t *wev)
         n = c->send(c, s->out_bpos, s->out_chain->buf->last - s->out_bpos);
 
         if (n == NGX_AGAIN || n == 0) {
-            ngx_add_timer(c->write, s->timeout);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(c->write, s->timeout);
+            }
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
                 ngx_rtmp_finalize_session(s);
             }

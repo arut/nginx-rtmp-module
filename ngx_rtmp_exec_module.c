@@ -645,8 +645,9 @@ ngx_rtmp_exec_child_dead(ngx_event_t *ev)
     e->respawn_evt.data = e;
     e->respawn_evt.log = e->log;
     e->respawn_evt.handler = ngx_rtmp_exec_respawn;
-
-    ngx_add_timer(&e->respawn_evt, e->respawn_timeout);
+    if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+      ngx_add_timer(&e->respawn_evt, e->respawn_timeout);
+    }
 }
 
 

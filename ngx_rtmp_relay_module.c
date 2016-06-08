@@ -236,8 +236,9 @@ ngx_rtmp_relay_static_pull_reconnect(ngx_event_t *ev)
         ctx->static_evt = ev;
         return;
     }
-
-    ngx_add_timer(ev, racf->pull_reconnect);
+    if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+        ngx_add_timer(ev, racf->pull_reconnect);
+    }
 }
 
 
@@ -294,7 +295,9 @@ ngx_rtmp_relay_push_reconnect(ngx_event_t *ev)
                 &target->url.url);
 
         if (!ctx->push_evt.timer_set) {
-            ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
+            }
         }
     }
 }
@@ -695,7 +698,9 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
                 &target->url.url);
 
         if (!ctx->push_evt.timer_set) {
-            ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
+            }
         }
     }
 
@@ -1334,7 +1339,9 @@ ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
     }
 
     if (s->static_relay) {
-        ngx_add_timer(ctx->static_evt, racf->pull_reconnect);
+        if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+            ngx_add_timer(ctx->static_evt, racf->pull_reconnect);
+        }
     }
 
     if (ctx->publish == NULL) {
@@ -1358,7 +1365,9 @@ ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
         if (s->relay && ctx->tag == &ngx_rtmp_relay_module &&
             !ctx->publish->push_evt.timer_set)
         {
-            ngx_add_timer(&ctx->publish->push_evt, racf->push_reconnect);
+            if( !(ngx_quit || ngx_terminate || ngx_exiting ) ) {
+                ngx_add_timer(&ctx->publish->push_evt, racf->push_reconnect);
+            }
         }
 
 #ifdef NGX_DEBUG
