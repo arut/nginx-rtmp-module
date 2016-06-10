@@ -24,6 +24,7 @@ void ngx_rtmp_bit_init_reader(ngx_rtmp_bit_reader_t *br, u_char *pos,
     u_char *last);
 uint64_t ngx_rtmp_bit_read(ngx_rtmp_bit_reader_t *br, ngx_uint_t n);
 uint64_t ngx_rtmp_bit_read_golomb(ngx_rtmp_bit_reader_t *br);
+int64_t ngx_rtmp_bit_read_golomb_signed(ngx_rtmp_bit_reader_t *br);
 
 
 #define ngx_rtmp_bit_read_err(br) ((br)->err)
