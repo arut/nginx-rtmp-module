@@ -97,6 +97,7 @@ typedef struct {
     ngx_msec_t                          sync;
     ngx_msec_t                          playlen;
     ngx_uint_t                          winfrags;
+    ngx_uint_t                          max_fragsize;
     ngx_flag_t                          continuous;
     ngx_flag_t                          nested;
     ngx_str_t                           path;
@@ -1580,9 +1581,25 @@ ngx_rtmp_hls_update_fragment(ngx_rtmp_session_t *s, uint64_t ts,
         f = ngx_rtmp_hls_get_frag(s, ctx->nfrags);
         d = (int64_t) (ts - ctx->frag_ts);
 
-        if (d > (int64_t) hacf->max_fraglen * 90 || d < -90000) {
+        if (ctx->file.fsize >= hacf->max_fragsize) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
-                          "hls: force fragment split: %.3f sec, ", d / 90000.);
+                          "hls: force fragment split: %d bytes",
+                          ctx->file.fsize);
+            force = 1;
+
+        } else if (boundary == 2 && d > (int64_t) hacf->max_fraglen * 45) {
+            /*
+             * Video key frame but no audio is buffered.
+             * Force on 1/2 of max_fraglen
+             */
+            ngx_log_error(NGX_LOG_WARN, s->connection->log, 0,
+                          "hls: force fragment split on boundary: %.3f sec",
+                          d / 90000.);
+            force = 1;
+
+        } else if (d > (int64_t) hacf->max_fraglen * 90 || d < -90000) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                          "hls: force fragment split: %.3f sec", d / 90000.);
             force = 1;
 
         } else {
@@ -1687,7 +1704,7 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     size_t                          bsize;
     ngx_buf_t                      *b;
     u_char                         *p;
-    ngx_uint_t                      objtype, srindex, chconf, size;
+    ngx_uint_t                      objtype, srindex, chconf, size, no_video;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
 
@@ -1740,9 +1757,13 @@ ngx_rtmp_hls_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
      * start new fragment here if
      * there's no video at all, otherwise
      * do it in video handler
+     *
+     * audio and video may come out of sync
+     * use only one stream ts for the fragment update
+     * video if available or audio
      */
-
-    ngx_rtmp_hls_update_fragment(s, pts, codec_ctx->avc_header == NULL, 2);
+    no_video = codec_ctx->avc_header == NULL;
+    ngx_rtmp_hls_update_fragment(s, no_video ? pts : ctx->frag_ts, no_video, 2);
 
     if (b->last + size > b->end) {
         ngx_rtmp_hls_flush_audio(s);
@@ -2020,11 +2041,16 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
      * start new fragment if
      * - we have video key frame AND
      * - we have audio buffered or have no audio at all or stream is closed
+     * - set boundary to 2 if only the 1st condition is met
      */
 
     b = ctx->aframe;
-    boundary = frame.key && (codec_ctx->aac_header == NULL || !ctx->opened ||
-                             (b && b->last > b->pos));
+    if (frame.key) {
+        boundary = (codec_ctx->aac_header == NULL || !ctx->opened ||
+                    (b && b->last > b->pos)) ? 1 : 2;
+    } else {
+        boundary = 0;
+    }
 
     ngx_rtmp_hls_update_fragment(s, frame.dts, boundary, 1);
 
@@ -2286,6 +2312,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->hls = NGX_CONF_UNSET;
     conf->fraglen = NGX_CONF_UNSET_MSEC;
     conf->max_fraglen = NGX_CONF_UNSET_MSEC;
+    conf->max_fragsize = NGX_CONF_UNSET_UINT;
     conf->muxdelay = NGX_CONF_UNSET_MSEC;
     conf->sync = NGX_CONF_UNSET_MSEC;
     conf->playlen = NGX_CONF_UNSET_MSEC;
@@ -2316,6 +2343,8 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
     ngx_conf_merge_msec_value(conf->max_fraglen, prev->max_fraglen,
                               conf->fraglen * 10);
+    ngx_conf_merge_msec_value(conf->max_fragsize, prev->max_fragsize,
+                              16*1024*1024); /*16Mb*/
     ngx_conf_merge_msec_value(conf->muxdelay, prev->muxdelay, 700);
     ngx_conf_merge_msec_value(conf->sync, prev->sync, 2);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
