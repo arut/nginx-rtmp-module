@@ -85,7 +85,7 @@ typedef struct {
     ngx_flag_t                          nested;
     ngx_str_t                           path;
     ngx_uint_t                          winfrags;
-    ngx_flag_t                          cleanup;
+    ngx_msec_t                          cleanup;
     ngx_path_t                         *slot;
 } ngx_rtmp_dash_app_conf_t;
 
@@ -122,7 +122,7 @@ static ngx_command_t ngx_rtmp_dash_commands[] = {
 
     { ngx_string("dash_cleanup"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_flag_slot,
+      ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_dash_app_conf_t, cleanup),
       NULL },
@@ -1437,7 +1437,7 @@ ngx_rtmp_dash_create_app_conf(ngx_conf_t *cf)
     conf->dash = NGX_CONF_UNSET;
     conf->fraglen = NGX_CONF_UNSET_MSEC;
     conf->playlen = NGX_CONF_UNSET_MSEC;
-    conf->cleanup = NGX_CONF_UNSET;
+    conf->cleanup = NGX_CONF_UNSET_MSEC;
     conf->nested = NGX_CONF_UNSET;
 
     return conf;
@@ -1454,7 +1454,7 @@ ngx_rtmp_dash_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_value(conf->dash, prev->dash, 0);
     ngx_conf_merge_msec_value(conf->fraglen, prev->fraglen, 5000);
     ngx_conf_merge_msec_value(conf->playlen, prev->playlen, 30000);
-    ngx_conf_merge_value(conf->cleanup, prev->cleanup, 1);
+    ngx_conf_merge_msec_value(conf->cleanup, prev->cleanup, conf->playlen);
     ngx_conf_merge_value(conf->nested, prev->nested, 0);
 
     if (conf->fraglen) {
@@ -1474,7 +1474,7 @@ ngx_rtmp_dash_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         }
 
         cleanup->path = conf->path;
-        cleanup->playlen = conf->playlen;
+        cleanup->playlen = conf->cleanup;
 
         conf->slot = ngx_pcalloc(cf->pool, sizeof(*conf->slot));
         if (conf->slot == NULL) {

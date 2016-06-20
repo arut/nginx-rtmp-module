@@ -107,7 +107,7 @@ typedef struct {
     ngx_path_t                         *slot;
     ngx_msec_t                          max_audio_delay;
     size_t                              audio_buffer_size;
-    ngx_flag_t                          cleanup;
+    ngx_msec_t                          cleanup;
     ngx_array_t                        *variant;
     ngx_str_t                           base_url;
     ngx_int_t                           granularity;
@@ -255,7 +255,7 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
 
     { ngx_string("hls_cleanup"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_flag_slot,
+      ngx_conf_set_msec_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, cleanup),
       NULL },
@@ -2323,7 +2323,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->type = NGX_CONF_UNSET_UINT;
     conf->max_audio_delay = NGX_CONF_UNSET_MSEC;
     conf->audio_buffer_size = NGX_CONF_UNSET_SIZE;
-    conf->cleanup = NGX_CONF_UNSET;
+    conf->cleanup = NGX_CONF_UNSET_MSEC;
     conf->granularity = NGX_CONF_UNSET;
     conf->keys = NGX_CONF_UNSET;
     conf->frags_per_key = NGX_CONF_UNSET_UINT;
@@ -2360,7 +2360,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
                               300);
     ngx_conf_merge_size_value(conf->audio_buffer_size, prev->audio_buffer_size,
                               NGX_RTMP_HLS_BUFSIZE);
-    ngx_conf_merge_value(conf->cleanup, prev->cleanup, 1);
+    ngx_conf_merge_msec_value(conf->cleanup, prev->cleanup, conf->playlen);
     ngx_conf_merge_str_value(conf->base_url, prev->base_url, "");
     ngx_conf_merge_value(conf->granularity, prev->granularity, 0);
     ngx_conf_merge_value(conf->keys, prev->keys, 0);
@@ -2387,7 +2387,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         }
 
         cleanup->path = conf->path;
-        cleanup->playlen = conf->playlen;
+        cleanup->playlen = conf->cleanup;
 
         conf->slot = ngx_pcalloc(cf->pool, sizeof(*conf->slot));
         if (conf->slot == NULL) {
@@ -2421,7 +2421,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
         }
 
         cleanup->path = conf->key_path;
-        cleanup->playlen = conf->playlen;
+        cleanup->playlen = conf->cleanup;
 
         conf->slot = ngx_pcalloc(cf->pool, sizeof(*conf->slot));
         if (conf->slot == NULL) {
