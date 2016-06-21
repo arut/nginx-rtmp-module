@@ -673,6 +673,8 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                         NGX_RTMP_STAT_L("\",\"profile\":\"");
                         NGX_RTMP_STAT_CS(
                                 ngx_rtmp_stat_get_avc_profile(codec->avc_profile));
+                    } else {
+                         NGX_RTMP_STAT_L("\"");
                     }
                     if (codec->avc_compat) {
                         NGX_RTMP_STAT_L("\",\"compat\":");
@@ -684,9 +686,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                         NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf),
                                       "%.1f", codec->avc_level / 10.) - buf);
                     }
-                    if (!codec->avc_profile && !codec->avc_compat && !codec->avc_level) {
-                        NGX_RTMP_STAT_L("\"");
-                    }
+
 
                     NGX_RTMP_STAT_L("}, \"audio\": {");
                     cname = ngx_rtmp_get_audio_codec_name(codec->audio_codec_id);
