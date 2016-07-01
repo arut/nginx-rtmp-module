@@ -978,7 +978,7 @@ ngx_rtmp_relay_send_publish(ngx_rtmp_session_t *s)
 
         { NGX_RTMP_AMF_STRING,
           ngx_null_string,
-          NULL, 0 }, /* <- to fill */
+          NULL,0 }, /* <- to fill */
 
         { NGX_RTMP_AMF_STRING,
           ngx_null_string,
@@ -987,6 +987,8 @@ ngx_rtmp_relay_send_publish(ngx_rtmp_session_t *s)
 
     ngx_rtmp_header_t           h;
     ngx_rtmp_relay_ctx_t       *ctx;
+    u_char  name_with_vhost[NGX_RTMP_MAX_NAME + 1];
+    size_t  name_with_vhost_len = 0;
 
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
@@ -998,14 +1000,19 @@ ngx_rtmp_relay_send_publish(ngx_rtmp_session_t *s)
         out_elts[3].data = ctx->play_path.data;
         out_elts[3].len  = ctx->play_path.len;
     } else {
-        out_elts[3].data = ctx->name.data;
-        out_elts[3].len  = ctx->name.len;
+        u_char  *p;
+        p = ngx_snprintf(name_with_vhost, NGX_RTMP_MAX_NAME, "%s?vhost=live.renrenjiang.cn",ctx->name.data); 
+        name_with_vhost_len = p - name_with_vhost;
+        *p = 0;
+        out_elts[3].data = name_with_vhost;
+        out_elts[3].len  = name_with_vhost_len;
     }
 
     ngx_memzero(&h, sizeof(h));
     h.csid = NGX_RTMP_RELAY_CSID_AMF;
     h.msid = NGX_RTMP_RELAY_MSID;
     h.type = NGX_RTMP_MSG_AMF_CMD;
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "relay: sending publish amf, out_elts[3].data = %s, len = %ud ", name_with_vhost,name_with_vhost_len);
 
     return ngx_rtmp_send_amf(s, &h, out_elts,
             sizeof(out_elts) / sizeof(out_elts[0]));
