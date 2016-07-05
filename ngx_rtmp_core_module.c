@@ -545,7 +545,9 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             break;
         }
 
-        if (ngx_memcmp(ls[i].sockaddr + off, u.sockaddr + off, len) != 0) {
+        if (ngx_memcmp(ls[i].sockaddr + off, (u_char *) &u.sockaddr + off, len)
+            != 0)
+        {
             continue;
         }
 
@@ -565,7 +567,7 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_memzero(ls, sizeof(ngx_rtmp_listen_t));
 
-    ngx_memcpy(ls->sockaddr, u.sockaddr, u.socklen);
+    ngx_memcpy(ls->sockaddr, (u_char *) &u.sockaddr, u.socklen);
 
     ls->socklen = u.socklen;
     ls->wildcard = u.wildcard;
