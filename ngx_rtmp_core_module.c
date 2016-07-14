@@ -93,6 +93,13 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       offsetof(ngx_rtmp_core_srv_conf_t, max_streams),
       NULL },
 
+    { ngx_string("max_delay"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      NGX_RTMP_SRV_CONF_OFFSET,
+      offsetof(ngx_rtmp_core_srv_conf_t, max_delay),
+      NULL },
+
     { ngx_string("ack_window"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_num_slot,
@@ -240,6 +247,7 @@ ngx_rtmp_core_create_srv_conf(ngx_conf_t *cf)
     conf->ping_timeout = NGX_CONF_UNSET_MSEC;
     conf->so_keepalive = NGX_CONF_UNSET;
     conf->max_streams = NGX_CONF_UNSET;
+    conf->max_delay= NGX_CONF_UNSET_MSEC;
     conf->chunk_size = NGX_CONF_UNSET;
     conf->ack_window = NGX_CONF_UNSET_UINT;
     conf->max_message = NGX_CONF_UNSET_SIZE;
@@ -266,6 +274,7 @@ ngx_rtmp_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->so_keepalive, prev->so_keepalive, 0);
     ngx_conf_merge_value(conf->max_streams, prev->max_streams, 32);
+    ngx_conf_merge_msec_value(conf->max_delay, prev->max_delay, 3000);
     ngx_conf_merge_value(conf->chunk_size, prev->chunk_size, 4096);
     ngx_conf_merge_uint_value(conf->ack_window, prev->ack_window, 5000000);
     ngx_conf_merge_size_value(conf->max_message, prev->max_message,

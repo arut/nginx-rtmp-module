@@ -714,15 +714,41 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
 
     nmsg = (s->out_last - s->out_pos) % s->out_queue + 1;
 
+    ngx_rtmp_core_srv_conf_t   *cscf;
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
+
     if (priority > 3) {
         priority = 3;
+    }
+
+    uint64_t t =0;
+    t = s->current_time;
+    if(t> 0){
+	    int64_t     v,v3;
+	    if(s->base_time == 0){
+		    s->base_time = ngx_current_msec - t;
+	    }
+
+	    v = (ngx_current_msec - s->base_time);
+	    v3 = v - t;
+
+	    ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+			    "Message Info delay =%i, base_time=%i, epoch=%i, current_time=%i",
+			    v3, s->base_time, s->epoch, t);
+	    if (v3 > (int64_t)cscf->max_delay) {//超过2秒，丢包
+		    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+				    "RTMP drop message by sec ,delay=%i, max_delay=%i, may totaltime=%i, current_time=%i",
+				    v3, cscf->max_delay, v, s->current_time);
+		    return NGX_AGAIN;
+	    }
     }
 
     /* drop packet?
      * Note we always leave 1 slot free */
     if (nmsg + priority * s->out_queue / 4 >= s->out_queue) {
-        ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
-                "RTMP drop message bufs=%ui, priority=%ui",
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "RTMP drop message by out_queue bufs=%ui, priority=%ui",
                 nmsg, priority);
         return NGX_AGAIN;
     }
