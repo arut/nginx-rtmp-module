@@ -357,6 +357,7 @@ ngx_rtmp_handshake_done(ngx_rtmp_session_t *s)
     if (ngx_rtmp_fire_event(s, NGX_RTMP_HANDSHAKE_DONE,
                 NULL, NULL) != NGX_OK)
     {
+	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "ngx_rtmp_finalize_session 9100");
         ngx_rtmp_finalize_session(s);
         return;
     }
@@ -398,6 +399,7 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
         n = c->recv(c, b->last, b->end - b->last);
 
         if (n == NGX_ERROR || n == 0) {
+	    ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9101");
             ngx_rtmp_finalize_session(s);
             return;
         }
@@ -405,6 +407,7 @@ ngx_rtmp_handshake_recv(ngx_event_t *rev)
         if (n == NGX_AGAIN) {
             ngx_add_timer(rev, s->timeout);
             if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+		ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9102");
                 ngx_rtmp_finalize_session(s);
             }
             return;
@@ -513,6 +516,7 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
         n = c->send(c, b->pos, b->last - b->pos);
 
         if (n == NGX_ERROR) {
+	    ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9103");
             ngx_rtmp_finalize_session(s);
             return;
         }
@@ -520,6 +524,7 @@ ngx_rtmp_handshake_send(ngx_event_t *wev)
         if (n == NGX_AGAIN || n == 0) {
             ngx_add_timer(c->write, s->timeout);
             if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+		ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9104");
                 ngx_rtmp_finalize_session(s);
             }
             return;
@@ -607,6 +612,7 @@ ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async)
                 ngx_rtmp_client_version,
                 &ngx_rtmp_client_partial_key) != NGX_OK)
     {
+	ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9105");
         ngx_rtmp_finalize_session(s);
         return;
     }
@@ -614,6 +620,7 @@ ngx_rtmp_client_handshake(ngx_rtmp_session_t *s, unsigned async)
     if (async) {
         ngx_add_timer(c->write, s->timeout);
         if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+	    ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9106");
             ngx_rtmp_finalize_session(s);
         }
         return;

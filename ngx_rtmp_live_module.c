@@ -337,6 +337,7 @@ ngx_rtmp_live_set_status(ngx_rtmp_session_t *s, ngx_chain_t *control,
     /* subscriber */
 
     if (control && ngx_rtmp_send_message(s, control, 0) != NGX_OK) {
+	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "ngx_rtmp_finalize_session 9400");
         ngx_rtmp_finalize_session(s);
         return;
     }
@@ -346,6 +347,7 @@ ngx_rtmp_live_set_status(ngx_rtmp_session_t *s, ngx_chain_t *control,
 
         for (n = 0; n < nstatus; ++n, ++cl) {
             if (*cl && ngx_rtmp_send_message(s, *cl, 0) != NGX_OK) {
+		ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "ngx_rtmp_finalize_session 9401");
                 ngx_rtmp_finalize_session(s);
                 return;
             }
@@ -525,6 +527,7 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
         ngx_rtmp_send_status(s, "NetStream.Play.StreamNotFound", "error",
                              "No such stream");
 
+	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "ngx_rtmp_finalize_session 9402");
         ngx_rtmp_finalize_session(s);
 
         return;
@@ -614,6 +617,7 @@ ngx_rtmp_live_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
                     ss = pctx->session;
                     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                    "live: no publisher");
+		    ngx_log_error(NGX_LOG_INFO, ss->connection->log, 0, "ngx_rtmp_finalize_session 9403");
                     ngx_rtmp_finalize_session(ss);
                 }
             }
@@ -1007,6 +1011,7 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             if (mandatory) {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                "live: mandatory packet failed");
+		ngx_log_error(NGX_LOG_INFO, ss->connection->log, 0, "ngx_rtmp_finalize_session 9404");
                 ngx_rtmp_finalize_session(ss);
             }
 

@@ -180,6 +180,7 @@ ngx_rtmp_ping(ngx_event_t *pev)
             "ping: schedule %Mms", cscf->ping_timeout);
 
     if (ngx_rtmp_send_ping_request(s, (uint32_t)ngx_current_msec) != NGX_OK) {
+        ngx_log_error(NGX_LOG_INFO, c->log, 0, "ping: sned ping request error");
         ngx_rtmp_finalize_session(s);
         return;
     }
@@ -256,12 +257,14 @@ ngx_rtmp_recv(ngx_event_t *rev)
             n = c->recv(c, b->last, b->end - b->last);
 
             if (n == NGX_ERROR || n == 0) {
+		ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9000");
                 ngx_rtmp_finalize_session(s);
                 return;
             }
 
             if (n == NGX_AGAIN) {
                 if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+		    ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9001");
                     ngx_rtmp_finalize_session(s);
                 }
                 return;
@@ -287,6 +290,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
                         "sending RTMP ACK(%uD)", s->in_bytes);
 
                 if (ngx_rtmp_send_ack(s, s->in_bytes)) {
+		    ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9002");
                     ngx_rtmp_finalize_session(s);
                     return;
                 }
@@ -430,7 +434,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
 
             if (h->mlen > cscf->max_message) {
                 ngx_log_error(NGX_LOG_INFO, c->log, 0,
-                        "too big message: %uz", cscf->max_message);
+                        "too big message: max_message %uz, mlen %uz", cscf->max_message, h->mlen);
                 ngx_rtmp_finalize_session(s);
                 return;
             }
@@ -462,6 +466,7 @@ ngx_rtmp_recv(ngx_event_t *rev)
             h->timestamp += st->dtime;
 
             if (ngx_rtmp_receive_message(s, h, head) != NGX_OK) {
+		ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9003");
                 ngx_rtmp_finalize_session(s);
                 return;
             }
@@ -763,6 +768,9 @@ ngx_rtmp_send_message(ngx_rtmp_session_t *s, ngx_chain_t *out,
             nmsg, priority, s->out_last);
 
     if (priority && s->out_buffer && nmsg < s->out_cork) {
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "RTMP cork message bufs=%ui, priority=%ui, out_cork=%ui",
+                nmsg, priority,s->out_cork);
         return NGX_OK;
     }
 

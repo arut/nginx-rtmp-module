@@ -607,6 +607,7 @@ ngx_rtmp_relay_create(ngx_rtmp_session_t *s, ngx_str_t *name,
 
     publish_ctx = create_publish_ctx(s, name, target);
     if (publish_ctx == NULL) {
+	ngx_log_error(NGX_LOG_INFO,s->connection->log, 0, "ngx_rtmp_finalize_session 9600");
         ngx_rtmp_finalize_session(play_ctx->session);
         return NGX_ERROR;
     }
@@ -1376,6 +1377,7 @@ ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
                  ctx->publish->session->connection->log, 0,
                 "relay: publish disconnect empty app='%V' name='%V'",
                 &ctx->app, &ctx->name);
+	    ngx_log_error(NGX_LOG_INFO,ctx->publish->session->connection->log, 0, "ngx_rtmp_finalize_session 9601");
             ngx_rtmp_finalize_session(ctx->publish->session);
         }
 
@@ -1398,6 +1400,7 @@ ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
         ngx_log_debug2(NGX_LOG_DEBUG_RTMP, (*cctx)->session->connection->log,
             0, "relay: play disconnect orphan app='%V' name='%V'",
             &(*cctx)->app, &(*cctx)->name);
+	ngx_log_error(NGX_LOG_INFO,(*cctx)->session->connection->log, 0, "ngx_rtmp_finalize_session 9602");
         ngx_rtmp_finalize_session((*cctx)->session);
     }
     ctx->publish = NULL;
