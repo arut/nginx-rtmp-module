@@ -577,51 +577,15 @@ ngx_rtmp_codec_reconstruct_meta(ngx_rtmp_session_t *s)
         u_char                      level[32];
     }                               v;
 
-    static ngx_rtmp_amf_elt_t       out_inf[] = {
+    static ngx_rtmp_amf_elt_t       out_inf[14] = {
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("Server"),
           "NGINX RTMP (github.com/arut/nginx-rtmp-module)", 0 },
 
         { NGX_RTMP_AMF_NUMBER,
-          ngx_string("width"),
-          &v.width, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("height"),
-          &v.height, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("displayWidth"),
-          &v.width, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("displayHeight"),
-          &v.height, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("duration"),
-          &v.duration, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("framerate"),
-          &v.frame_rate, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("fps"),
-          &v.frame_rate, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("videodatarate"),
-          &v.video_data_rate, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
           ngx_string("videocodecid"),
           &v.video_codec_id, 0 },
-
-        { NGX_RTMP_AMF_NUMBER,
-          ngx_string("audiodatarate"),
-          &v.audio_data_rate, 0 },
 
         { NGX_RTMP_AMF_NUMBER,
           ngx_string("audiocodecid"),
@@ -633,19 +597,69 @@ ngx_rtmp_codec_reconstruct_meta(ngx_rtmp_session_t *s)
 
         { NGX_RTMP_AMF_STRING,
           ngx_string("level"),
-          &v.level, sizeof(v.level) },
+          &v.level, sizeof(v.level) }
     };
 
-    static ngx_rtmp_amf_elt_t       out_elts[] = {
+    static ngx_rtmp_amf_elt_t       out_elts[2] = {
 
         { NGX_RTMP_AMF_STRING,
           ngx_null_string,
-          "onMetaData", 0 },
-
-        { NGX_RTMP_AMF_OBJECT,
-          ngx_null_string,
-          out_inf, sizeof(out_inf) },
+          "onMetaData", 0 }
     };
+
+    uint32_t offset = 5;
+
+    if (ctx->width > 0.0) {
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("width"),
+          &v.width, 0 };
+
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("displayWidth"),
+          &v.width, 0 };
+    }
+
+    if (ctx->height > 0.0) {
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("height"),
+          &v.height, 0 };
+
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("displayHeight"),
+          &v.height, 0 };
+    }
+
+    if (ctx->duration > 0.0) {
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("duration"),
+          &v.duration, 0 };
+    }
+
+    if (ctx->frame_rate > 0.0) {
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("framerate"),
+          &v.frame_rate, 0 };
+
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("fps"),
+          &v.frame_rate, 0 };
+    }
+
+    if (ctx->video_data_rate > 0.0) {
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("videodatarate"),
+          &v.video_data_rate, 0 };
+    }
+
+    if (ctx->audio_data_rate > 0.0) {
+        out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
+          ngx_string("audiodatarate"),
+          &v.audio_data_rate, 0 };
+    }
+
+    out_elts[1] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          out_inf, offset * sizeof(out_inf[0]) };
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
     if (ctx == NULL) {
