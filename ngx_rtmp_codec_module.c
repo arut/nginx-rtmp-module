@@ -609,6 +609,11 @@ ngx_rtmp_codec_reconstruct_meta(ngx_rtmp_session_t *s)
 
     uint32_t offset = 5;
 
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
     if (ctx->width > 0.0) {
         out_inf[offset++] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_NUMBER,
           ngx_string("width"),
@@ -660,11 +665,6 @@ ngx_rtmp_codec_reconstruct_meta(ngx_rtmp_session_t *s)
     out_elts[1] = (ngx_rtmp_amf_elt_t){ NGX_RTMP_AMF_OBJECT,
           ngx_null_string,
           out_inf, offset * sizeof(out_inf[0]) };
-
-    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_codec_module);
-    if (ctx == NULL) {
-        return NGX_OK;
-    }
 
     cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
