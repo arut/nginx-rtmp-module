@@ -142,11 +142,12 @@ rtmp_auto_push directive.
                 # with substitutions: $app/${app}, $name/${name} for application & stream name.
                 #
                 # This ffmpeg call receives stream from this application &
-                # reduces the resolution down to 32x32. The stream is the published to
+                # reduces the resolution down to 32x32. The stream is then published to
                 # 'small' application (see below) under the same name.
                 #
                 # ffmpeg can do anything with the stream like video/audio
-                # transcoding, resizing, altering container/codec params etc
+                # transcoding, resizing, altering container/codec params etc.
+                # Read more about ffmpeg's capabilities at http://ffmpeg.org/
                 #
                 # Multiple exec lines can be specified.
 
