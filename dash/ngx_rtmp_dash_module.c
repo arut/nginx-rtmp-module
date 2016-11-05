@@ -230,6 +230,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
     static u_char              start_time[sizeof("1970-09-28T12:00:00+06:00")];
     static u_char              end_time[sizeof("1970-09-28T12:00:00+06:00")];
+    static u_char              publish_time[sizeof("1970-09-28T12:00:00+06:00")];
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
@@ -260,6 +261,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "    xmlns=\"urn:mpeg:dash:schema:mpd:2011\"\n"                            \
     "    availabilityStartTime=\"%s\"\n"                                       \
     "    availabilityEndTime=\"%s\"\n"                                         \
+    "    publishTime=\"%s\"\n"                                         \
     "    minimumUpdatePeriod=\"PT%uiS\"\n"                                     \
     "    minBufferTime=\"PT%uiS\"\n"                                           \
     "    timeShiftBufferDepth=\"PT0H0M0.00S\"\n"                               \
@@ -365,11 +367,22 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                  ngx_abs(ctx->start_time.gmtoff / 60),
                  ngx_abs(ctx->start_time.gmtoff % 60)) = 0;
 
+    ngx_libc_localtime(ngx_time(), &tm);
+
+    *ngx_sprintf(publish_time, "%4d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d",
+                 tm.tm_year + 1900, tm.tm_mon + 1,
+                 tm.tm_mday, tm.tm_hour,
+                 tm.tm_min, tm.tm_sec,
+                 ctx->start_time.gmtoff < 0 ? '-' : '+',
+                 ngx_abs(ctx->start_time.gmtoff / 60),
+                 ngx_abs(ctx->start_time.gmtoff % 60)) = 0;
+
     last = buffer + sizeof(buffer);
 
     p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_HEADER,
                      start_time,
                      end_time,
+					 publish_time,
                      (ngx_uint_t) (dacf->fraglen / 1000),
                      (ngx_uint_t) (dacf->fraglen / 1000),
                      (ngx_uint_t) (dacf->fraglen / 500));
