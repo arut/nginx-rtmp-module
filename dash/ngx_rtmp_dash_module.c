@@ -382,7 +382,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_HEADER,
                      start_time,
                      end_time,
-					 publish_time,
+                     publish_time,
                      (ngx_uint_t) (dacf->fraglen / 1000),
                      (ngx_uint_t) (dacf->fraglen / 1000),
                      (ngx_uint_t) (dacf->fraglen / 500));
