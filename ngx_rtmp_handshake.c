@@ -104,30 +104,59 @@ static ngx_int_t
 ngx_rtmp_make_digest(ngx_str_t *key, ngx_buf_t *src,
         u_char *skip, u_char *dst, ngx_log_t *log)
 {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    static HMAC_CTX         *hmac;
+#else
     static HMAC_CTX         hmac;
+#endif
     static unsigned         hmac_initialized;
     unsigned int            len;
 
     if (!hmac_initialized) {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        hmac = HMAC_CTX_new();
+#else
         HMAC_CTX_init(&hmac);
+#endif
         hmac_initialized = 1;
     }
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    HMAC_Init_ex(hmac, key->data, key->len, EVP_sha256(), NULL);
+#else
     HMAC_Init_ex(&hmac, key->data, key->len, EVP_sha256(), NULL);
+#endif
 
     if (skip && src->pos <= skip && skip <= src->last) {
         if (skip != src->pos) {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+            HMAC_Update(hmac, src->pos, skip - src->pos);
+#else
             HMAC_Update(&hmac, src->pos, skip - src->pos);
+#endif
         }
         if (src->last != skip + NGX_RTMP_HANDSHAKE_KEYLEN) {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+            HMAC_Update(hmac, skip + NGX_RTMP_HANDSHAKE_KEYLEN,
+#else
             HMAC_Update(&hmac, skip + NGX_RTMP_HANDSHAKE_KEYLEN,
+#endif
                     src->last - skip - NGX_RTMP_HANDSHAKE_KEYLEN);
         }
     } else {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        HMAC_Update(hmac, src->pos, src->last - src->pos);
+#else
         HMAC_Update(&hmac, src->pos, src->last - src->pos);
+#endif
+
     }
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    HMAC_Final(hmac, dst, &len);
+#else
     HMAC_Final(&hmac, dst, &len);
+#endif
 
     return NGX_OK;
 }
