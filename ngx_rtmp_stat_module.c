@@ -673,7 +673,7 @@ ngx_rtmp_stat_live(ngx_http_request_t *r, ngx_chain_t ***lll,
                         NGX_RTMP_STAT_L("\",\"profile\":\"");
                         NGX_RTMP_STAT_CS(
                                 ngx_rtmp_stat_get_avc_profile(codec->avc_profile));
-                                                        NGX_RTMP_STAT_L("\"");
+                        NGX_RTMP_STAT_L("\"");
 
                     }
                     if (codec->avc_compat) {
