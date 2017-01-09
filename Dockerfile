@@ -16,7 +16,7 @@ RUN cd /root && \
 COPY ./* /root/nginx-rtmp-module-master/
   
 RUN cd /root && \
-  tar -zxvf nginx-1.9.2.tar.g
+  tar -zxvf nginx-1.9.2.tar.gz
   
 RUN cd /root/nginx-1.9.2 && \
   ./configure --add-module=../nginx-rtmp-module-master && \
