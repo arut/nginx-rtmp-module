@@ -104,30 +104,37 @@ static ngx_int_t
 ngx_rtmp_make_digest(ngx_str_t *key, ngx_buf_t *src,
         u_char *skip, u_char *dst, ngx_log_t *log)
 {
-    static HMAC_CTX         hmac;
-    static unsigned         hmac_initialized;
+    static HMAC_CTX        *hmac;
     unsigned int            len;
 
-    if (!hmac_initialized) {
-        HMAC_CTX_init(&hmac);
-        hmac_initialized = 1;
+    if (hmac == NULL) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+        static HMAC_CTX  shmac;
+        hmac = &shmac;
+        HMAC_CTX_init(hmac);
+#else
+        hmac = HMAC_CTX_new();
+        if (hmac == NULL) {
+            return NGX_ERROR;
+        }
+#endif
     }
 
-    HMAC_Init_ex(&hmac, key->data, key->len, EVP_sha256(), NULL);
+    HMAC_Init_ex(hmac, key->data, key->len, EVP_sha256(), NULL);
 
     if (skip && src->pos <= skip && skip <= src->last) {
         if (skip != src->pos) {
-            HMAC_Update(&hmac, src->pos, skip - src->pos);
+            HMAC_Update(hmac, src->pos, skip - src->pos);
         }
         if (src->last != skip + NGX_RTMP_HANDSHAKE_KEYLEN) {
-            HMAC_Update(&hmac, skip + NGX_RTMP_HANDSHAKE_KEYLEN,
+            HMAC_Update(hmac, skip + NGX_RTMP_HANDSHAKE_KEYLEN,
                     src->last - skip - NGX_RTMP_HANDSHAKE_KEYLEN);
         }
     } else {
-        HMAC_Update(&hmac, src->pos, src->last - src->pos);
+        HMAC_Update(hmac, src->pos, src->last - src->pos);
     }
 
-    HMAC_Final(&hmac, dst, &len);
+    HMAC_Final(hmac, dst, &len);
 
     return NGX_OK;
 }
