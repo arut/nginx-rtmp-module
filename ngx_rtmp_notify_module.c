@@ -642,6 +642,10 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
 
     b = ngx_create_temp_buf(pool,
                             sizeof("&call=") + cbname_len +
+                            sizeof("&time=") + NGX_TIME_T_LEN +
+                            sizeof("&timestamp=") + NGX_INT32_LEN +
+                            sizeof("&received=") + NGX_INT32_LEN +
+                            sizeof("&sent=") + NGX_INT32_LEN +
                             sizeof("&name=") + name_len * 3 +
                             1 + args_len);
     if (b == NULL) {
@@ -653,7 +657,23 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
 
     b->last = ngx_cpymem(b->last, (u_char*) "&call=", sizeof("&call=") - 1);
     b->last = ngx_cpymem(b->last, ds->cbname, cbname_len);
+    
+    b->last = ngx_cpymem(b->last, (u_char *) "&time=",
+                         sizeof("&time=") - 1);
+    b->last = ngx_sprintf(b->last, "%T", ngx_cached_time->sec - ctx->start);
 
+    b->last = ngx_cpymem(b->last, (u_char *) "&timestamp=",
+                         sizeof("&timestamp=") - 1);
+    b->last = ngx_sprintf(b->last, "%D", s->current_time);
+    
+    b->last = ngx_cpymem(b->last, (u_char *) "&received=",
+                         sizeof("&received=") - 1);
+    b->last = ngx_sprintf(b->last, "%uD", s->in_bytes);
+    
+    b->last = ngx_cpymem(b->last, (u_char *) "&sent=",
+                         sizeof("&sent=") - 1);
+    b->last = ngx_sprintf(b->last, "%uD", s->out_bytes);
+    
     if (name_len) {
         b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);
         b->last = (u_char*) ngx_escape_uri(b->last, ctx->name, name_len,
@@ -701,6 +721,8 @@ ngx_rtmp_notify_update_create(ngx_rtmp_session_t *s, void *arg,
                             sizeof("&call=update") + sfx.len +
                             sizeof("&time=") + NGX_TIME_T_LEN +
                             sizeof("&timestamp=") + NGX_INT32_LEN +
+                            sizeof("&received=") + NGX_INT32_LEN +
+                            sizeof("&sent=") + NGX_INT32_LEN +
                             sizeof("&name=") + name_len * 3 +
                             1 + args_len);
     if (b == NULL) {
@@ -721,6 +743,14 @@ ngx_rtmp_notify_update_create(ngx_rtmp_session_t *s, void *arg,
     b->last = ngx_cpymem(b->last, (u_char *) "&timestamp=",
                          sizeof("&timestamp=") - 1);
     b->last = ngx_sprintf(b->last, "%D", s->current_time);
+    
+    b->last = ngx_cpymem(b->last, (u_char *) "&received=",
+                         sizeof("&received=") - 1);
+    b->last = ngx_sprintf(b->last, "%uD", s->in_bytes);
+    
+    b->last = ngx_cpymem(b->last, (u_char *) "&sent=",
+                         sizeof("&sent=") - 1);
+    b->last = ngx_sprintf(b->last, "%uD", s->out_bytes);
 
     if (name_len) {
         b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);
