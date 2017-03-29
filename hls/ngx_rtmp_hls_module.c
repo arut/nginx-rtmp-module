@@ -50,6 +50,7 @@ typedef struct {
 
 typedef struct {
     unsigned                            opened:1;
+    unsigned                            publishing:1;
 
     ngx_rtmp_mpegts_file_t              file;
 
@@ -114,6 +115,7 @@ typedef struct {
     ngx_str_t                           key_path;
     ngx_str_t                           key_url;
     ngx_uint_t                          frags_per_key;
+    ngx_flag_t                          live_to_vod;
 } ngx_rtmp_hls_app_conf_t;
 
 
@@ -306,6 +308,13 @@ static ngx_command_t ngx_rtmp_hls_commands[] = {
       ngx_conf_set_num_slot,
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_hls_app_conf_t, frags_per_key),
+      NULL },
+
+    { ngx_string("hls_live_to_vod"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_hls_app_conf_t, live_to_vod),
       NULL },
 
     ngx_null_command
@@ -527,7 +536,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
                      "#EXT-X-TARGETDURATION:%ui\n",
                      ctx->frag, max_frag);
 
-    if (hacf->type == NGX_RTMP_HLS_TYPE_EVENT) {
+    if (hacf->type == NGX_RTMP_HLS_TYPE_EVENT && (ctx->publishing || !hacf->live_to_vod)) {
         p = ngx_slprintf(p, end, "#EXT-X-PLAYLIST-TYPE: EVENT\n");
     }
 
@@ -593,6 +602,13 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
             return NGX_ERROR;
         }
     }
+    if (!ctx->publishing && hacf->live_to_vod) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0, "hls: live to vod");
+        p = buffer;
+        end = p + sizeof(buffer);
+        p = ngx_slprintf(p, end, "#EXT-X-ENDLIST\n");
+        ngx_write_fd(fd, buffer, p - buffer);
+    }
 
     ngx_close_file(fd);
 
@@ -611,7 +627,6 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 
     return NGX_OK;
 }
-
 
 static ngx_int_t
 ngx_rtmp_hls_copy(ngx_rtmp_session_t *s, void *dst, u_char **src, size_t n,
@@ -1459,6 +1474,8 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         ctx->keyfile.len = p - ctx->keyfile.data;
     }
 
+    ctx->publishing = 1;
+
     ngx_log_debug4(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: playlist='%V' playlist_bak='%V' "
                    "stream_pattern='%V' keyfile_pattern='%V'",
@@ -1487,6 +1504,8 @@ ngx_rtmp_hls_close_stream(ngx_rtmp_session_t *s, ngx_rtmp_close_stream_t *v)
     if (hacf == NULL || !hacf->hls || ctx == NULL) {
         goto next;
     }
+
+    ctx->publishing = 0;
 
     ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "hls: close stream");
@@ -2308,6 +2327,7 @@ ngx_rtmp_hls_create_app_conf(ngx_conf_t *cf)
     conf->granularity = NGX_CONF_UNSET;
     conf->keys = NGX_CONF_UNSET;
     conf->frags_per_key = NGX_CONF_UNSET_UINT;
+    conf->live_to_vod = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -2346,6 +2366,7 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->key_path, prev->key_path, "");
     ngx_conf_merge_str_value(conf->key_url, prev->key_url, "");
     ngx_conf_merge_uint_value(conf->frags_per_key, prev->frags_per_key, 0);
+    ngx_conf_merge_value(conf->live_to_vod, prev->live_to_vod, 0);
 
     if (conf->fraglen) {
         conf->winfrags = conf->playlen / conf->fraglen;
