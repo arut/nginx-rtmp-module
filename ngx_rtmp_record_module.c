@@ -1195,6 +1195,7 @@ ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_int_t                   i;
     ngx_str_t                  *value;
     ngx_conf_t                  save;
+    ngx_module_t              **modules;
     ngx_rtmp_module_t          *module;
     ngx_rtmp_core_app_conf_t   *cacf, **pcacf, *rcacf;
     ngx_rtmp_record_app_conf_t *racf, **pracf, *rracf;
@@ -1221,17 +1222,22 @@ ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    for (i = 0; ngx_modules[i]; i++) {
-        if (ngx_modules[i]->type != NGX_RTMP_MODULE) {
+#if (nginx_version >= 1009011)
+    modules = cf->cycle->modules;
+#else
+    modules = ngx_modules;
+#endif
+
+    for (i = 0; modules[i]; i++) {
+        if (modules[i]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[i]->ctx;
+        module = modules[i]->ctx;
 
         if (module->create_app_conf) {
-            ctx->app_conf[ngx_modules[i]->ctx_index] =
-                                module->create_app_conf(cf);
-            if (ctx->app_conf[ngx_modules[i]->ctx_index] == NULL) {
+            ctx->app_conf[modules[i]->ctx_index] = module->create_app_conf(cf);
+            if (ctx->app_conf[modules[i]->ctx_index] == NULL) {
                 return NGX_CONF_ERROR;
             }
         }

@@ -29,9 +29,16 @@ static ngx_int_t ngx_rtmp_init_event_handlers(ngx_conf_t *cf,
 static char * ngx_rtmp_merge_applications(ngx_conf_t *cf,
         ngx_array_t *applications, void **app_conf, ngx_rtmp_module_t *module,
         ngx_uint_t ctx_index);
+static ngx_int_t ngx_rtmp_init_process(ngx_cycle_t *cycle);
 
 
+#if (nginx_version >= 1007011)
+ngx_queue_t                         ngx_rtmp_init_queue;
+#elif (nginx_version >= 1007005)
+ngx_thread_volatile ngx_queue_t     ngx_rtmp_init_queue;
+#else
 ngx_thread_volatile ngx_event_t    *ngx_rtmp_init_queue;
+#endif
 
 
 ngx_uint_t  ngx_rtmp_max_module;
@@ -64,7 +71,7 @@ ngx_module_t  ngx_rtmp_module = {
     NGX_CORE_MODULE,                       /* module type */
     NULL,                                  /* init master */
     NULL,                                  /* init module */
-    NULL,                                  /* init process */
+    ngx_rtmp_init_process,                 /* init process */
     NULL,                                  /* init thread */
     NULL,                                  /* exit thread */
     NULL,                                  /* exit process */
@@ -80,6 +87,7 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                   i, m, mi, s;
     ngx_conf_t                   pcf;
     ngx_array_t                  ports;
+    ngx_module_t               **modules;
     ngx_rtmp_listen_t           *listen;
     ngx_rtmp_module_t           *module;
     ngx_rtmp_conf_ctx_t         *ctx;
@@ -95,6 +103,12 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* count the number of the rtmp modules and set up their indices */
 
+#if (nginx_version >= 1009011)
+
+    ngx_rtmp_max_module = ngx_count_modules(cf->cycle, NGX_RTMP_MODULE);
+
+#else
+
     ngx_rtmp_max_module = 0;
     for (m = 0; ngx_modules[m]; m++) {
         if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
@@ -103,6 +117,8 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         ngx_modules[m]->ctx_index = ngx_rtmp_max_module++;
     }
+
+#endif
 
 
     /* the rtmp main_conf context, it is the same in the all rtmp contexts */
@@ -141,13 +157,19 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * of the all rtmp modules
      */
 
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+#if (nginx_version >= 1009011)
+    modules = cf->cycle->modules;
+#else
+    modules = ngx_modules;
+#endif
+
+    for (m = 0; modules[m]; m++) {
+        if (modules[m]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[m]->ctx;
-        mi = ngx_modules[m]->ctx_index;
+        module = modules[m]->ctx;
+        mi = modules[m]->ctx_index;
 
         if (module->create_main_conf) {
             ctx->main_conf[mi] = module->create_main_conf(cf);
@@ -174,12 +196,12 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     pcf = *cf;
     cf->ctx = ctx;
 
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+    for (m = 0; modules[m]; m++) {
+        if (modules[m]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[m]->ctx;
+        module = modules[m]->ctx;
 
         if (module->preconfiguration) {
             if (module->preconfiguration(cf) != NGX_OK) {
@@ -205,13 +227,13 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cmcf = ctx->main_conf[ngx_rtmp_core_module.ctx_index];
     cscfp = cmcf->servers.elts;
 
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+    for (m = 0; modules[m]; m++) {
+        if (modules[m]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[m]->ctx;
-        mi = ngx_modules[m]->ctx_index;
+        module = modules[m]->ctx;
+        mi = modules[m]->ctx_index;
 
         /* init rtmp{} main_conf's */
 
@@ -276,12 +298,12 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    for (m = 0; ngx_modules[m]; m++) {
-        if (ngx_modules[m]->type != NGX_RTMP_MODULE) {
+    for (m = 0; modules[m]; m++) {
+        if (modules[m]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = ngx_modules[m]->ctx;
+        module = modules[m]->ctx;
 
         if (module->postconfiguration) {
             if (module->postconfiguration(cf) != NGX_OK) {
@@ -826,4 +848,14 @@ ngx_rtmp_rmemcpy(void *dst, const void* src, size_t n)
     }
 
     return dst;
+}
+
+
+static ngx_int_t
+ngx_rtmp_init_process(ngx_cycle_t *cycle)
+{
+#if (nginx_version >= 1007005)
+    ngx_queue_init(&ngx_rtmp_init_queue);
+#endif
+    return NGX_OK;
 }

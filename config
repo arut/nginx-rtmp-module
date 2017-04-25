@@ -1,6 +1,6 @@
 ngx_addon_name="ngx_rtmp_module"
 
-CORE_MODULES="$CORE_MODULES
+RTMP_CORE_MODULES="                                         \
                 ngx_rtmp_module                             \
                 ngx_rtmp_core_module                        \
                 ngx_rtmp_cmd_module                         \
@@ -15,6 +15,7 @@ CORE_MODULES="$CORE_MODULES
                 ngx_rtmp_relay_module                       \
                 ngx_rtmp_exec_module                        \
                 ngx_rtmp_auto_push_module                   \
+                ngx_rtmp_auto_push_index_module             \
                 ngx_rtmp_notify_module                      \
                 ngx_rtmp_log_module                         \
                 ngx_rtmp_limit_module                       \
@@ -23,13 +24,13 @@ CORE_MODULES="$CORE_MODULES
                 "
 
 
-HTTP_MODULES="$HTTP_MODULES                                 \
+RTMP_HTTP_MODULES="                                         \
                 ngx_rtmp_stat_module                        \
                 ngx_rtmp_control_module                     \
                 "
 
 
-NGX_ADDON_DEPS="$NGX_ADDON_DEPS                             \
+RTMP_DEPS="                                                 \
                 $ngx_addon_dir/ngx_rtmp_amf.h               \
                 $ngx_addon_dir/ngx_rtmp_bandwidth.h         \
                 $ngx_addon_dir/ngx_rtmp_cmd_module.h        \
@@ -50,7 +51,7 @@ NGX_ADDON_DEPS="$NGX_ADDON_DEPS                             \
                 "
 
 
-NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
+RTMP_CORE_SRCS="                                            \
                 $ngx_addon_dir/ngx_rtmp.c                   \
                 $ngx_addon_dir/ngx_rtmp_init.c              \
                 $ngx_addon_dir/ngx_rtmp_handshake.c         \
@@ -70,8 +71,6 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/ngx_rtmp_flv_module.c        \
                 $ngx_addon_dir/ngx_rtmp_mp4_module.c        \
                 $ngx_addon_dir/ngx_rtmp_netcall_module.c    \
-                $ngx_addon_dir/ngx_rtmp_stat_module.c       \
-                $ngx_addon_dir/ngx_rtmp_control_module.c    \
                 $ngx_addon_dir/ngx_rtmp_relay_module.c      \
                 $ngx_addon_dir/ngx_rtmp_bandwidth.c         \
                 $ngx_addon_dir/ngx_rtmp_exec_module.c       \
@@ -86,7 +85,49 @@ NGX_ADDON_SRCS="$NGX_ADDON_SRCS                             \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.c        \
                 $ngx_addon_dir/dash/ngx_rtmp_mp4.c          \
                 "
-CFLAGS="$CFLAGS -I$ngx_addon_dir"
+
+
+RTMP_HTTP_SRCS="                                            \
+                $ngx_addon_dir/ngx_rtmp_stat_module.c       \
+                $ngx_addon_dir/ngx_rtmp_control_module.c    \
+                "
+
+if [ -f auto/module ] ; then
+    ngx_module_incs=$ngx_addon_dir
+    ngx_module_deps=$RTMP_DEPS
+
+    if [ $ngx_module_link = DYNAMIC ] ; then
+        ngx_module_name="$RTMP_CORE_MODULES $RTMP_HTTP_MODULES"
+        ngx_module_srcs="$RTMP_CORE_SRCS $RTMP_HTTP_SRCS"
+
+        . auto/module
+
+    else
+        ngx_module_type=CORE
+        ngx_module_name=$RTMP_CORE_MODULES
+        ngx_module_srcs=$RTMP_CORE_SRCS
+
+        . auto/module
+
+
+        ngx_module_type=HTTP
+        ngx_module_name=$RTMP_HTTP_MODULES
+        ngx_module_incs=
+        ngx_module_deps=
+        ngx_module_srcs=$RTMP_HTTP_SRCS
+
+        . auto/module
+    fi
+
+else
+    CORE_MODULES="$CORE_MODULES $RTMP_CORE_MODULES"
+    HTTP_MODULES="$HTTP_MODULES $RTMP_HTTP_MODULES"
+
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS $RTMP_DEPS"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $RTMP_CORE_SRCS $RTMP_HTTP_SRCS"
+
+    CFLAGS="$CFLAGS -I$ngx_addon_dir"
+fi
 
 USE_OPENSSL=YES
 

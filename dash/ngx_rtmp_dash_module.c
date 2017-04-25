@@ -412,7 +412,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
         p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_AUDIO,
                          &ctx->name,
                          codec_ctx->audio_codec_id == NGX_RTMP_AUDIO_AAC ?
-                         "40.2" : "6b",
+                         (codec_ctx->aac_sbr ? "40.5" : "40.2") : "6b",
                          codec_ctx->sample_rate,
                          (ngx_uint_t) (codec_ctx->audio_data_rate * 1000),
                          name, sep,
@@ -1413,14 +1413,22 @@ ngx_rtmp_dash_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 }
 
 
+#if (nginx_version >= 1011005)
+static ngx_msec_t
+#else
 static time_t
+#endif
 ngx_rtmp_dash_cleanup(void *data)
 {
     ngx_rtmp_dash_cleanup_t *cleanup = data;
 
     ngx_rtmp_dash_cleanup_dir(&cleanup->path, cleanup->playlen);
 
+#if (nginx_version >= 1011005)
+    return cleanup->playlen * 2;
+#else
     return cleanup->playlen / 500;
+#endif
 }
 
 
