@@ -45,14 +45,15 @@ static ngx_int_t ngx_rtmp_record_init(ngx_rtmp_session_t *s);
 
 
 static ngx_conf_bitmask_t  ngx_rtmp_record_mask[] = {
-    { ngx_string("off"),                NGX_RTMP_RECORD_OFF         },
-    { ngx_string("all"),                NGX_RTMP_RECORD_AUDIO       |
-                                        NGX_RTMP_RECORD_VIDEO       },
-    { ngx_string("audio"),              NGX_RTMP_RECORD_AUDIO       },
-    { ngx_string("video"),              NGX_RTMP_RECORD_VIDEO       },
-    { ngx_string("keyframes"),          NGX_RTMP_RECORD_KEYFRAMES   },
-    { ngx_string("manual"),             NGX_RTMP_RECORD_MANUAL      },
-    { ngx_null_string,                  0                           }
+    { ngx_string("off"),                NGX_RTMP_RECORD_OFF            },
+    { ngx_string("all"),                NGX_RTMP_RECORD_AUDIO          |
+                                        NGX_RTMP_RECORD_VIDEO          },
+    { ngx_string("audio"),              NGX_RTMP_RECORD_AUDIO          },
+    { ngx_string("video"),              NGX_RTMP_RECORD_VIDEO          },
+    { ngx_string("keyframes"),          NGX_RTMP_RECORD_KEYFRAMES      },
+    { ngx_string("manual"),             NGX_RTMP_RECORD_MANUAL         },
+    { ngx_string("auto_restart"),       NGX_RTMP_RECORD_AUTO_RESTART   },
+    { ngx_null_string,                  0                              }
 };
 
 
@@ -436,6 +437,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
                           ngx_rtmp_record_rec_ctx_t *rctx)
 {
     ngx_rtmp_record_app_conf_t *rracf;
+    ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_err_t                   err;
     ngx_str_t                   path;
     ngx_int_t                   mode, create_mode;
@@ -449,6 +451,8 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     if (rctx->file.fd != NGX_INVALID_FILE) {
         return NGX_AGAIN;
     }
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "record: %V opening", &rracf->id);
@@ -467,7 +471,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     rctx->file.offset = 0;
     rctx->file.log = s->connection->log;
     rctx->file.fd = ngx_open_file(path.data, mode, create_mode,
-                                  NGX_FILE_DEFAULT_ACCESS);
+                                  cscf->file_access);
     ngx_str_set(&rctx->file.name, "recorded");
 
     if (rctx->file.fd == NGX_INVALID_FILE) {
@@ -1041,7 +1045,9 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
              ? keyframe
              : (rracf->flags & NGX_RTMP_RECORD_VIDEO) == 0;
 
-    if (brkframe && (rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0) {
+    if (brkframe && ((rracf->flags & NGX_RTMP_RECORD_MANUAL) == 0 ||
+       ((rracf->flags & NGX_RTMP_RECORD_AUTO_RESTART) &&
+        rctx->file.fd != NGX_INVALID_FILE))) {
 
         if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
 
@@ -1063,7 +1069,8 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
         }
     }
 
-    if ((rracf->flags & NGX_RTMP_RECORD_MANUAL) &&
+    if (((rracf->flags & NGX_RTMP_RECORD_MANUAL) ||
+        !(rracf->flags & NGX_RTMP_RECORD_AUTO_RESTART)) &&
         !brkframe && rctx->nframes == 0)
     {
         return NGX_OK;

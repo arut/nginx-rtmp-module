@@ -701,6 +701,7 @@ ngx_rtmp_notify_update_create(ngx_rtmp_session_t *s, void *arg,
                             sizeof("&call=update") + sfx.len +
                             sizeof("&time=") + NGX_TIME_T_LEN +
                             sizeof("&timestamp=") + NGX_INT32_LEN +
+                            sizeof("&csid=") + NGX_INT32_LEN +
                             sizeof("&name=") + name_len * 3 +
                             1 + args_len);
     if (b == NULL) {
@@ -721,6 +722,10 @@ ngx_rtmp_notify_update_create(ngx_rtmp_session_t *s, void *arg,
     b->last = ngx_cpymem(b->last, (u_char *) "&timestamp=",
                          sizeof("&timestamp=") - 1);
     b->last = ngx_sprintf(b->last, "%D", s->current_time);
+
+    b->last = ngx_cpymem(b->last, (u_char *) "&csid=",
+                             sizeof("&csid=") - 1);
+    b->last = ngx_sprintf(b->last, "%d", s->current_time_csid);
 
     if (name_len) {
         b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);
@@ -799,7 +804,7 @@ ngx_rtmp_notify_record_done_create(ngx_rtmp_session_t *s, void *arg,
 
 static ngx_int_t
 ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s,
-        ngx_chain_t *in)
+        ngx_chain_t *in, u_char strict)
 {
     ngx_buf_t      *b;
     ngx_int_t       n;
@@ -821,6 +826,9 @@ ngx_rtmp_notify_parse_http_retcode(ngx_rtmp_session_t *s,
                     case (u_char) '3':
                         return NGX_AGAIN;
                     default:
+                        if (strict == 1) {
+                            return NGX_DECLINED;
+                        }
                         return NGX_ERROR;
                 }
             }
@@ -962,7 +970,7 @@ ngx_rtmp_notify_connect_handle(ngx_rtmp_session_t *s,
 
     static ngx_str_t    location = ngx_string("location");
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 0);
     if (rc == NGX_ERROR) {
         return NGX_ERROR;
     }
@@ -1014,7 +1022,7 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
 
     static ngx_str_t    location = ngx_string("location");
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 0);
     if (rc == NGX_ERROR) {
         ngx_rtmp_notify_clear_flag(s, NGX_RTMP_NOTIFY_PUBLISHING);
         return NGX_ERROR;
@@ -1063,11 +1071,18 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
     u->url.len = rc - 7;
     u->default_port = 1935;
     u->uri_part = 1;
-    u->no_resolve = 1; /* want ip here */
 
     if (ngx_parse_url(s->connection->pool, u) != NGX_OK) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: push failed '%V'", &local_name);
+        return NGX_ERROR;
+    }
+
+    if (u->uri.len > 0 && ngx_rtmp_parse_relay_str(s->connection->pool, &target,
+                                                   NULL) != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: push failed with args '%V'", &u->uri);
         return NGX_ERROR;
     }
 
@@ -1093,7 +1108,7 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
 
     static ngx_str_t            location = ngx_string("location");
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 0);
     if (rc == NGX_ERROR) {
         ngx_rtmp_notify_clear_flag(s, NGX_RTMP_NOTIFY_PLAYING);
         return NGX_ERROR;
@@ -1142,11 +1157,18 @@ ngx_rtmp_notify_play_handle(ngx_rtmp_session_t *s,
     u->url.len = rc - 7;
     u->default_port = 1935;
     u->uri_part = 1;
-    u->no_resolve = 1; /* want ip here */
 
     if (ngx_parse_url(s->connection->pool, u) != NGX_OK) {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: pull failed '%V'", &local_name);
+        return NGX_ERROR;
+    }
+
+    if (u->uri.len > 0 && ngx_rtmp_parse_relay_str(s->connection->pool, &target,
+                                                   NULL) != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                      "notify: pull failed with args '%V'", &u->uri);
         return NGX_ERROR;
     }
 
@@ -1168,10 +1190,9 @@ ngx_rtmp_notify_update_handle(ngx_rtmp_session_t *s,
 
     nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
-    rc = ngx_rtmp_notify_parse_http_retcode(s, in);
+    rc = ngx_rtmp_notify_parse_http_retcode(s, in, 1);
 
-    if ((!nacf->update_strict && rc == NGX_ERROR) ||
-         (nacf->update_strict && rc != NGX_OK))
+    if (rc != NGX_OK && (nacf->update_strict == 1 || rc != NGX_ERROR))
     {
         ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
                       "notify: update failed");
@@ -1203,26 +1224,29 @@ ngx_rtmp_notify_update(ngx_event_t *e)
     c = e->data;
     s = c->data;
 
-    nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
+    // avoid update notifications before the session start
+    if(s->current_time > 0){
+    	nacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_notify_module);
 
-    url = nacf->url[NGX_RTMP_NOTIFY_UPDATE];
+    	url = nacf->url[NGX_RTMP_NOTIFY_UPDATE];
 
-    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                  "notify: update '%V'", &url->url);
+    	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+    			"notify: update '%V'", &url->url);
 
-    ngx_memzero(&ci, sizeof(ci));
+    	ngx_memzero(&ci, sizeof(ci));
 
-    ci.url = url;
-    ci.create = ngx_rtmp_notify_update_create;
-    ci.handle = ngx_rtmp_notify_update_handle;
+    	ci.url = url;
+    	ci.create = ngx_rtmp_notify_update_create;
+    	ci.handle = ngx_rtmp_notify_update_handle;
 
-    if (ngx_rtmp_netcall_create(s, &ci) == NGX_OK) {
-        return;
+    	if (ngx_rtmp_netcall_create(s, &ci) == NGX_OK) {
+    		return;
+    	}
+
+    	/* schedule next update on connection error */
+
+    	ngx_rtmp_notify_update_handle(s, NULL, NULL);
     }
-
-    /* schedule next update on connection error */
-
-    ngx_rtmp_notify_update_handle(s, NULL, NULL);
 }
 
 

@@ -232,6 +232,7 @@ typedef struct {
     ngx_msec_t              peer_epoch;
     ngx_msec_t              base_time;
     uint32_t                current_time;
+    uint32_t                current_time_csid; // the channel id that used for setting latest current_time
 
     /* ping */
     ngx_event_t             ping_evt;
@@ -329,6 +330,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     size_t                  out_queue;
     size_t                  out_cork;
     ngx_msec_t              buflen;
+    ngx_uint_t              file_access;
 
     ngx_rtmp_conf_ctx_t    *ctx;
 } ngx_rtmp_core_srv_conf_t;
