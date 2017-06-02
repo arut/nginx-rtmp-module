@@ -479,8 +479,10 @@ ngx_rtmp_play_copy_local_file(ngx_rtmp_session_t *s, u_char *name)
 {
     ngx_rtmp_play_app_conf_t   *pacf;
     ngx_rtmp_play_ctx_t        *ctx;
-    u_char                     *path, *p;
-    static u_char               dpath[NGX_MAX_PATH + 1];
+    u_char                     *path, *p, *d;
+    static u_char               dpath[NGX_MAX_PATH + 1], dir[NGX_MAX_PATH + 1];
+    u_int                       l;
+    ngx_err_t   err;
 
     pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
     if (pacf == NULL) {
@@ -496,6 +498,27 @@ ngx_rtmp_play_copy_local_file(ngx_rtmp_session_t *s, u_char *name)
 
     p = ngx_snprintf(dpath, NGX_MAX_PATH, "%V/%s%V", &pacf->local_path,
                      name + ctx->pfx_size, &ctx->sfx);
+
+    d = name + ctx->pfx_size;
+    while (*d != '\0') {
+        if (*d == '/') {
+            p = ngx_snprintf(dir, NGX_MAX_PATH, "%V/%s", &pacf->local_path, name + ctx->pfx_size, &ctx->sfx);
+            l = ngx_strlen(dir) - ngx_strlen(d);
+            dir[l]='\0';
+            ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                  "play: create dir '%s' for '%s'", dir, dpath);
+            if (ngx_create_dir(dir, 0700) == NGX_FILE_ERROR) {
+                err = ngx_errno;
+                if (err != NGX_EEXIST) {
+                    ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
+                        "play: error creating dir '%s' for '%s'", dir, dpath);
+                    break;
+                }
+            }
+        }
+        d++;
+    }
+
     *p = 0;
 
     ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
