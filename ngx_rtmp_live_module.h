@@ -74,6 +74,7 @@ typedef struct {
     ngx_msec_t                          buflen;
     ngx_pool_t                         *pool;
     ngx_rtmp_live_stream_t             *free_streams;
+    ngx_str_t                           stream_key;
 } ngx_rtmp_live_app_conf_t;
 
 
