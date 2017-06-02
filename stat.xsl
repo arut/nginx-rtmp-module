@@ -97,6 +97,7 @@
     </tr>
     <xsl:apply-templates select="live"/>
     <xsl:apply-templates select="play"/>
+    <xsl:apply-templates select="recorders"/>
 </xsl:template>
 
 <xsl:template match="live">
@@ -121,6 +122,90 @@
         </td>
     </tr>
     <xsl:apply-templates select="stream"/>
+</xsl:template>
+
+<xsl:template match="recorders">
+    <tr bgcolor="#aaaaaa">
+        <td>
+            <a href="">
+                <xsl:attribute name="onClick">
+                    var d = document.getElementById('<xsl:value-of select="../name"/>-recorders');
+                    d.style.display=d.style.display=='none'?'':'none';
+                    return false;
+                </xsl:attribute>
+                <i>recorders</i>
+            </a>
+        </td>
+        <td align="middle">
+            <xsl:value-of select="nclients"/>
+        </td>
+    </tr>
+    <tr style="display:none">
+        <xsl:attribute name="id"><xsl:value-of select="../name"/>-recorders</xsl:attribute>
+        <td colspan="16">
+            <table cellspacing="1" cellpadding="5">
+                <tr>
+                    <th>Id</th>
+                    <th>Path</th>
+                    <th>Suffix</th>
+                    <th>Flags</th>
+                    <th>Max Size</th>
+                    <th>Max Frames</th>
+                    <th>Interval</th>
+                    <th>Unique</th>
+                    <th>Append</th>
+                    <th>Lock File</th>
+                    <th>Notify</th>
+                </tr>
+                <xsl:apply-templates select="recorder"/>
+            </table>
+        </td>
+    </tr>
+</xsl:template>
+
+<xsl:template match="recorder">
+    <tr bgcolor="#cccccc">
+        <td><xsl:value-of select="id"/></td>
+        <td><xsl:value-of select="path"/></td>
+        <td><xsl:value-of select="suffix"/></td>
+        <td>
+            <xsl:if test="flags/video">video </xsl:if>
+            <xsl:if test="flags/audio">audio </xsl:if>
+            <xsl:if test="flags/manual">manual </xsl:if>
+        </td>
+        <td><xsl:value-of select="max_size"/></td>
+        <td><xsl:value-of select="max_frames"/></td>
+        <td><xsl:value-of select="interval"/></td>
+        <td>
+            <xsl:call-template name="binarystate">
+                <xsl:with-param name="value" select="unique"/>
+            </xsl:call-template>
+        </td>
+        <td>
+            <xsl:call-template name="binarystate">
+                <xsl:with-param name="value" select="append"/>
+            </xsl:call-template>
+        </td>
+        <td>
+            <xsl:call-template name="binarystate">
+                <xsl:with-param name="value" select="lock_file"/>
+            </xsl:call-template>
+        </td>
+        <td>
+            <xsl:call-template name="binarystate">
+                <xsl:with-param name="value" select="notify"/>
+            </xsl:call-template>
+        </td>
+    </tr>
+</xsl:template>
+
+<xsl:template name="binarystate">
+    <xsl:param name="value"/>
+
+    <xsl:choose>
+        <xsl:when test="$value">on</xsl:when>
+        <xsl:otherwise>off</xsl:otherwise>
+    </xsl:choose>
 </xsl:template>
 
 <xsl:template match="stream">
@@ -228,8 +313,51 @@
                 </tr>
                 <xsl:apply-templates select="client"/>
             </table>
+            <xsl:apply-templates select="records"/>
         </td>
     </tr>
+</xsl:template>
+
+<xsl:template match="records">
+            <table cellspacing="1" cellpadding="5">
+                <tr>
+                    <th>Recorder</th>
+                    <th>State</th>
+                    <th>Epoch</th>
+                    <th>Time Shift</th>
+                    <th>File Name</th>
+                    <th>Length</th>
+                    <th>Frames</th>
+                </tr>
+                <xsl:apply-templates select="record"/>
+            </table>
+</xsl:template>
+
+<xsl:template match="record">
+                <tr>
+                    <xsl:attribute name="bgcolor">
+                        <xsl:choose>
+                            <xsl:when test="recording">#cccccc</xsl:when>
+                            <xsl:otherwise>#eeeeee</xsl:otherwise>
+                        </xsl:choose>
+                    </xsl:attribute>
+                    <td><xsl:value-of select="recorder"/></td>
+                    <td>
+                        <xsl:choose>
+                            <xsl:when test="recording">recording</xsl:when>
+                            <xsl:otherwise>idle</xsl:otherwise>
+                        </xsl:choose>
+                    </td>
+                    <td><xsl:value-of select="epoch"/></td>
+                    <td><xsl:value-of select="time_shift"/></td>
+                    <td><xsl:value-of select="file"/></td>
+                    <td>
+                        <xsl:call-template name="showtime">
+                           <xsl:with-param name="time" select="length * 1000"/>
+                        </xsl:call-template>
+                    </td>
+                    <td><xsl:value-of select="nframes"/></td>
+                    </tr>
 </xsl:template>
 
 <xsl:template name="showtime">

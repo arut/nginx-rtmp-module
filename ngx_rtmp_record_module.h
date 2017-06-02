@@ -75,6 +75,8 @@ ngx_int_t ngx_rtmp_record_open(ngx_rtmp_session_t *s, ngx_uint_t n,
           ngx_str_t *path);
 ngx_int_t ngx_rtmp_record_close(ngx_rtmp_session_t *s, ngx_uint_t n,
           ngx_str_t *path);
+ngx_int_t ngx_rtmp_record_get_path(ngx_rtmp_session_t *s,
+          ngx_rtmp_record_rec_ctx_t *rctx, ngx_str_t *path);
 
 
 typedef struct {
