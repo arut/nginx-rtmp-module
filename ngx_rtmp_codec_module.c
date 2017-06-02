@@ -359,7 +359,8 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
 {
     ngx_uint_t              profile_idc, width, height, crop_left, crop_right,
                             crop_top, crop_bottom, frame_mbs_only, n, cf_idc,
-                            num_ref_frames;
+                            num_ref_frames, sl_size, sl_index, sl_udelta;
+    ngx_int_t               sl_last, sl_next, sl_delta;
     ngx_rtmp_codec_ctx_t   *ctx;
     ngx_rtmp_bit_reader_t   br;
 
@@ -437,11 +438,34 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
                 /* seq scaling list present */
                 if (ngx_rtmp_bit_read(&br, 1)) {
 
-                    /* TODO: scaling_list()
+                    /* scaling list */
                     if (n < 6) {
+                        sl_size = 16;
                     } else {
+                        sl_size = 64;
                     }
-                    */
+
+                    sl_last = 8;
+                    sl_next = 8;
+
+                    for (sl_index = 0; sl_index < sl_size; sl_index++) {
+
+                        if (sl_next != 0) {
+
+                            /* convert to signed: (-1)**k+1 * ceil(k/2) */
+                            sl_udelta = ngx_rtmp_bit_read_golomb(&br);
+                            sl_delta = (sl_udelta + 1) >> 1;
+                            if ((sl_udelta & 1) == 0) {
+                                sl_delta = -sl_delta;
+                            }
+
+                            sl_next = (sl_last + sl_delta + 256) % 256;
+
+                            if (sl_next != 0) {
+                                sl_last = sl_next;
+                            }
+                        }
+                    }
                 }
             }
         }
