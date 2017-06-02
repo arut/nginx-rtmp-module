@@ -1936,10 +1936,13 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                        (ngx_uint_t) nal_type, len);
 
         if (nal_type >= 7 && nal_type <= 9) {
+            sps_pps_sent = 1;
+/*
             if (ngx_rtmp_hls_copy(s, NULL, &p, len - 1, &in) != NGX_OK) {
                 return NGX_ERROR;
             }
             continue;
+*/
         }
 
         if (!aud_sent) {
