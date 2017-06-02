@@ -1129,6 +1129,9 @@ ngx_rtmp_live_postconfiguration(ngx_conf_t *cf)
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_VIDEO]);
     *h = ngx_rtmp_live_av;
 
+    h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AMF_META]);
+    *h = ngx_rtmp_live_av;
+
     /* chain handlers */
 
     next_publish = ngx_rtmp_publish;
