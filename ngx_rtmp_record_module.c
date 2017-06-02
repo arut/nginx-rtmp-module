@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) Roman Arutyunyan
  */
@@ -11,8 +10,10 @@
 #include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_codec_module.h"
 #include "ngx_rtmp_record_module.h"
+#include "ngx_rtmp_eval.h"
 
-
+#define NGX_RTMP_EVAL_BUFLEN    16
+#define NGX_RTMP_EVAL_MAX_NAME  255
 ngx_rtmp_record_done_pt             ngx_rtmp_record_done;
 
 
@@ -177,6 +178,30 @@ ngx_module_t  ngx_rtmp_record_module = {
     NGX_MODULE_V1_PADDING
 };
 
+static ngx_rtmp_eval_t ngx_rtmp_record_suffix_specific_eval[]={
+  {ngx_string("name"),
+   ngx_rtmp_record_eval_ctx_str,
+   offsetof(ngx_rtmp_record_ctx_t,name)},
+   ngx_rtmp_null_eval
+};
+static ngx_rtmp_eval_t * ngx_rtmp_record_suffix_eval[]={
+  ngx_rtmp_eval_session,
+  ngx_rtmp_record_suffix_specific_eval,
+  NULL
+};
+static void ngx_rtmp_record_eval_ctx_str(void *rctx,ngx_rtmp_eval_t *e,ngx_str_t *ret)
+{
+    ngx_rtmp_session_t *s=rctx;
+    ngx_rtmp_record_ctx_t *ctx;
+    ctx=ngx_rtmp_get_module_ctx(s,ngx_rtmp_record_module);
+    if (ctx==NULL)
+    {
+      ret->len=0;
+      return;
+    }
+    ret->data=(u_char *)ctx+e->offset;
+    ret->len=ngx_strlen(ret->data);
+}
 
 static void *
 ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
@@ -363,6 +388,83 @@ ngx_rtmp_record_find(ngx_rtmp_record_app_conf_t *racf, ngx_str_t *id)
     return NGX_CONF_UNSET_UINT;
 }
 
+/*this function eval the suffix string of the record*/
+static void
+ngx_rtmp_record_eval_suffix(ngx_rtmp_session_t *s,ngx_str_t *suffix)
+{
+  ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,"zengxiaobo eval 0 suffix '%V'",suffix);
+  enum {
+      NORMAL,
+      NAME,
+      SNAME
+  } state = NORMAL;
+  /**alloc buffer to store eval string*/
+  ngx_buf_t   buf;
+  buf.pos = buf.last = buf.start = ngx_alloc(NGX_RTMP_EVAL_MAX_NAME,s->connection->log);
+  buf.end = buf.pos + NGX_RTMP_EVAL_MAX_NAME;
+  /*variable for suffix*/
+  u_char  *p,*lower,*upper,c;
+  ngx_uint_t n;
+  size_t len;
+  ngx_str_t args_out;
+  lower=upper=NULL;
+  p=suffix->data;
+  for (n = 0; n< suffix->len; ++n)
+  {
+    p=&suffix->data[n];
+    c=*p;
+    switch(state){
+        case NORMAL:
+            if (c=='$')
+            {
+              if (lower!=NULL)
+              {
+                buf.last=ngx_cpymem(buf.last,lower,upper-lower+1);//copy len
+                ngx_str_t t;
+                t.data=buf.pos;
+                t.len=buf.last-buf.pos;
+              }
+              state=NAME;
+              lower=upper=p;
+            }else{
+              if (lower==NULL)
+              {
+                lower=p;
+              }
+              upper=p;
+            }
+        case NAME:
+            if (c=='{')
+            {
+              state=SNAME;
+              continue;
+            }
+        case SNAME:
+            if (c=='}')
+            {
+              upper=p;
+              len=upper-lower+1;
+              ngx_str_t args_in;
+              args_in.data=ngx_palloc(s->connection->pool,len);
+              args_in.len=len;
+              ngx_cpymem(args_in.data,lower,len);
+              ngx_rtmp_eval(s,&args_in,ngx_rtmp_record_suffix_eval,&args_out,s->connection->log);//eval string
+              buf.last=ngx_cpymem(buf.last,args_out.data,args_out.len);
+              lower=upper=NULL;
+              state=NORMAL;
+            }
+    }
+  }
+  if (state==NORMAL)
+  {
+    buf.last=ngx_cpymem(buf.last,lower,upper-lower+1);//copy len
+  }
+  c=0;//copy to end;
+  ngx_cpymem(buf.last,&c,1);
+  suffix->data=buf.pos;
+  suffix->len=buf.last-buf.pos;
+  ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,"eval suffix='%V'",suffix);
+}
 
 /* This funcion returns pointer to a static buffer */
 static void
@@ -388,14 +490,18 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
     p = ngx_cpymem(p, rracf->path.data,
                 ngx_min(rracf->path.len, (size_t)(l - p - 1)));
     *p++ = '/';
-    p = (u_char *)ngx_escape_uri(p, ctx->name, ngx_min(ngx_strlen(ctx->name),
-                (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
+    // p = (u_char *)ngx_escape_uri(p, ctx->name, ngx_min(ngx_strlen(ctx->name),
+    //             (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
 
     /* append timestamp */
     if (rracf->unique) {
         p = ngx_cpymem(p, buf, ngx_min(ngx_sprintf(buf, "-%T",
                        rctx->timestamp) - buf, l - p));
     }
+    /*eval suffix string*/
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,"zengxiaobo 1 record: %V suffix: '%V'", &rracf->id, &rracf->suffix);
+    ngx_rtmp_record_eval_suffix(s,&rracf->suffix);
+    ngx_log_debug2(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,"zengxiaobo 2 record: %V suffix: '%V'", &rracf->id, &rracf->suffix);
 
     if (ngx_strchr(rracf->suffix.data, '%')) {
         ngx_libc_localtime(rctx->timestamp, &tm);
@@ -1195,7 +1301,6 @@ ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_int_t                   i;
     ngx_str_t                  *value;
     ngx_conf_t                  save;
-    ngx_module_t              **modules;
     ngx_rtmp_module_t          *module;
     ngx_rtmp_core_app_conf_t   *cacf, **pcacf, *rcacf;
     ngx_rtmp_record_app_conf_t *racf, **pracf, *rracf;
@@ -1222,22 +1327,17 @@ ngx_rtmp_record_recorder(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-#if (nginx_version >= 1009011)
-    modules = cf->cycle->modules;
-#else
-    modules = ngx_modules;
-#endif
-
-    for (i = 0; modules[i]; i++) {
-        if (modules[i]->type != NGX_RTMP_MODULE) {
+    for (i = 0; ngx_modules[i]; i++) {
+        if (ngx_modules[i]->type != NGX_RTMP_MODULE) {
             continue;
         }
 
-        module = modules[i]->ctx;
+        module = ngx_modules[i]->ctx;
 
         if (module->create_app_conf) {
-            ctx->app_conf[modules[i]->ctx_index] = module->create_app_conf(cf);
-            if (ctx->app_conf[modules[i]->ctx_index] == NULL) {
+            ctx->app_conf[ngx_modules[i]->ctx_index] =
+                                module->create_app_conf(cf);
+            if (ctx->app_conf[ngx_modules[i]->ctx_index] == NULL) {
                 return NGX_CONF_ERROR;
             }
         }
