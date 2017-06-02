@@ -94,6 +94,8 @@ ngx_rtmp_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_rtmp_core_srv_conf_t    *cscf, **cscfp;
     ngx_rtmp_core_main_conf_t   *cmcf;
 
+    ngx_queue_init(&ngx_rtmp_init_queue);
+
     ctx = ngx_pcalloc(cf->pool, sizeof(ngx_rtmp_conf_ctx_t));
     if (ctx == NULL) {
         return NGX_CONF_ERROR;
