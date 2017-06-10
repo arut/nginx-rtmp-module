@@ -52,7 +52,7 @@ typedef struct {
     ngx_str_t                           playlist_bak;
     ngx_str_t                           name;
     ngx_str_t                           stream;
-    ngx_time_t                          start_time;
+    time_t                              start_time;
 
     ngx_uint_t                          nfrags;
     ngx_uint_t                          frag;
@@ -337,7 +337,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "  </Period>\n"                                                            \
     "</MPD>\n"
 
-    ngx_libc_gmtime(ctx->start_time.sec / 1000, &tm);
+    ngx_libc_gmtime(ctx->start_time, &tm);
 
     ngx_sprintf(start_time, "%4d-%02d-%02dT%02d:%02d:%02dZ%Z",
                 tm.tm_year + 1900, tm.tm_mon + 1,
@@ -938,7 +938,7 @@ ngx_rtmp_dash_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
                    "dash: playlist='%V' playlist_bak='%V' stream_pattern='%V'",
                    &ctx->playlist, &ctx->playlist_bak, &ctx->stream);
 
-    ctx->start_time = *ngx_cached_time;
+    ctx->start_time = ngx_time();
 
     if (ngx_rtmp_dash_ensure_directory(s) != NGX_OK) {
         return NGX_ERROR;
