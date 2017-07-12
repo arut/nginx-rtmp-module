@@ -330,3 +330,6 @@ rtmp_auto_push directive.
             }
         }
     }
+    
+#Official RTMP Specification
+Adobe released the [RTMP Specification](http://wwwimages.adobe.com/www.adobe.com/content/dam/Adobe/en/devnet/rtmp/pdf/rtmp_specification_1.0.pdf) in Jun 15, 2009. It is however incomplete but very good for a foundation of what RTMP is.
