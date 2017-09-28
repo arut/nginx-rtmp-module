@@ -79,6 +79,7 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
 
         case AF_UNIX:
             unix_socket = 1;
+            /* fall through */
 
         default: /* AF_INET */
             sin = (struct sockaddr_in *) sa;
@@ -110,6 +111,7 @@ ngx_rtmp_init_connection(ngx_connection_t *c)
 
         case AF_UNIX:
             unix_socket = 1;
+            /* fall through */
 
         default: /* AF_INET */
             addr = port->addrs;
