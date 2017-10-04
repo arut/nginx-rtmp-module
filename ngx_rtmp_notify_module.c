@@ -1071,6 +1071,30 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
         return NGX_ERROR;
     }
 
+#define NGX_RTMP_RELAY_STR_PARAM(headerName, targetVarName, paramName)        \
+    static ngx_str_t paramName##HeaderName = ngx_string(#headerName);         \
+    rc = ngx_rtmp_notify_parse_http_header(s, in, &paramName##HeaderName,     \
+                                           headerValue,                       \
+                                           sizeof(headerValue) - 1);          \
+                                                                              \
+    if (rc > 0) {                                                             \
+        target.targetVarName.len = rc;                                        \
+        target.targetVarName.data = ngx_pcalloc(s->connection->pool,          \
+                                                sizeof(u_char) * rc);         \
+        ngx_memcpy(target.targetVarName.data, headerValue, rc);               \
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,             \
+                       "notify: push param " #paramName ": '%V'",             \
+                       &target.targetVarName);                                \
+    }
+
+    u_char headerValue[256];
+    NGX_RTMP_RELAY_STR_PARAM(x-rtmp-tc-url, tc_url, tcUrl);
+    NGX_RTMP_RELAY_STR_PARAM(x-rtmp-page-url, page_url, pageUrl);
+    NGX_RTMP_RELAY_STR_PARAM(x-rtmp-swf-url, swf_url, swfUrl);
+    NGX_RTMP_RELAY_STR_PARAM(x-rtmp-flash-ver, flash_ver, flashVer);
+
+#undef NGX_RTMP_RELAY_STR_PARAM
+
     ngx_rtmp_relay_push(s, &local_name, &target);
 
 next:
