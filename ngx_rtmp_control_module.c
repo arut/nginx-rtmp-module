@@ -155,7 +155,6 @@ ngx_rtmp_control_drop_handler(ngx_http_request_t *r, ngx_rtmp_session_t *s)
 
     ctx = ngx_http_get_module_ctx(r, ngx_rtmp_control_module);
 
-    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "ngx_rtmp_finalize_session 9010, ngx_rtmp_control_drop_handler");
     ngx_rtmp_finalize_session(s);
 
     ++ctx->count;

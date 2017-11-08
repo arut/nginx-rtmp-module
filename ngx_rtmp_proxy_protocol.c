@@ -41,7 +41,6 @@ ngx_rtmp_proxy_protocol(ngx_rtmp_session_t *s)
     ngx_add_timer(rev, s->timeout);
 
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
-	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0, "ngx_rtmp_finalize_session 9500");
         ngx_rtmp_finalize_session(s);
         return;
     }
@@ -91,14 +90,12 @@ ngx_rtmp_proxy_protocol_recv(ngx_event_t *rev)
             ngx_add_timer(rev, s->timeout);
 
             if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-		ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9501");
                 ngx_rtmp_finalize_session(s);
             }
 
             return;
         }
 
-	ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9502");
         ngx_rtmp_finalize_session(s);
 
         return;
@@ -196,6 +193,5 @@ bad_header:
 
 failed:
 
-    ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9503");
     ngx_rtmp_finalize_session(s);
 }

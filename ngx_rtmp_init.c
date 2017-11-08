@@ -208,7 +208,6 @@ ngx_rtmp_init_session(ngx_connection_t *c, ngx_rtmp_addr_conf_t *addr_conf)
 
 
     if (ngx_rtmp_fire_event(s, NGX_RTMP_CONNECT, NULL, NULL) != NGX_OK) {
-	ngx_log_error(NGX_LOG_INFO, c->log, 0, "ngx_rtmp_finalize_session 9200");
         ngx_rtmp_finalize_session(s);
         return NULL;
     }
