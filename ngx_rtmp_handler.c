@@ -180,7 +180,6 @@ ngx_rtmp_ping(ngx_event_t *pev)
             "ping: schedule %Mms", cscf->ping_timeout);
 
     if (ngx_rtmp_send_ping_request(s, (uint32_t)ngx_current_msec) != NGX_OK) {
-        ngx_log_error(NGX_LOG_INFO, c->log, 0, "ping: sned ping request error");
         ngx_rtmp_finalize_session(s);
         return;
     }
