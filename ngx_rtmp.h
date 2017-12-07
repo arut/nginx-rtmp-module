@@ -247,6 +247,9 @@ typedef struct {
     /* RTMPS */
     unsigned                ssl:1;
 
+    /* always send args */
+    unsigned                send_args:1;
+
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */
 
@@ -530,6 +533,12 @@ ngx_int_t ngx_rtmp_send_ack_size(ngx_rtmp_session_t *s,
         uint32_t ack_size);
 ngx_int_t ngx_rtmp_send_bandwidth(ngx_rtmp_session_t *s,
         uint32_t ack_size, uint8_t limit_type);
+
+/* Connection error messages */
+ngx_chain_t* ngx_rtmp_create_connection_error(ngx_rtmp_session_t *s,
+        double trans, char *desc);
+ngx_int_t ngx_rtmp_send_connection_error(ngx_rtmp_session_t *s,
+        double trans, char *desc);
 
 /* User control messages */
 ngx_chain_t * ngx_rtmp_create_stream_begin(ngx_rtmp_session_t *s,

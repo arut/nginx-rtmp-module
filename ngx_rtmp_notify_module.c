@@ -991,9 +991,16 @@ ngx_rtmp_notify_connect_handle(ngx_rtmp_session_t *s,
     u_char              app[NGX_RTMP_MAX_NAME];
 
     static ngx_str_t    location = ngx_string("location");
+    static ngx_str_t    error_description = ngx_string("RTMP-description");
 
     rc = ngx_rtmp_notify_parse_http_retcode(s, in);
     if (rc == NGX_ERROR) {
+        rc = ngx_rtmp_notify_parse_http_header(s, in, &error_description, 
+                                            app, sizeof(app) - 1);
+        if (rc > 0) {
+            app[rc] = 0;
+            ngx_rtmp_send_connection_error(s, v->trans, (char*)app);
+        }
         return NGX_ERROR;
     }
 

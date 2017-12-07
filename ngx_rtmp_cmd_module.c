@@ -271,6 +271,15 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     h.csid = NGX_RTMP_CSID_AMF_INI;
     h.type = NGX_RTMP_MSG_AMF_CMD;
 
+    /* in case of redirect new arguments set could be specified
+     * store them to pass to every event request
+     */
+    p = (u_char *)ngx_strchr(v->app, '?');
+    if (p) {
+        *p++ = 0;
+        ngx_cpystrn(v->args, p, NGX_RTMP_MAX_ARGS);
+        s->send_args = 1;
+    }
 
 #define NGX_RTMP_SET_STRPAR(name)                                             \
     s->name.len = ngx_strlen(v->name);                                        \
@@ -285,11 +294,6 @@ ngx_rtmp_cmd_connect(ngx_rtmp_session_t *s, ngx_rtmp_connect_t *v)
     NGX_RTMP_SET_STRPAR(page_url);
 
 #undef NGX_RTMP_SET_STRPAR
-
-    p = ngx_strlchr(s->app.data, s->app.data + s->app.len, '?');
-    if (p) {
-        s->app.len = (p - s->app.data);
-    }
 
     s->acodecs = (uint32_t) v->acodecs;
     s->vcodecs = (uint32_t) v->vcodecs;
