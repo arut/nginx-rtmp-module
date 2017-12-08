@@ -922,6 +922,7 @@ ngx_rtmp_notify_parse_http_header(ngx_rtmp_session_t *s,
 
                     n = 0;
                     state = parse_name;
+                    /* fall through */
 
                 case parse_name:
                     switch (c) {
@@ -949,6 +950,7 @@ ngx_rtmp_notify_parse_http_header(ngx_rtmp_session_t *s,
                         break;
                     }
                     state = parse_value;
+                    /* fall through */
 
                 case parse_value:
                     if (c == '\n') {

@@ -15,6 +15,7 @@ RTMP_CORE_MODULES="                                         \
                 ngx_rtmp_relay_module                       \
                 ngx_rtmp_exec_module                        \
                 ngx_rtmp_auto_push_module                   \
+                ngx_rtmp_auto_push_index_module             \
                 ngx_rtmp_notify_module                      \
                 ngx_rtmp_log_module                         \
                 ngx_rtmp_limit_module                       \
