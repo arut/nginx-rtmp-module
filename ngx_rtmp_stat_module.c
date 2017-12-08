@@ -115,7 +115,7 @@ ngx_rtmp_stat_init_process(ngx_cycle_t *cycle)
      * so we can run posted events here
      */
 
-    ngx_event_process_posted(cycle, &ngx_rtmp_init_queue);
+    ngx_event_process_posted(cycle, (ngx_queue_t*) &ngx_rtmp_init_queue);
 
     return NGX_OK;
 }
