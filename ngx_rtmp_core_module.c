@@ -9,6 +9,7 @@
 #include <ngx_event.h>
 #include <nginx.h>
 #include "ngx_rtmp.h"
+#include "ngx_rtmp_ssl_module.h"
 
 
 static void *ngx_rtmp_core_create_main_conf(ngx_conf_t *cf);
@@ -45,7 +46,7 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       NULL },
 
     { ngx_string("listen"),
-      NGX_RTMP_SRV_CONF|NGX_CONF_TAKE12,
+      NGX_RTMP_SRV_CONF|NGX_CONF_TAKE123,
       ngx_rtmp_core_listen,
       NGX_RTMP_SRV_CONF_OFFSET,
       0,
@@ -743,6 +744,14 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         if (ngx_strcmp(value[i].data, "proxy_protocol") == 0) {
             ls->proxy_protocol = 1;
+            continue;
+        }
+
+        if (ngx_strcmp(value[i].data, "rtmps") == 0) {
+            if (ngx_rtmp_ssl_enable(cf) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+            ls->ssl = 1;
             continue;
         }
 

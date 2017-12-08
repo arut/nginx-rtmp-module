@@ -53,6 +53,7 @@ typedef struct {
     unsigned                            video_key_sent:1;
     unsigned                            audio:1;
     unsigned                            video:1;
+    unsigned                            started:1;
 } ngx_rtmp_record_rec_ctx_t;
 
 

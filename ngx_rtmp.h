@@ -45,6 +45,7 @@ typedef struct {
 #endif
     unsigned                so_keepalive:2;
     unsigned                proxy_protocol:1;
+    unsigned                ssl:1;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                     tcp_keepidle;
     int                     tcp_keepintvl;
@@ -57,6 +58,7 @@ typedef struct {
     ngx_rtmp_conf_ctx_t    *ctx;
     ngx_str_t               addr_text;
     unsigned                proxy_protocol:1;
+    unsigned                ssl:1;
 } ngx_rtmp_addr_conf_t;
 
 typedef struct {
@@ -101,6 +103,7 @@ typedef struct {
 #endif
     unsigned                so_keepalive:2;
     unsigned                proxy_protocol:1;
+    unsigned                ssl:1;
 #if (NGX_HAVE_KEEPALIVE_TUNABLE)
     int                     tcp_keepidle;
     int                     tcp_keepintvl;
@@ -242,6 +245,12 @@ typedef struct {
     unsigned                auto_pushed:1;
     unsigned                relay:1;
     unsigned                static_relay:1;
+
+    /* RTMPS */
+    unsigned                ssl:1;
+
+    /* always send args */
+    unsigned                send_args:1;
 
     /* input stream 0 (reserved by RTMP spec)
      * is used as free chain link */
@@ -526,6 +535,12 @@ ngx_int_t ngx_rtmp_send_ack_size(ngx_rtmp_session_t *s,
         uint32_t ack_size);
 ngx_int_t ngx_rtmp_send_bandwidth(ngx_rtmp_session_t *s,
         uint32_t ack_size, uint8_t limit_type);
+
+/* Connection error messages */
+ngx_chain_t* ngx_rtmp_create_connection_error(ngx_rtmp_session_t *s,
+        double trans, char *desc);
+ngx_int_t ngx_rtmp_send_connection_error(ngx_rtmp_session_t *s,
+        double trans, char *desc);
 
 /* User control messages */
 ngx_chain_t * ngx_rtmp_create_stream_begin(ngx_rtmp_session_t *s,

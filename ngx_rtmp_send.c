@@ -633,3 +633,64 @@ ngx_rtmp_send_sample_access(ngx_rtmp_session_t *s)
     return ngx_rtmp_send_shared_packet(s,
            ngx_rtmp_create_sample_access(s));
 }
+
+
+ngx_chain_t*
+ngx_rtmp_create_connection_error(ngx_rtmp_session_t *s, double trans, char *desc)
+{
+    ngx_rtmp_header_t           h;
+
+    static ngx_rtmp_amf_elt_t  out_inf[] = {
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("level"),
+          "error", 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("code"),
+          "NetConnection.Connect.Error", 0 },
+
+        //description data value is set below
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("description"),
+          NULL, 0 },
+    };
+
+    static ngx_rtmp_amf_elt_t  out_elts[] = {
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          "_error", 0 },
+
+        //trans data value is set below
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_NULL,
+          ngx_null_string,
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          out_inf, sizeof(out_inf) },
+    };
+
+    out_inf[2].data = desc;
+    out_elts[1].data = &trans;
+
+    ngx_memzero(&h, sizeof(h));
+    h.csid = NGX_RTMP_CSID_AMF_INI;
+    h.type = NGX_RTMP_MSG_AMF_CMD;
+
+    return ngx_rtmp_create_amf(s, &h, out_elts, 
+                               sizeof(out_elts) / sizeof(out_elts[0]));
+}
+
+ngx_int_t
+ngx_rtmp_send_connection_error(ngx_rtmp_session_t *s, double trans, char *desc)
+{
+    //Make sure the error message fits into one chunk
+    if (ngx_rtmp_send_chunk_size(s, 512) != NGX_OK)
+        return NGX_ERROR;
+    return ngx_rtmp_send_shared_packet(s,
+           ngx_rtmp_create_connection_error(s, trans, desc));
+}
