@@ -1951,6 +1951,7 @@ ngx_rtmp_hls_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                                       "hls: error appending AUD NAL");
                     }
+                    /* fall through */
                 case 9:
                     aud_sent = 1;
                     break;
@@ -2210,14 +2211,22 @@ ngx_rtmp_hls_cleanup_dir(ngx_str_t *ppath, ngx_msec_t playlen)
 }
 
 
+#if (nginx_version >= 1011005)
+static ngx_msec_t
+#else
 static time_t
+#endif
 ngx_rtmp_hls_cleanup(void *data)
 {
     ngx_rtmp_hls_cleanup_t *cleanup = data;
 
     ngx_rtmp_hls_cleanup_dir(&cleanup->path, cleanup->playlen);
 
+#if (nginx_version >= 1011005)
+    return cleanup->playlen * 2;
+#else
     return cleanup->playlen / 500;
+#endif
 }
 
 

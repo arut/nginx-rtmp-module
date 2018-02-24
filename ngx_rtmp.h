@@ -135,6 +135,8 @@ typedef struct {
 #define NGX_RTMP_MSG_AGGREGATE          22
 #define NGX_RTMP_MSG_MAX                22
 
+#define NGX_RTMP_MAX_CHUNK_SIZE         10485760
+
 #define NGX_RTMP_CONNECT                NGX_RTMP_MSG_MAX + 1
 #define NGX_RTMP_DISCONNECT             NGX_RTMP_MSG_MAX + 2
 #define NGX_RTMP_HANDSHAKE_DONE         NGX_RTMP_MSG_MAX + 3
