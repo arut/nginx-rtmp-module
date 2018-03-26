@@ -608,17 +608,17 @@ ngx_rtmp_netcall_http_format_session(ngx_rtmp_session_t *s, ngx_pool_t *pool)
     b->last = ngx_cpymem(b->last, (u_char*) "&swfurl=",
                          sizeof("&swfurl=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, s->swf_url.data,
-                                       s->swf_url.len, NGX_ESCAPE_ARGS);
+                                       s->swf_url.len, NGX_ESCAPE_URI_COMPONENT);
 
     b->last = ngx_cpymem(b->last, (u_char*) "&tcurl=",
                          sizeof("&tcurl=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, s->tc_url.data,
-                                       s->tc_url.len, NGX_ESCAPE_ARGS);
+                                       s->tc_url.len, NGX_ESCAPE_URI_COMPONENT);
 
     b->last = ngx_cpymem(b->last, (u_char*) "&pageurl=",
                          sizeof("&pageurl=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, s->page_url.data,
-                                       s->page_url.len, NGX_ESCAPE_ARGS);
+                                       s->page_url.len, NGX_ESCAPE_URI_COMPONENT);
 
     b->last = ngx_cpymem(b->last, (u_char*) "&addr=", sizeof("&addr=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, addr_text->data,
