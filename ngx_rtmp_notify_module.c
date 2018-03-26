@@ -413,17 +413,17 @@ ngx_rtmp_notify_connect_create(ngx_rtmp_session_t *s, void *arg,
     b->last = ngx_cpymem(b->last, (u_char*) "&swfurl=",
                          sizeof("&swfurl=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, v->swf_url, swf_url_len,
-                                       NGX_ESCAPE_ARGS);
+                                       NGX_ESCAPE_URI_COMPONENT);
 
     b->last = ngx_cpymem(b->last, (u_char*) "&tcurl=",
                          sizeof("&tcurl=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, v->tc_url, tc_url_len,
-                                       NGX_ESCAPE_ARGS);
+                                       NGX_ESCAPE_URI_COMPONENT);
 
     b->last = ngx_cpymem(b->last, (u_char*) "&pageurl=",
                          sizeof("&pageurl=") - 1);
     b->last = (u_char*) ngx_escape_uri(b->last, v->page_url, page_url_len,
-                                       NGX_ESCAPE_ARGS);
+                                       NGX_ESCAPE_URI_COMPONENT);
 
     b->last = ngx_cpymem(b->last, (u_char*) "&addr=", sizeof("&addr=") -1);
     b->last = (u_char*) ngx_escape_uri(b->last, addr_text->data,
