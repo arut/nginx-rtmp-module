@@ -599,10 +599,8 @@ ngx_rtmp_relay_create(ngx_rtmp_session_t *s, ngx_str_t *name,
     }
 
     if (*cctx) {
-        play_ctx->publish = (*cctx)->publish;
-        play_ctx->next = (*cctx)->play;
-        (*cctx)->play = play_ctx;
-        return NGX_OK;
+        ngx_rtmp_finalize_session(play_ctx->session);
+        return NGX_ERROR;
     }
 
     publish_ctx = create_publish_ctx(s, name, target);
@@ -694,7 +692,7 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
                 &name, &target->app, &target->play_path,
                 &target->url.url);
 
-        if (!ctx->push_evt.timer_set) {
+        if (ctx && !ctx->push_evt.timer_set) {
             ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
         }
     }
