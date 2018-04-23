@@ -212,16 +212,50 @@ ngx_rtmp_dash_rename_file(u_char *src, u_char *dst)
 }
 
 static u_char
-ngx_rtmp_dash_write_segments(ngx_rtmp_session_t *s, ngx_rtmp_dash_ctx_t *ctx, u_char *p, u_char *last)
+ngx_rtmp_dash_write_segment(u_char *p, u_char *last, ngx_uint_t t, ngx_uint_t d, ngx_uint_t r)
 {
 #define NGX_RTMP_DASH_MANIFEST_TIME                                            \
     "             <S t=\"%uD\" d=\"%uD\"/>\n"
 
+#define NGX_RTMP_DASH_MANIFEST_TIME_WITH_REPETITION                            \
+    "             <S t=\"%uD\" d=\"%uD\" r=\"%uD\"/>\n"
+
+    if (r == 0) {
+        p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_TIME,
+                         t, d);
+    } else {
+        p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_TIME_WITH_REPETITION,
+                         t, d, r);
+    }
+}
+
+static u_char
+ngx_rtmp_dash_write_segment_timeline(ngx_rtmp_session_t *s, ngx_rtmp_dash_ctx_t *ctx, u_char *p, u_char *last)
+{
+
+    ngx_uint_t i, t, d, r;
 
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_dash_get_frag(s, i);
-        p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_TIME,
-                         f->timestamp, f->duration);
+
+        if (i == 0) {
+            t = f->timestamp;
+            d = f->duration;
+            r = 0;
+        } else {
+            if (f->duration == d) {
+                r++;
+            } else {
+                p = ngx_rtmp_dash_write_segment(p, last, t, d, r);
+                t = f->timestamp;
+                d = f->duration;
+                r = 0;
+            }
+        }
+
+        if (i == ctx->nfrags - 1) {
+            p = ngx_rtmp_dash_write_segment(p, last, t, d, r);
+        }
     }
 
     return p;
@@ -398,7 +432,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          name, sep,
                          name, sep);
 
-        p = ngx_rtmp_dash_write_segments(s, ctx, p, last);
+        p = ngx_rtmp_dash_write_segment_timeline(s, ctx, p, last);
 
         p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_VIDEO_FOOTER);
 
@@ -415,7 +449,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                          name, sep,
                          name, sep);
 
-        p = ngx_rtmp_dash_write_segments(s, ctx, p, last);
+        p = ngx_rtmp_dash_write_segment_timeline(s, ctx, p, last);
 
         p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_AUDIO_FOOTER);
 
