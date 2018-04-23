@@ -211,7 +211,7 @@ ngx_rtmp_dash_rename_file(u_char *src, u_char *dst)
 #endif
 }
 
-static u_char
+static u_char *
 ngx_rtmp_dash_write_segment(u_char *p, u_char *last, ngx_uint_t t, ngx_uint_t d, ngx_uint_t r)
 {
 #define NGX_RTMP_DASH_MANIFEST_TIME                                            \
@@ -227,13 +227,16 @@ ngx_rtmp_dash_write_segment(u_char *p, u_char *last, ngx_uint_t t, ngx_uint_t d,
         p = ngx_slprintf(p, last, NGX_RTMP_DASH_MANIFEST_TIME_WITH_REPETITION,
                          t, d, r);
     }
+
+    return p;
 }
 
-static u_char
+static u_char *
 ngx_rtmp_dash_write_segment_timeline(ngx_rtmp_session_t *s, ngx_rtmp_dash_ctx_t *ctx, u_char *p, u_char *last)
 {
 
-    ngx_uint_t i, t, d, r;
+    ngx_uint_t              i, t, d, r;
+    ngx_rtmp_dash_frag_t    *f;
 
     for (i = 0; i < ctx->nfrags; i++) {
         f = ngx_rtmp_dash_get_frag(s, i);
@@ -271,10 +274,8 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     ngx_fd_t                   fd;
     struct tm                  tm;
     ngx_str_t                  noname, *name;
-    ngx_uint_t                 i;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
-    ngx_rtmp_dash_frag_t      *f;
     ngx_rtmp_dash_app_conf_t  *dacf;
 
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
