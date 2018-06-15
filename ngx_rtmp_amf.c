@@ -328,7 +328,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
         } else {
             switch (ngx_rtmp_amf_get(ctx, &type8, 1)) {
                 case NGX_DONE:
-                    if (elts->type & NGX_RTMP_AMF_OPTIONAL) {
+                    if (elts && elts->type & NGX_RTMP_AMF_OPTIONAL) {
                         return NGX_OK;
                     }
                     /* fall through */
@@ -373,7 +373,7 @@ ngx_rtmp_amf_read(ngx_rtmp_amf_ctx_t *ctx, ngx_rtmp_amf_elt_t *elts,
                 if (data == NULL) {
                     rc = ngx_rtmp_amf_get(ctx, data, len);
 
-                } else if (elts->len <= len) {
+                } else if (elts && elts->len <= len) {
                     rc = ngx_rtmp_amf_get(ctx, data, elts->len - 1);
                     if (rc != NGX_OK)
                         return NGX_ERROR;
