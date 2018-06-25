@@ -57,6 +57,13 @@
 
 * Linux/FreeBSD/MacOS/Windows
 
+### Simple Installation
+#### Ubuntu/Debian
+
+    apt-get install nginx-full
+  
+This will install the rtmp module along with other nginx modules.
+
 ### Build
 
 cd to NGINX source directory & run this:
