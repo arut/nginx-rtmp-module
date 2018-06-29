@@ -28,6 +28,7 @@ typedef struct {
     size_t                              max_frames;
     ngx_msec_t                          interval;
     ngx_str_t                           suffix;
+    ngx_str_t				prefix;
     ngx_flag_t                          unique;
     ngx_flag_t                          append;
     ngx_flag_t                          lock_file;
