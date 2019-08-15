@@ -30,6 +30,7 @@ static void ngx_rtmp_codec_parse_aac_header(ngx_rtmp_session_t *s,
        ngx_chain_t *in);
 static void ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s,
        ngx_chain_t *in);
+static void ngx_rtmp_codec_read_scaling_list(ngx_rtmp_bit_reader_t *br, ngx_uint_t size);
 #if (NGX_DEBUG)
 static void ngx_rtmp_codec_dump_header(ngx_rtmp_session_t *s, const char *type,
        ngx_chain_t *in);
@@ -359,7 +360,8 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
 {
     ngx_uint_t              profile_idc, width, height, crop_left, crop_right,
                             crop_top, crop_bottom, frame_mbs_only, n, cf_idc,
-                            num_ref_frames;
+                            num_ref_frames, chroma_array_type, color_plane_format,
+                            crop_unit_x, crop_unit_y;
     ngx_rtmp_codec_ctx_t   *ctx;
     ngx_rtmp_bit_reader_t   br;
 
@@ -407,9 +409,19 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
     /* SPS id */
     ngx_rtmp_bit_read_golomb(&br);
 
+    /* When chroma_format_idc is not present, it shall be inferred to be equal
+       to 1 (4:2:0 chroma format). When profile_idc is equal to 183,
+       chroma_format_idc shall be equal to 0 (4:0:0 chroma format). */
+    chroma_array_type = 1;
+    if (profile_idc == 183) {
+      chroma_array_type = 0;
+    }
+
     if (profile_idc == 100 || profile_idc == 110 ||
         profile_idc == 122 || profile_idc == 244 || profile_idc == 44 ||
-        profile_idc == 83 || profile_idc == 86 || profile_idc == 118)
+        profile_idc == 83 || profile_idc == 86 || profile_idc == 118 ||
+        profile_idc == 128 || profile_idc == 138 || profile_idc == 139 ||
+        profile_idc == 134 || profile_idc == 135)
     {
         /* chroma format idc */
         cf_idc = (ngx_uint_t) ngx_rtmp_bit_read_golomb(&br);
@@ -417,7 +429,10 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
         if (cf_idc == 3) {
 
             /* separate color plane */
-            ngx_rtmp_bit_read(&br, 1);
+            color_plane_format = ngx_rtmp_bit_read(&br, 1);
+            if (color_plane_format == 0) {
+              chroma_array_type = cf_idc;
+            }
         }
 
         /* bit depth luma - 8 */
@@ -436,12 +451,11 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
 
                 /* seq scaling list present */
                 if (ngx_rtmp_bit_read(&br, 1)) {
-
-                    /* TODO: scaling_list()
                     if (n < 6) {
+                      ngx_rtmp_codec_read_scaling_list(&br, 16);
                     } else {
+                      ngx_rtmp_codec_read_scaling_list(&br, 64);
                     }
-                    */
                 }
             }
         }
@@ -519,9 +533,20 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
         crop_bottom = 0;
     }
 
-    ctx->width = (width + 1) * 16 - (crop_left + crop_right) * 2;
+    if (chroma_array_type == 1) {
+      crop_unit_x = 2;
+      crop_unit_y = 2 * (2 - frame_mbs_only);
+    } else if (chroma_array_type == 2) {
+      crop_unit_x = 2;
+      crop_unit_y = 2 - frame_mbs_only;
+    } else {
+      crop_unit_x = 1;
+      crop_unit_y = 2 - frame_mbs_only;
+    }
+
+    ctx->width = (width + 1) * 16 - (crop_left + crop_right) * crop_unit_x;
     ctx->height = (2 - frame_mbs_only) * (height + 1) * 16 -
-                  (crop_top + crop_bottom) * 2;
+                  (crop_top + crop_bottom) * crop_unit_y;
 
     ngx_log_debug7(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "codec: avc header "
@@ -530,6 +555,22 @@ ngx_rtmp_codec_parse_avc_header(ngx_rtmp_session_t *s, ngx_chain_t *in)
                    ctx->avc_profile, ctx->avc_compat, ctx->avc_level,
                    ctx->avc_nal_bytes, ctx->avc_ref_frames,
                    ctx->width, ctx->height);
+}
+
+static void ngx_rtmp_codec_read_scaling_list(ngx_rtmp_bit_reader_t *br, ngx_uint_t size) {
+  ngx_uint_t last_scale = 8;
+  ngx_uint_t next_scale = 8;
+  ngx_uint_t delta;
+  ngx_uint_t j;
+  for (j = 0; j < size; j++) {
+    if (next_scale != 0) {
+      delta = ngx_rtmp_bit_read_golomb(br);
+      next_scale = ((last_scale + delta) & 0xFF);
+    }
+    if (next_scale != 0) {
+      last_scale = next_scale;
+    }
+  }
 }
 
 
