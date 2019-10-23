@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include "ngx_rtmp_relay_module.h"
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_eval.h"
 
 
 static ngx_rtmp_publish_pt          next_publish;
@@ -27,7 +28,9 @@ static ngx_int_t ngx_rtmp_relay_publish(ngx_rtmp_session_t *s,
        ngx_rtmp_publish_t *v);
 static ngx_rtmp_relay_ctx_t * ngx_rtmp_relay_create_connection(
        ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
-       ngx_rtmp_relay_target_t *target);
+       ngx_rtmp_relay_target_t *target,
+       ngx_rtmp_session_t *session);
+static void ngx_rtmp_relay_eval_ctx_str(void *ctx, ngx_rtmp_eval_t *e, ngx_str_t *ret);
 
 
 /*                _____
@@ -155,6 +158,34 @@ ngx_module_t  ngx_rtmp_relay_module = {
 };
 
 
+static ngx_rtmp_eval_t ngx_rtmp_relay_specific_eval [] = {
+
+    { ngx_string("name"),
+      ngx_rtmp_relay_eval_ctx_str,
+      offsetof(ngx_rtmp_session_t, stream) },
+
+    { ngx_string("args"),
+      ngx_rtmp_relay_eval_ctx_str,
+      offsetof(ngx_rtmp_session_t, args) },
+
+    ngx_rtmp_null_eval
+};
+
+
+static ngx_rtmp_eval_t * ngx_rtmp_relay_eval[] = {
+    ngx_rtmp_eval_session,
+    ngx_rtmp_relay_specific_eval,
+    NULL
+};
+
+
+static void
+ngx_rtmp_relay_eval_ctx_str(void *ctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
+{
+    *ret = * (ngx_str_t *) ((u_char *) ctx + e->offset);
+}
+
+
 static void *
 ngx_rtmp_relay_create_app_conf(ngx_conf_t *cf)
 {
@@ -230,7 +261,7 @@ ngx_rtmp_relay_static_pull_reconnect(ngx_event_t *ev)
                    "relay: reconnecting static pull");
 
     ctx = ngx_rtmp_relay_create_connection(&rs->cctx, &rs->target->name,
-                                           rs->target);
+                                           rs->target, NULL);
     if (ctx) {
         ctx->session->static_relay = 1;
         ctx->static_evt = ev;
@@ -289,9 +320,9 @@ ngx_rtmp_relay_push_reconnect(ngx_event_t *ev)
 
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "relay: push reconnect failed name='%V' app='%V' "
-                "playpath='%V' url='%V'",
+                "playpath='%V' url='%V' args='%V'",
                 &ctx->name, &target->app, &target->play_path,
-                &target->url.url);
+                &target->url.url, &s->args);
 
         if (!ctx->push_evt.timer_set) {
             ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
@@ -336,7 +367,7 @@ ngx_rtmp_relay_copy_str(ngx_pool_t *pool, ngx_str_t *dst, ngx_str_t *src)
 
 static ngx_rtmp_relay_ctx_t *
 ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
-        ngx_rtmp_relay_target_t *target)
+        ngx_rtmp_relay_target_t *target, ngx_rtmp_session_t *session)
 {
     ngx_rtmp_relay_app_conf_t      *racf;
     ngx_rtmp_relay_ctx_t           *rctx;
@@ -371,7 +402,21 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
         goto clear;
     }
 
-    if (ngx_rtmp_relay_copy_str(pool, &rctx->url, &target->url.url) != NGX_OK) {
+       
+    url = &target->url;
+    if(session && ngx_strlchr(url->url.data, url->url.data + url->url.len, '$')) {
+        ngx_str_t *u = ngx_pcalloc(pool, sizeof(ngx_str_t));
+        if(ngx_rtmp_eval(session, &target->url.url, ngx_rtmp_relay_eval, u, racf->log) == NGX_OK) {
+            url = ngx_pcalloc(pool, sizeof(ngx_url_t));
+            url->default_port = 1935;
+            url->uri_part = 1;
+            url->url = *u;
+            if(ngx_parse_url(pool, url) != NGX_OK) {
+                goto clear;
+            }
+        }
+    }
+    if (ngx_rtmp_relay_copy_str(pool, &rctx->url, &url->url) != NGX_OK) {
         goto clear;
     }
 
@@ -398,7 +443,7 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
 
     if (rctx->app.len == 0 || rctx->play_path.len == 0) {
         /* parse uri */
-        uri = &target->url.uri;
+        uri = &url->uri;
         first = uri->data;
         last  = uri->data + uri->len;
         if (first != last && *first == '/') {
@@ -443,14 +488,15 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
         goto clear;
     }
 
-    if (target->url.naddrs == 0) {
+    if (url->naddrs == 0) {
         ngx_log_error(NGX_LOG_ERR, racf->log, 0,
                       "relay: no address");
         goto clear;
     }
 
     /* get address */
-    addr = &target->url.addrs[target->counter % target->url.naddrs];
+    addr = &url->addrs[target->counter % url->naddrs];
+
     target->counter++;
 
     /* copy log to keep shared log unchanged */
@@ -525,7 +571,7 @@ ngx_rtmp_relay_create_remote_ctx(ngx_rtmp_session_t *s, ngx_str_t* name,
     cctx.srv_conf = s->srv_conf;
     cctx.main_conf = s->main_conf;
 
-    return ngx_rtmp_relay_create_connection(&cctx, name, target);
+    return ngx_rtmp_relay_create_connection(&cctx, name, target, s);
 }
 
 
@@ -625,8 +671,8 @@ ngx_rtmp_relay_pull(ngx_rtmp_session_t *s, ngx_str_t *name,
         ngx_rtmp_relay_target_t *target)
 {
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "relay: create pull name='%V' app='%V' playpath='%V' url='%V'",
-            name, &target->app, &target->play_path, &target->url.url);
+            "relay: create pull name='%V' app='%V' playpath='%V' url='%V' args='%V'",
+            name, &target->app, &target->play_path, &target->url.url, &s->args);
 
     return ngx_rtmp_relay_create(s, name, target,
             ngx_rtmp_relay_create_remote_ctx,
@@ -639,8 +685,8 @@ ngx_rtmp_relay_push(ngx_rtmp_session_t *s, ngx_str_t *name,
         ngx_rtmp_relay_target_t *target)
 {
     ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-            "relay: create push name='%V' app='%V' playpath='%V' url='%V'",
-            name, &target->app, &target->play_path, &target->url.url);
+            "relay: create push name='%V' app='%V' playpath='%V' url='%V' args='%V'",
+            name, &target->app, &target->play_path, &target->url.url, &s->args);
 
     return ngx_rtmp_relay_create(s, name, target,
             ngx_rtmp_relay_create_local_ctx,
@@ -690,9 +736,9 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "relay: push failed name='%V' app='%V' "
-                "playpath='%V' url='%V'",
+                "playpath='%V' url='%V' args='%V'",
                 &name, &target->app, &target->play_path,
-                &target->url.url);
+                &target->url.url, &s->args);
 
         if (!ctx->push_evt.timer_set) {
             ngx_add_timer(&ctx->push_evt, racf->push_reconnect);
@@ -742,9 +788,9 @@ ngx_rtmp_relay_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
                 "relay: pull failed name='%V' app='%V' "
-                "playpath='%V' url='%V'",
+                "playpath='%V' url='%V' args='%V'",
                 &name, &target->app, &target->play_path,
-                &target->url.url);
+                &target->url.url, &s->args);
     }
 
 next:
