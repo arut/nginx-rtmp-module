@@ -402,15 +402,23 @@ ngx_rtmp_recv(ngx_event_t *rev)
                 pp[2] = *p++;
                 pp[1] = *p++;
                 pp[0] = *p++;
-            }
-
-            if (st->len == 0) {
+                
                 /* Messages with type=3 should
                  * never have ext timestamp field
                  * according to standard.
                  * However that's not always the case
-                 * in real life */
-                st->ext = (ext && cscf->publish_time_fix);
+                 * in real life.
+                 * Sometimes ext timestamp is same as delta time
+                 * of the first message chunk.
+                 */
+                if (fmt == 3 && st->dtime != timestamp) {
+                    p -= 4;
+                    ext = 0;
+                    timestamp = 0;
+                }
+            }
+
+            if (st->len == 0) {    
                 if (fmt) {
                     st->dtime = timestamp;
                 } else {
