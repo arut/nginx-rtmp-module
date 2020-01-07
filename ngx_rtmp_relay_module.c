@@ -1407,6 +1407,7 @@ ngx_rtmp_relay_close(ngx_rtmp_session_t *s)
     for (; *cctx && *cctx != ctx; cctx = &(*cctx)->next);
     if (*cctx) {
         *cctx = ctx->next;
+        ctx->next = NULL; // Reset next for when context gets reused.
     }
 }
 
