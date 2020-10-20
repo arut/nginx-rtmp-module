@@ -72,6 +72,7 @@ typedef struct {
 
     ngx_uint_t                          audio_cc;
     ngx_uint_t                          video_cc;
+    ngx_uint_t                          meta_cc;
     ngx_uint_t                          key_frags;
 
     uint64_t                            aframe_base;
@@ -2580,6 +2581,7 @@ ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
 {
     ngx_rtmp_core_main_conf_t   *cmcf;
     ngx_rtmp_handler_pt         *h;
+    ngx_rtmp_amf_handler_t      *ch;    
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
