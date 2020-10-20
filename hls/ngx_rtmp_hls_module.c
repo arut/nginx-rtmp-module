@@ -10,6 +10,7 @@
 #include <ngx_rtmp_cmd_module.h>
 #include <ngx_rtmp_codec_module.h>
 #include "ngx_rtmp_mpegts.h"
+#include "ngx_rtmp_amf.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
@@ -2430,6 +2431,95 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
 static ngx_int_t
+ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+    ngx_chain_t *in)
+{
+    ngx_rtmp_hls_ctx_t      *ctx;
+    ngx_rtmp_mpegts_frame_t frame;
+    ngx_int_t               rc;
+    ngx_buf_t               out;
+    ngx_uint_t              skip;
+
+    static u_char           buffer[132];
+
+    static struct {
+        char title[32];
+    } v;
+
+    ngx_memzero(&v, sizeof(v));
+    
+    static ngx_rtmp_amf_elt_t       in_inf[] = {
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("StreamTitle"),
+          &v.title, 32 },
+    };
+    
+    static ngx_rtmp_amf_elt_t       in_elts[] = {
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("first_string"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_string("mix_array"),
+          in_inf, sizeof(in_inf) },
+    };
+
+    skip = !(in->buf->last > in->buf->pos
+            && *in->buf->pos == NGX_RTMP_AMF_STRING);
+
+    if (ngx_rtmp_receive_amf(s, in, in_elts + skip,
+                sizeof(in_elts) / sizeof(in_elts[0]) - skip))
+    {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "codec: error parsing data frame");
+        return NGX_OK;
+    }
+
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    ngx_memzero(&frame, sizeof(frame));
+    frame.cc = ctx->meta_cc;    
+    frame.dts = (uint64_t) h->timestamp * 90;
+    frame.pts = frame.dts;    
+    frame.pid = 0x102;
+    frame.sid = 0xbd;
+
+    ngx_rtmp_hls_update_fragment(s, frame.dts, 1, 1);
+    if (!ctx->opened) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "ctx not opened");      
+        return NGX_OK;
+    }
+    
+    ngx_memzero(&out, sizeof(out));
+
+    out.start = buffer;
+    out.end = buffer + sizeof(buffer);
+    out.pos = out.start;
+    out.last = out.pos;
+
+    rc = ngx_rtmp_mpegts_write_frame(&ctx->file, &frame, &out);
+
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "hls: ID3 frame write failed");
+    } else {
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: ID3 frame write pts=%uL", frame.pts);
+    }
+
+    ctx->meta_cc = frame.cc;
+    
+    return rc;
+}  
+
+
+static ngx_int_t
 ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
 {
     ngx_rtmp_core_main_conf_t   *cmcf;
@@ -2443,6 +2533,13 @@ ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
     *h = ngx_rtmp_hls_audio;
 
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "onMetaData");
+    ch->handler = ngx_rtmp_hls_meta;
+    
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_hls_publish;
 
