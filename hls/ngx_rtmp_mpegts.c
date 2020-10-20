@@ -264,7 +264,11 @@ ngx_rtmp_mpegts_write_frame(ngx_rtmp_mpegts_file_t *file,
 
             *p++ = (u_char) (pes_size >> 8);
             *p++ = (u_char) pes_size;
-            *p++ = 0x80; /* H222 */
+            if (f->pid == 0x102) {
+              *p++ = 0x84; /* set data aligment bit for metadata packet */
+            } else {
+              *p++ = 0x80; /* H222 */
+            }
             *p++ = (u_char) flags;
             *p++ = (u_char) header_size;
 
