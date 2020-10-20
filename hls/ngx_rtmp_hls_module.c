@@ -11,6 +11,7 @@
 #include <ngx_rtmp_codec_module.h>
 #include "ngx_rtmp_mpegts.h"
 #include "ngx_rtmp_amf.h"
+#include "id3v2lib.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
@@ -2441,6 +2442,8 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_uint_t              skip;
 
     static u_char           buffer[132];
+    ID3v2_tag*              tag;
+    ID3v2_frame_list*       frame_list;    
 
     static struct {
         char title[32];
@@ -2496,12 +2499,65 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
     
+    
+    tag = new_tag();
+    tag_set_title(v.title, 3, tag);    
+    //    tag_set_artist("gabriele", 0, tag);    
+
+    tag->tag_header = new_header();
+    memcpy(tag->tag_header->tag, "ID3", 3);
+    tag->tag_header->major_version = '\x04';
+    tag->tag_header->minor_version = '\x00';
+    tag->tag_header->flags = '\x00';
+    tag->tag_header->tag_size = get_tag_size(tag)+1;
+    
     ngx_memzero(&out, sizeof(out));
 
     out.start = buffer;
     out.end = buffer + sizeof(buffer);
     out.pos = out.start;
     out.last = out.pos;
+
+    // TODO: maybe move this section inside the id3 library
+    *out.last++ = tag->tag_header->tag[0];
+    *out.last++ = tag->tag_header->tag[1];
+    *out.last++ = tag->tag_header->tag[2];
+    
+    *out.last++ = tag->tag_header->major_version;
+    *out.last++ = tag->tag_header->minor_version;
+    *out.last++ = tag->tag_header->flags;
+    *out.last++ = 0x00; 
+    *out.last++ = 0x00;
+    *out.last++ = 0x00;    
+    *out.last++ = tag->tag_header->tag_size;
+
+    frame_list = tag->frames->start;
+    while(frame_list != NULL)
+    {
+        *out.last++ = frame_list->frame->frame_id[0];
+        *out.last++ = frame_list->frame->frame_id[1];
+        *out.last++ = frame_list->frame->frame_id[2];
+        *out.last++ = frame_list->frame->frame_id[3];
+    
+        // int enc = syncint_encode(frame_list->frame->size);
+        int enc = frame_list->frame->size + 1;        
+        *out.last++ = (enc >> 24) & 0xFF;
+        *out.last++ = (enc >> 16) & 0xFF;
+        *out.last++ = (enc >> 8) & 0xFF;
+        *out.last++ = (enc) & 0xFF;
+
+        //*out.last++ = frame_list->frame->flags[0];
+        //*out.last++ = frame_list->frame->flags[1];
+        *out.last++ = 0x00;
+        *out.last++ = 0x00;        
+
+        int i;
+        for(i=0; i<frame_list->frame->size; i++)
+            *out.last++ = frame_list->frame->data[i];
+
+        *out.last++ = 0x00;            
+        frame_list = frame_list->next;
+    }
 
     rc = ngx_rtmp_mpegts_write_frame(&ctx->file, &frame, &out);
 
