@@ -2432,6 +2432,23 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+char * trim_spaces(char *str) {
+    char *end;
+    /* skip leading whitespace */
+    while (isspace(*str)) {
+        str = str + 1;
+    }
+    /* remove trailing whitespace */
+    end = str + strlen(str) - 1;
+    while (end > str && isspace(*end)) {
+        end = end - 1;
+    }
+
+    *(end+1) = '\0';
+    return str;
+}
+
+
 static ngx_int_t
 ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t *in)
@@ -2441,6 +2458,7 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_int_t               rc;
     ngx_buf_t               out;
     ngx_uint_t              skip;
+    char                    *token;
 
     static u_char           buffer[132];
     ID3v2_tag*              tag;
@@ -2448,6 +2466,8 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     static struct {
         char title[32];
+        char artist[32];
+        char streamTitle[64];
     } v;
 
     ngx_memzero(&v, sizeof(v));
@@ -2455,7 +2475,7 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     static ngx_rtmp_amf_elt_t       in_inf[] = {
         { NGX_RTMP_AMF_STRING,
           ngx_string("StreamTitle"),
-          &v.title, 32 },
+          &v.streamTitle, 64 },
     };
     
     static ngx_rtmp_amf_elt_t       in_elts[] = {
@@ -2479,6 +2499,13 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
+    token = strtok(v.streamTitle, "|");
+    token = trim_spaces(token);
+    snprintf(v.title, sizeof(v.title), "%s", token);
+
+    token = strtok(NULL, "|");
+    token = trim_spaces(token);    
+    snprintf(v.artist, sizeof(v.artist), "%s", token);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
@@ -2503,7 +2530,7 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     
     tag = new_tag();
     tag_set_title(v.title, 3, tag);    
-    //    tag_set_artist("gabriele", 0, tag);    
+    tag_set_artist(v.artist, 3, tag);    
 
     tag->tag_header = new_header();
     memcpy(tag->tag_header->tag, "ID3", 3);
@@ -2579,7 +2606,7 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 static ngx_int_t
 ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
 {
-    ngx_rtmp_core_main_conf_t   *cmcf;
+  ngx_rtmp_core_main_conf_t   *cmcf;
     ngx_rtmp_handler_pt         *h;
     ngx_rtmp_amf_handler_t      *ch;    
 
@@ -2591,6 +2618,15 @@ ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
     *h = ngx_rtmp_hls_audio;
 
+    
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "@setDataFrame");
+    ch->handler = ngx_rtmp_hls_meta;
+
+    
     ch = ngx_array_push(&cmcf->amf);
     if (ch == NULL) {
         return NGX_ERROR;
