@@ -2471,7 +2471,7 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     } v;
 
     ngx_memzero(&v, sizeof(v));
-    
+
     static ngx_rtmp_amf_elt_t       in_inf[] = {
         { NGX_RTMP_AMF_STRING,
           ngx_string("StreamTitle"),
@@ -2504,9 +2504,11 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     snprintf(v.title, sizeof(v.title), "%s", token);
 
     token = strtok(NULL, "|");
-    token = trim_spaces(token);    
-    snprintf(v.artist, sizeof(v.artist), "%s", token);
-
+    if (token != NULL) {
+      token = trim_spaces(token);    
+      snprintf(v.artist, sizeof(v.artist), "%s", token);
+    }
+    
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
     if (ctx == NULL) {
@@ -2526,7 +2528,6 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                        "ctx not opened");      
         return NGX_OK;
     }
-    
     
     tag = new_tag();
     tag_set_title(v.title, 3, tag);    
