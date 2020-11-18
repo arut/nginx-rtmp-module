@@ -2499,10 +2499,14 @@ ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    token = strtok(v.streamTitle, "|");
-    token = trim_spaces(token);
-    snprintf(v.title, sizeof(v.title), "%s", token);
-
+    token = strtok(v.streamTitle, "|"); 
+    if (token != NULL) {   
+        token = trim_spaces(token);
+        snprintf(v.title, sizeof(v.title), "%s", token);
+    } else {
+        return NGX_OK;
+    }
+    
     token = strtok(NULL, "|");
     if (token != NULL) {
       token = trim_spaces(token);    
