@@ -298,6 +298,15 @@ rtmp_auto_push directive.
                 root /path/to/stat.xsl/;
             }
 
+
+            # This URL provides RTMP statistics in json
+            location /json_stat {
+                rtmp_stat all;
+
+                # Stat output format valid values json or xml;
+                rtmp_stat_format json;
+            }
+
             location /hls {
                 # Serve HLS fragments
                 types {
