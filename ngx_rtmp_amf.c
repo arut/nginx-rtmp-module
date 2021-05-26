@@ -27,7 +27,7 @@ ngx_rtmp_amf_reverse_copy(void *dst, void* src, size_t len)
     return dst;
 }
 
-#define NGX_RTMP_AMF_DEBUG_SIZE 16
+#define NGX_RTMP_AMF_DEBUG_SIZE 72
 
 #ifdef NGX_DEBUG
 static void
