@@ -432,11 +432,11 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
         p = buffer;
         last = buffer + sizeof(buffer);
 
-        p = ngx_slprintf(p, last, "#EXT-X-STREAM-INF:PROGRAM-ID=1");
+        p = ngx_slprintf(p, last, "#EXT-X-STREAM-INF:");
 
         arg = var->args.elts;
         for (k = 0; k < var->args.nelts; k++, arg++) {
-            p = ngx_slprintf(p, last, ",%V", arg);
+            p = ( k == 0 ? ngx_slprintf(p, last, "%V", arg) : ngx_slprintf(p, last, ",%V", arg));
         }
 
         if (p < last) {
