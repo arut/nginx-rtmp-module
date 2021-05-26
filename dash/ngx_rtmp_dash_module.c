@@ -52,7 +52,6 @@ typedef struct {
     ngx_str_t                           playlist_bak;
     ngx_str_t                           name;
     ngx_str_t                           stream;
-    time_t                              start_time;
 
     ngx_uint_t                          nfrags;
     ngx_uint_t                          frag;
@@ -211,7 +210,6 @@ ngx_rtmp_dash_rename_file(u_char *src, u_char *dst)
 #endif
 }
 
-
 static ngx_int_t
 ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
 {
@@ -226,10 +224,11 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_codec_ctx_t      *codec_ctx;
     ngx_rtmp_dash_frag_t      *f;
     ngx_rtmp_dash_app_conf_t  *dacf;
+    time_t                     now;
 
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
-    static u_char              start_time[sizeof("1970-09-28T12:00:00Z")];
-    static u_char              pub_time[sizeof("1970-09-28T12:00:00Z")];
+    u_char                     start_time[sizeof("1970-09-28T12:00:00Z")];
+    u_char                     pub_time[sizeof("1970-09-28T12:00:00Z")];
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
@@ -336,14 +335,16 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "  </Period>\n"                                                            \
     "</MPD>\n"
 
-    ngx_libc_gmtime(ctx->start_time, &tm);
+    now = ngx_time();
+
+    ngx_libc_gmtime(now - (s->current_time / 1000), &tm);
 
     ngx_sprintf(start_time, "%4d-%02d-%02dT%02d:%02d:%02dZ%Z",
                 tm.tm_year + 1900, tm.tm_mon + 1,
                 tm.tm_mday, tm.tm_hour,
                 tm.tm_min, tm.tm_sec);
 
-    ngx_libc_gmtime(ngx_time(), &tm);
+    ngx_libc_gmtime(now, &tm);
 
     ngx_sprintf(pub_time, "%4d-%02d-%02dT%02d:%02d:%02dZ%Z",
                 tm.tm_year + 1900, tm.tm_mon + 1,
@@ -941,8 +942,6 @@ ngx_rtmp_dash_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "dash: playlist='%V' playlist_bak='%V' stream_pattern='%V'",
                    &ctx->playlist, &ctx->playlist_bak, &ctx->stream);
-
-    ctx->start_time = ngx_time();
 
     if (ngx_rtmp_dash_ensure_directory(s) != NGX_OK) {
         return NGX_ERROR;
