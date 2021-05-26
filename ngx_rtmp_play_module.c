@@ -866,9 +866,23 @@ ngx_rtmp_play_next_entry(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN,
                                      NGX_FILE_DEFAULT_ACCESS);
 
+        /* try unsuffixed file name as fallback if adding suffix didn't work */
         if (ctx->file.fd == NGX_INVALID_FILE) {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, ngx_errno,
-                           "play: error opening file '%s'", path);
+                           "play: error opening file '%s', trying without suffix",
+                           path);
+
+            p = ngx_snprintf(path, NGX_MAX_PATH, "%V/%s",
+                             pe->root, v->name + ctx->pfx_size);
+            *p = 0;
+
+            ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN,
+                                         NGX_FILE_DEFAULT_ACCESS);
+        }
+
+        if (ctx->file.fd == NGX_INVALID_FILE) {
+            ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, ngx_errno,
+                           "play: error opening fallback file '%s'", path);
             continue;
         }
 
