@@ -528,7 +528,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
                      ctx->frag, max_frag);
 
     if (hacf->type == NGX_RTMP_HLS_TYPE_EVENT) {
-        p = ngx_slprintf(p, end, "#EXT-X-PLAYLIST-TYPE: EVENT\n");
+        p = ngx_slprintf(p, end, "#EXT-X-PLAYLIST-TYPE:EVENT\n");
     }
 
     n = ngx_write_fd(fd, buffer, p - buffer);
