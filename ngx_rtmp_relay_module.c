@@ -582,6 +582,15 @@ ngx_rtmp_relay_create(ngx_rtmp_session_t *s, ngx_str_t *name,
         return NGX_ERROR;
     }
 
+    if(target->param.len>0) {
+        if(target->param.data[0]!='?') {
+            name->data[name->len] = '?';
+            name->len++;
+        }
+        memcpy(name->data+name->len,target->param.data,target->param.len);
+        name->len += target->param.len;
+    }
+    
     play_ctx = create_play_ctx(s, name, target);
     if (play_ctx == NULL) {
         return NGX_ERROR;
@@ -1514,6 +1523,7 @@ ngx_rtmp_relay_push_pull(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         NGX_RTMP_RELAY_STR_PAR("app",         app);
         NGX_RTMP_RELAY_STR_PAR("name",        name);
+        NGX_RTMP_RELAY_STR_PAR("param",       param);
         NGX_RTMP_RELAY_STR_PAR("tcUrl",       tc_url);
         NGX_RTMP_RELAY_STR_PAR("pageUrl",     page_url);
         NGX_RTMP_RELAY_STR_PAR("swfUrl",      swf_url);
