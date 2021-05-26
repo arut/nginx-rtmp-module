@@ -421,10 +421,10 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
 
     static size_t               amf_events[] = {
         NGX_RTMP_MSG_AMF_CMD,
-        NGX_RTMP_MSG_AMF_META,
+        NGX_RTMP_MSG_AMF_NOTIFY,
         NGX_RTMP_MSG_AMF_SHARED,
         NGX_RTMP_MSG_AMF3_CMD,
-        NGX_RTMP_MSG_AMF3_META,
+        NGX_RTMP_MSG_AMF3_NOTIFY,
         NGX_RTMP_MSG_AMF3_SHARED
     };
 

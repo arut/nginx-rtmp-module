@@ -575,7 +575,7 @@ ngx_rtmp_create_play_status(ngx_rtmp_session_t *s, char *code, char* level,
 
     memset(&h, 0, sizeof(h));
 
-    h.type = NGX_RTMP_MSG_AMF_META;
+    h.type = NGX_RTMP_MSG_AMF_NOTIFY;
     h.csid = NGX_RTMP_CSID_AMF;
     h.msid = NGX_RTMP_MSID;
     h.timestamp = duration;
@@ -618,7 +618,7 @@ ngx_rtmp_create_sample_access(ngx_rtmp_session_t *s)
 
     memset(&h, 0, sizeof(h));
 
-    h.type = NGX_RTMP_MSG_AMF_META;
+    h.type = NGX_RTMP_MSG_AMF_NOTIFY;
     h.csid = NGX_RTMP_CSID_AMF;
     h.msid = NGX_RTMP_MSID;
 

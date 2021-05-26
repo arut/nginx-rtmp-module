@@ -340,7 +340,7 @@ ngx_rtmp_flv_read_meta(ngx_rtmp_session_t *s, ngx_file_t *f)
         return;
     }
 
-    if (ngx_rtmp_flv_header[0] != NGX_RTMP_MSG_AMF_META) {
+    if (ngx_rtmp_flv_header[0] != NGX_RTMP_MSG_AMF_NOTIFY) {
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                       "flv: first tag is not metadata, giving up");
         return;
@@ -348,7 +348,7 @@ ngx_rtmp_flv_read_meta(ngx_rtmp_session_t *s, ngx_file_t *f)
 
     ngx_memzero(&h, sizeof(h));
 
-    h.type = NGX_RTMP_MSG_AMF_META;
+    h.type = NGX_RTMP_MSG_AMF_NOTIFY;
     h.msid = NGX_RTMP_MSID;
     h.csid = NGX_RTMP_CSID_AMF;
 
