@@ -560,7 +560,11 @@ ngx_rtmp_send(ngx_event_t *wev)
         ngx_del_event(wev, NGX_WRITE_EVENT, 0);
     }
 
+#if (nginx_version >= 1007012)
+    ngx_event_process_posted((ngx_cycle_t *) ngx_cycle,(ngx_queue_t *) &s->posted_dry_events);
+#else
     ngx_event_process_posted((ngx_cycle_t *) ngx_cycle, &s->posted_dry_events);
+#endif
 }
 
 
