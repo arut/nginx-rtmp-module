@@ -811,12 +811,14 @@ static ngx_int_t
 ngx_rtmp_play_next_entry(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 {
     ngx_rtmp_play_app_conf_t   *pacf;
+    ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_rtmp_play_ctx_t        *ctx;
     ngx_rtmp_play_entry_t      *pe;
     u_char                     *p;
     static u_char               path[NGX_MAX_PATH + 1];
 
     pacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_play_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
@@ -864,7 +866,7 @@ ngx_rtmp_play_next_entry(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
         *p = 0;
 
         ctx->file.fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN,
-                                     NGX_FILE_DEFAULT_ACCESS);
+                                     cscf->file_access);
 
         if (ctx->file.fd == NGX_INVALID_FILE) {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, ngx_errno,

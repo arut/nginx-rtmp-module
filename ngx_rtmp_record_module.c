@@ -436,6 +436,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
                           ngx_rtmp_record_rec_ctx_t *rctx)
 {
     ngx_rtmp_record_app_conf_t *rracf;
+    ngx_rtmp_core_srv_conf_t   *cscf;
     ngx_err_t                   err;
     ngx_str_t                   path;
     ngx_int_t                   mode, create_mode;
@@ -449,6 +450,8 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     if (rctx->file.fd != NGX_INVALID_FILE) {
         return NGX_AGAIN;
     }
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                    "record: %V opening", &rracf->id);
@@ -467,7 +470,7 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
     rctx->file.offset = 0;
     rctx->file.log = s->connection->log;
     rctx->file.fd = ngx_open_file(path.data, mode, create_mode,
-                                  NGX_FILE_DEFAULT_ACCESS);
+                                  cscf->file_access);
     ngx_str_set(&rctx->file.name, "recorded");
 
     if (rctx->file.fd == NGX_INVALID_FILE) {
