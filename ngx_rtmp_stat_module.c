@@ -364,6 +364,14 @@ ngx_rtmp_stat_client(ngx_http_request_t *r, ngx_chain_t ***lll,
         NGX_RTMP_STAT_ES(&s->swf_url);
         NGX_RTMP_STAT_L("</swfurl>");
     }
+    
+    NGX_RTMP_STAT_L("<bytes_in>");
+    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%ui", (ngx_uint_t) s->in_bytes) - buf);
+    NGX_RTMP_STAT_L("</bytes_in>");
+
+    NGX_RTMP_STAT_L("<bytes_out>");
+    NGX_RTMP_STAT(buf, ngx_snprintf(buf, sizeof(buf), "%ui", (ngx_uint_t) s->out_bytes) - buf);
+    NGX_RTMP_STAT_L("</bytes_out>");    
 }
 
 
