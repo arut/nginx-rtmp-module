@@ -36,6 +36,11 @@ typedef enum {
 } ngx_rtmp_mp4_track_type_t;
 
 
+ngx_int_t ngx_rtmp_mp4_field_64(ngx_buf_t *b, uint64_t n);
+ngx_int_t ngx_rtmp_mp4_field_32(ngx_buf_t *b, uint32_t n);
+ngx_int_t ngx_rtmp_mp4_field_24(ngx_buf_t *b, uint32_t n);
+ngx_int_t ngx_rtmp_mp4_field_16(ngx_buf_t *b, uint16_t n);
+ngx_int_t ngx_rtmp_mp4_field_8(ngx_buf_t *b, uint8_t n);
 ngx_int_t ngx_rtmp_mp4_write_ftyp(ngx_buf_t *b);
 ngx_int_t ngx_rtmp_mp4_write_styp(ngx_buf_t *b);
 ngx_int_t ngx_rtmp_mp4_write_moov(ngx_rtmp_session_t *s, ngx_buf_t *b,
@@ -46,6 +51,8 @@ ngx_int_t ngx_rtmp_mp4_write_moof(ngx_buf_t *b, uint32_t earliest_pres_time,
 ngx_int_t ngx_rtmp_mp4_write_sidx(ngx_buf_t *b,
     ngx_uint_t reference_size, uint32_t earliest_pres_time,
     uint32_t latest_pres_time);
+u_char *ngx_rtmp_mp4_start_box(ngx_buf_t *b, const char box[4]);
+ngx_int_t ngx_rtmp_mp4_update_box_size(ngx_buf_t *b, u_char *p);
 ngx_uint_t ngx_rtmp_mp4_write_mdat(ngx_buf_t *b, ngx_uint_t size);
 
 

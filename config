@@ -21,6 +21,7 @@ RTMP_CORE_MODULES="                                         \
                 ngx_rtmp_limit_module                       \
                 ngx_rtmp_hls_module                         \
                 ngx_rtmp_dash_module                        \
+                ngx_rtmp_hds_module                         \
                 "
 
 
@@ -82,6 +83,7 @@ RTMP_CORE_SRCS="                                            \
                 $ngx_addon_dir/ngx_rtmp_proxy_protocol.c    \
                 $ngx_addon_dir/hls/ngx_rtmp_hls_module.c    \
                 $ngx_addon_dir/dash/ngx_rtmp_dash_module.c  \
+                $ngx_addon_dir/hds/ngx_rtmp_hds_module.c    \
                 $ngx_addon_dir/hls/ngx_rtmp_mpegts.c        \
                 $ngx_addon_dir/dash/ngx_rtmp_mp4.c          \
                 "
