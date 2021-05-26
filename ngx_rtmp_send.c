@@ -100,7 +100,7 @@ ngx_rtmp_create_abort(ngx_rtmp_session_t *s, uint32_t csid)
                    "create: abort csid=%uD", csid);
 
     {
-        NGX_RTMP_USER_START(s, NGX_RTMP_MSG_CHUNK_SIZE);
+        NGX_RTMP_USER_START(s, NGX_RTMP_MSG_ABORT);
 
         NGX_RTMP_USER_OUT4(csid);
 
