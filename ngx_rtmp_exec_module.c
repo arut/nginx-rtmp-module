@@ -640,7 +640,7 @@ ngx_rtmp_exec_child_dead(ngx_event_t *ev)
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
-                   "exec: shedule respawn %Mmsec", e->respawn_timeout);
+                   "exec: schedule respawn %Mmsec", e->respawn_timeout);
 
     e->respawn_evt.data = e;
     e->respawn_evt.log = e->log;
