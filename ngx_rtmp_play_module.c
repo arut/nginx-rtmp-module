@@ -291,7 +291,11 @@ ngx_rtmp_play_send(ngx_event_t *e)
         ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
                        "play: send buffer full");
 
+#if (nginx_version >= 1007012)
+        ngx_post_event(e, (ngx_queue_t *) &s->posted_dry_events);
+#else
         ngx_post_event(e, &s->posted_dry_events);
+#endif
         return;
     }
 
