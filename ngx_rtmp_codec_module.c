@@ -839,9 +839,17 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ngx_memzero(&v, sizeof(v));
 
-    /* use -1 as a sign of unchanged data;
-     * 0 is a valid value for uncompressed audio */
+    /* use -1 as a sign of unchanged data */
+    v.width = -1;
+    v.height = -1;
+    v.duration = -1;
+    v.frame_rate = -1;
+    v.video_data_rate = -1;
+    v.video_codec_id_n = -1;
+    v.audio_data_rate = -1;
     v.audio_codec_id_n = -1;
+    v.profile[0] = '\0';
+    v.level[0] = '\0';
 
     /* FFmpeg sends a string in front of actal metadata; ignore it */
     skip = !(in->buf->last > in->buf->pos
@@ -854,18 +862,17 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         return NGX_OK;
     }
 
-    ctx->width = (ngx_uint_t) v.width;
-    ctx->height = (ngx_uint_t) v.height;
-    ctx->duration = (ngx_uint_t) v.duration;
-    ctx->frame_rate = (ngx_uint_t) v.frame_rate;
-    ctx->video_data_rate = (ngx_uint_t) v.video_data_rate;
-    ctx->video_codec_id = (ngx_uint_t) v.video_codec_id_n;
-    ctx->audio_data_rate = (ngx_uint_t) v.audio_data_rate;
-    ctx->audio_codec_id = (v.audio_codec_id_n == -1
-            ? 0 : v.audio_codec_id_n == 0
+    if (v.width != -1) ctx->width = (ngx_uint_t) v.width;
+    if (v.height != -1) ctx->height = (ngx_uint_t) v.height;
+    if (v.duration != -1) ctx->duration = (ngx_uint_t) v.duration;
+    if (v.frame_rate != -1) ctx->frame_rate = (ngx_uint_t) v.frame_rate;
+    if (v.video_data_rate != -1) ctx->video_data_rate = (ngx_uint_t) v.video_data_rate;
+    if (v.video_codec_id_n != -1) ctx->video_codec_id = (ngx_uint_t) v.video_codec_id_n;
+    if (v.audio_data_rate != -1) ctx->audio_data_rate = (ngx_uint_t) v.audio_data_rate;
+    if (v.audio_codec_id_n != -1) ctx->audio_codec_id = (v.audio_codec_id_n == 0
             ? NGX_RTMP_AUDIO_UNCOMPRESSED : (ngx_uint_t) v.audio_codec_id_n);
-    ngx_memcpy(ctx->profile, v.profile, sizeof(v.profile));
-    ngx_memcpy(ctx->level, v.level, sizeof(v.level));
+    if (v.profile[0] != '\0') ngx_memcpy(ctx->profile, v.profile, sizeof(v.profile));
+    if (v.level[0] != '\0') ngx_memcpy(ctx->level, v.level, sizeof(v.level));
 
     ngx_log_debug8(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
             "codec: data frame: "
