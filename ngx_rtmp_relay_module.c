@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include "ngx_rtmp_relay_module.h"
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_codec_module.h"
 
 
 static ngx_rtmp_publish_pt          next_publish;
@@ -496,6 +497,7 @@ ngx_rtmp_relay_create_connection(ngx_rtmp_conf_ctx_t *cctx, ngx_str_t* name,
     }
     rs->app_conf = cctx->app_conf;
     rs->relay = 1;
+    rs->ready_for_publish = 0;
     rctx->session = rs;
     ngx_rtmp_set_ctx(rs, rctx, ngx_rtmp_relay_module);
     ngx_str_set(&rs->flashver, "ngx-local-relay");
@@ -1231,12 +1233,160 @@ ngx_rtmp_relay_on_error(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     return NGX_OK;
 }
 
+static ngx_int_t
+ngx_rtmp_relay_send_set_data_frame(ngx_rtmp_session_t *s)
+{
+    ngx_rtmp_relay_ctx_t           *ctx;
+    ngx_rtmp_codec_ctx_t           *codec_ctx;
+    ngx_rtmp_header_t               hdr;
+
+    static struct {
+        double                      width;
+        double                      height;
+        double                      duration;
+        double                      frame_rate;
+        double                      video_data_rate;
+        double                      video_codec_id;
+        double                      audio_data_rate;
+        double                      audio_codec_id;
+        u_char                      profile[32];
+        u_char                      level[32];
+    }                               v;
+
+    static ngx_rtmp_amf_elt_t       out_inf[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("Server"),
+          "NGINX RTMP (github.com/arut/nginx-rtmp-module)", 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("width"),
+          &v.width, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("height"),
+          &v.height, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("displayWidth"),
+          &v.width, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("displayHeight"),
+          &v.height, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("duration"),
+          &v.duration, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("framerate"),
+          &v.frame_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("fps"),
+          &v.frame_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("videodatarate"),
+          &v.video_data_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("videocodecid"),
+          &v.video_codec_id, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("audiodatarate"),
+          &v.audio_data_rate, 0 },
+
+        { NGX_RTMP_AMF_NUMBER,
+          ngx_string("audiocodecid"),
+          &v.audio_codec_id, 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("profile"),
+          &v.profile, sizeof(v.profile) },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("level"),
+          &v.level, sizeof(v.level) }
+    };
+
+    static ngx_rtmp_amf_elt_t       out_elts[] = {
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          "@setDataFrame", 0 },
+
+        { NGX_RTMP_AMF_STRING,
+          ngx_null_string,
+          "onMetaData", 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_null_string,
+          out_inf, sizeof(out_inf) }
+    };
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+    if (ctx == NULL || !s->relay) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "relay: couldn't get relay context");
+        return NGX_OK;
+    }
+
+    /* we need to get the codec context from the incoming publisher in order to
+     * send the metadata along */
+    codec_ctx = ngx_rtmp_get_module_ctx(ctx->publish->session,
+            ngx_rtmp_codec_module);
+    if (codec_ctx == NULL) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                "relay: couldn't get codec context");
+        return NGX_OK;
+    }
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+            "relay: data frame from codec context: "
+            "width=%ui height=%ui duration=%ui frame_rate=%ui "
+            "video_codec_id=%ui audio_codec_id=%ui",
+            codec_ctx->width, codec_ctx->height, codec_ctx->duration,
+            codec_ctx->frame_rate, codec_ctx->video_codec_id,
+            codec_ctx->audio_codec_id);
+
+    /* we only want to send the metadata if the codec module has already
+     * parsed it -- is there a better way to check this? */
+    if (codec_ctx->width > 0 && codec_ctx->height > 0) {
+      v.width = codec_ctx->width;
+      v.height = codec_ctx->height;
+      v.duration = codec_ctx->duration;
+      v.frame_rate = codec_ctx->frame_rate;
+      v.video_data_rate = codec_ctx->video_data_rate;
+      v.video_codec_id = codec_ctx->video_codec_id;
+      v.audio_data_rate = codec_ctx->audio_data_rate;
+      v.audio_codec_id = codec_ctx->audio_codec_id;
+      ngx_memcpy(v.profile, codec_ctx->profile, sizeof(codec_ctx->profile));
+      ngx_memcpy(v.level, codec_ctx->level, sizeof(codec_ctx->level));
+
+      ngx_memzero(&hdr, sizeof(hdr));
+      hdr.csid = NGX_RTMP_RELAY_CSID_AMF_INI;
+      hdr.msid = NGX_RTMP_RELAY_MSID;
+      hdr.type = NGX_RTMP_MSG_AMF_META;
+
+      ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "relay: sending @setDataFrame");
+
+      return ngx_rtmp_send_amf(s, &hdr, out_elts,
+              sizeof(out_elts) / sizeof(out_elts[0]));
+    }
+
+    return NGX_OK;
+}
 
 static ngx_int_t
 ngx_rtmp_relay_on_status(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_chain_t *in)
 {
     ngx_rtmp_relay_ctx_t       *ctx;
+
     static struct {
         double                  trans;
         u_char                  level[32];
@@ -1300,9 +1450,57 @@ ngx_rtmp_relay_on_status(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             "relay: onStatus: level='%s' code='%s' description='%s'",
             v.level, v.code, v.desc);
 
+    /* when doing a push to Adobe Media Server, we have to use the
+     * @setDataFrame command to send the metadata
+     * see: http://help.adobe.com/en_US/adobemediaserver/devguide/WS5b3ccc516d4fbf351e63e3d11a0773d56e-7ff6Dev.2.3.html
+     */
+    if (!ngx_strncasecmp(v.code, (u_char *)"NetStream.Publish.Start",
+            ngx_strlen("NetStream.Publish.Start"))) {
+
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "relay: sending metadata from NetStream.Publish.Start from player");
+
+        s->ready_for_publish = 1;
+
+        if (ngx_rtmp_relay_send_set_data_frame(s) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "relay: unable to send metadata via @setDataFrame");
+        }
+    }
+
     return NGX_OK;
 }
 
+static ngx_int_t
+ngx_rtmp_relay_on_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    /* when we receive onMetaData, the session (s) is our incoming publisher's
+     * session, so we need to send the @setDataFrame to our ctx->play->session */
+    ngx_rtmp_relay_ctx_t       *ctx;
+    ngx_rtmp_relay_ctx_t       *pctx;
+
+    ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+        "relay: got metadata from @setDataFrame invocation from publisher.");
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    for (pctx = ctx->play; pctx; pctx = pctx->next) {
+        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "relay: %ssending metadata from @setDataFrame invocation from publisher to %V/%V/%V",
+                (pctx->session->relay && pctx->session->ready_for_publish) ? "" : "not ", &pctx->url,  &pctx->app, &pctx->play_path);
+        if (!pctx->session->relay || !pctx->session->ready_for_publish) continue;
+        if (ngx_rtmp_relay_send_set_data_frame(pctx->session) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                    "relay: unable to send @setDataFrame to %V/%V", &pctx->url, &pctx->play_path);
+        }
+    }
+
+    return NGX_OK;
+}
 
 static ngx_int_t
 ngx_rtmp_relay_handshake_done(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
@@ -1685,6 +1883,10 @@ ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf)
     ch = ngx_array_push(&cmcf->amf);
     ngx_str_set(&ch->name, "onStatus");
     ch->handler = ngx_rtmp_relay_on_status;
+
+    ch = ngx_array_push(&cmcf->amf);
+    ngx_str_set(&ch->name, "@setDataFrame");
+    ch->handler = ngx_rtmp_relay_on_meta_data;
 
     return NGX_OK;
 }
