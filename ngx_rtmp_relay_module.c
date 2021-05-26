@@ -12,6 +12,7 @@
 
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_play_pt             next_play;
+static ngx_rtmp_stream_begin_pt     next_stream_begin;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
 static ngx_rtmp_close_stream_pt     next_close_stream;
 
@@ -1154,7 +1155,7 @@ ngx_rtmp_relay_on_result(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
                 if (ngx_rtmp_relay_send_publish(s) != NGX_OK) {
                     return NGX_ERROR;
                 }
-                return ngx_rtmp_relay_play_local(s);
+                return NGX_OK;
 
             } else {
                 if (ngx_rtmp_relay_send_play(s) != NGX_OK) {
@@ -1316,6 +1317,25 @@ ngx_rtmp_relay_handshake_done(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     return ngx_rtmp_relay_send_connect(s);
+}
+
+
+static ngx_int_t
+ngx_rtmp_relay_stream_begin(ngx_rtmp_session_t *s, ngx_rtmp_stream_begin_t *v)
+{
+    ngx_rtmp_relay_ctx_t  *ctx;
+
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_relay_module);
+    if (ctx == NULL || !s->relay) {
+        goto next;
+    }
+
+    if (ctx->publish != ctx && !s->static_relay) {
+        ngx_rtmp_relay_play_local(s);
+    }
+
+next:
+    return next_stream_begin(s, v);
 }
 
 
@@ -1666,6 +1686,9 @@ ngx_rtmp_relay_postconfiguration(ngx_conf_t *cf)
 
     next_play = ngx_rtmp_play;
     ngx_rtmp_play = ngx_rtmp_relay_play;
+
+    next_stream_begin = ngx_rtmp_stream_begin;
+    ngx_rtmp_stream_begin = ngx_rtmp_relay_stream_begin;
 
     next_delete_stream = ngx_rtmp_delete_stream;
     ngx_rtmp_delete_stream = ngx_rtmp_relay_delete_stream;
