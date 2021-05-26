@@ -10,9 +10,10 @@
 #include "ngx_rtmp_relay_module.h"
 
 
+#if !(NGX_WIN32)
 static ngx_rtmp_publish_pt          next_publish;
 static ngx_rtmp_delete_stream_pt    next_delete_stream;
-
+#endif
 
 static ngx_int_t ngx_rtmp_auto_push_init_process(ngx_cycle_t *cycle);
 static void ngx_rtmp_auto_push_exit_process(ngx_cycle_t *cycle);
