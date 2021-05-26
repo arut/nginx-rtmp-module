@@ -340,6 +340,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
                                               NGX_INT_T_LEN * 2];
     u_char                          play_path[NGX_RTMP_MAX_NAME];
     ngx_str_t                       name;
+    ngx_str_t                       args;
     u_char                         *p;
     ngx_str_t                      *u;
     ngx_pid_t                       pid;
@@ -359,6 +360,8 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
 
     name.data = ctx->name;
     name.len = ngx_strlen(name.data);
+    args.data = ctx->args;
+    args.len = ngx_strlen(args.data);
 
     ngx_memzero(&at, sizeof(at));
     ngx_str_set(&at.page_url, "nginx-auto-push");
@@ -425,7 +428,7 @@ ngx_rtmp_auto_push_reconnect(ngx_event_t *ev)
                        "auto_push: connect slot=%i pid=%P socket='%s' name='%s'",
                        n, pid, path, ctx->name);
 
-        if (ngx_rtmp_relay_push(s, &name, &at) == NGX_OK) {
+        if (ngx_rtmp_relay_push(s, &name, &args, &at) == NGX_OK) {
             *slot = 1;
             npushed++;
             continue;
