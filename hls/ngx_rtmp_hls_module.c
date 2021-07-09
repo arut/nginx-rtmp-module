@@ -887,7 +887,7 @@ ngx_rtmp_hls_get_fragment_datetime(ngx_rtmp_session_t *s, uint64_t ts)
 
     case NGX_RTMP_HLS_DATETIME_SYSTEM:
         datetime->data = (u_char *) ngx_pcalloc(s->connection->pool, ngx_cached_http_log_iso8601.len * sizeof(u_char));
-        ngx_cpymem(&datetime->data, (const void *) &ngx_cached_http_log_iso8601.data, ngx_cached_http_log_iso8601.len);
+        ngx_cpymem(datetime->data, ngx_cached_http_log_iso8601.data, ngx_cached_http_log_iso8601.len);
         datetime->len = ngx_cached_http_log_iso8601.len;
         return datetime;
 
