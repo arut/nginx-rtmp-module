@@ -679,7 +679,7 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-	//safa adding args (auth) to the name
+	//safe adding args (auth) to the name
 	if(racf->forward_auth)
 	{
 		ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
@@ -800,7 +800,7 @@ ngx_rtmp_relay_play_local(ngx_rtmp_session_t *s)
         return NGX_ERROR;
     }
 	int arg_pos = 0;
-	for(int c = 0 ; c < ctx->name.len ; c++)
+	for(int c = 0 ; c < (int)(ctx->name.len) ; c++)
 	{
 		if (ctx->name.data[c] == '?')
 		{
