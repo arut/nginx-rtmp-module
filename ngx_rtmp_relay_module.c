@@ -56,6 +56,7 @@ typedef struct {
     ngx_msec_t                  push_reconnect;
     ngx_msec_t                  pull_reconnect;
     ngx_rtmp_relay_ctx_t        **ctx;
+	ngx_flag_t                  forward_auth;
 } ngx_rtmp_relay_app_conf_t;
 
 
@@ -121,6 +122,12 @@ static ngx_command_t  ngx_rtmp_relay_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_relay_app_conf_t, session_relay),
       NULL },
+	{ ngx_string("forward_auth"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_relay_app_conf_t, forward_auth),
+      NULL },	 
 
 
       ngx_null_command
@@ -191,7 +198,7 @@ ngx_rtmp_relay_create_app_conf(ngx_conf_t *cf)
     racf->session_relay = NGX_CONF_UNSET;
     racf->push_reconnect = NGX_CONF_UNSET_MSEC;
     racf->pull_reconnect = NGX_CONF_UNSET_MSEC;
-
+	racf->forward_auth = NGX_CONF_UNSET;
     return racf;
 }
 
@@ -211,6 +218,7 @@ ngx_rtmp_relay_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
             3000);
     ngx_conf_merge_msec_value(conf->pull_reconnect, prev->pull_reconnect,
             3000);
+	ngx_conf_merge_value(conf->forward_auth, prev->forward_auth, 0);															 
 
     return NGX_CONF_OK;
 }
@@ -671,8 +679,26 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-    name.len = ngx_strlen(v->name);
-    name.data = v->name;
+	//safe adding args (auth) to the name
+	if(racf->forward_auth)
+	{
+		name.len = ngx_strlen(v->name) + ngx_strlen(v->args) + 1;
+		name.data = ngx_palloc(s->connection->pool, name.len + 1);
+
+		if (name.data == NULL) {
+			return NGX_ERROR;
+		}
+		*ngx_cpymem(name.data, v->name, ngx_strlen(v->name)) = 0;
+		u_char q[1];
+		q[0] = '?';
+		*ngx_cpymem(name.data + ngx_strlen(v->name), q, 1) = 0;
+		*ngx_cpymem(name.data +ngx_strlen(v->name)+1,v->args, ngx_strlen(v->args)) = 0;
+	}
+	else
+	{
+		name.len = ngx_strlen(v->name) ;
+		name.data = v->name;
+	}
 
     t = racf->pushes.elts;
     for (n = 0; n < racf->pushes.nelts; ++n, ++t) {
@@ -685,6 +711,11 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         }
 
         if (ngx_rtmp_relay_push(s, &name, target) == NGX_OK) {
+			ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "relay: push succeed name='%V' app='%V' "
+                "playpath='%V' url='%V'",
+                &name, &target->app, &target->play_path,
+                &target->url.url);									
             continue;
         }
 
@@ -762,12 +793,26 @@ ngx_rtmp_relay_play_local(ngx_rtmp_session_t *s)
     if (ctx == NULL) {
         return NGX_ERROR;
     }
-
+	int arg_pos = 0;
+	for(int c = 0 ; c < ctx->name.len ; c++)
+	{
+		if (ctx->name.data[c] == '?')
+		{
+			arg_pos = c;
+		}
+	}
     ngx_memzero(&v, sizeof(ngx_rtmp_play_t));
     v.silent = 1;
-    *(ngx_cpymem(v.name, ctx->name.data,
+	if(arg_pos != 0)
+		*(ngx_cpymem(v.name, ctx->name.data,
+            arg_pos)) = 0;
+	else
+		*(ngx_cpymem(v.name, ctx->name.data,
             ngx_min(sizeof(v.name) - 1, ctx->name.len))) = 0;
-
+	
+	ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                "relay: play name='%s'",
+                v.name);
     return ngx_rtmp_play(s, &v);
 }
 
