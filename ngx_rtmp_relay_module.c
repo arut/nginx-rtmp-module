@@ -56,7 +56,7 @@ typedef struct {
     ngx_msec_t                  push_reconnect;
     ngx_msec_t                  pull_reconnect;
     ngx_rtmp_relay_ctx_t        **ctx;
-	ngx_flag_t                  forward_auth;
+	ngx_flag_t                  forward_auth;									  
 } ngx_rtmp_relay_app_conf_t;
 
 
@@ -679,13 +679,19 @@ ngx_rtmp_relay_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         goto next;
     }
 
-	//safe adding args (auth) to the name
+	//safa adding args (auth) to the name
 	if(racf->forward_auth)
 	{
+		ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+			"relay: name='%s' args='%s'",
+			v->name, v->args);
+
 		name.len = ngx_strlen(v->name) + ngx_strlen(v->args) + 1;
 		name.data = ngx_palloc(s->connection->pool, name.len + 1);
 
 		if (name.data == NULL) {
+			ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+					  "what the heck");
 			return NGX_ERROR;
 		}
 		*ngx_cpymem(name.data, v->name, ngx_strlen(v->name)) = 0;
