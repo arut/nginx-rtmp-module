@@ -510,12 +510,12 @@ ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
 #if (NGX_WIN32)
         {
             LONG  lo, hi;
-
+            DWORD ret;
             lo = 0;
             hi = 0;
-            lo = SetFilePointer(rctx->file.fd, lo, &hi, FILE_END);
-            file_size = (lo == INVALID_SET_FILE_POINTER ?
-                         (off_t) -1 : (off_t) hi << 32 | (off_t) lo);
+            ret = SetFilePointer(rctx->file.fd, lo, &hi, FILE_END);
+            file_size = (ret == INVALID_SET_FILE_POINTER ?
+                         (off_t) -1 : (off_t) hi << 32 | (off_t) ret);
         }
 #else
         file_size = lseek(rctx->file.fd, 0, SEEK_END);
