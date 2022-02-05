@@ -105,12 +105,10 @@ jobs:
           cp ~/nginx-rtmp-module/support/index.html docs/html/index.html
           sed -i 's/-WX/ /' auto/cc/msvc
           auto/configure --prefix=. --add-module=../nginx-rtmp-module --with-openssl=../openssl --with-zlib=../zlib-1.2.11 --with-pcre=../pcre-8.45 --with-cc=cl
-          pwd
       - name: Build nginx
         shell: bash
         run: |
           cd ~/nginx
-          set CL=/MP
           nmake
       - name: Move build files to directory
         shell: bash
@@ -136,7 +134,7 @@ jobs:
          path: C:\Users\runneradmin\nginx\build\nginx-with-rtmp-win32.zip
   create-release:
    needs: [build-windows, build-linux]
-   if: ${{ github.action == 'release' }}
+   if: ${{ github.event_name == 'release' }}
    runs-on: ubuntu-latest
    steps:
     - name: Download Windows artifact
