@@ -147,16 +147,15 @@ jobs:
       with:
        name: build-linux
        path: /home/runner/
-    - run: ls -R ~
     - name: Upload linux release
       uses: alexellis/upload-assets@0.2.2
       env:
           GITHUB_TOKEN: ${{ github.token }}
       with:
-          asset_paths: '["/home/runner/nginx/nginx-with-rtmp-linux.tar.gz"]'
+          asset_paths: '["/home/runner/nginx-with-rtmp-linux.tar.gz"]'
     - name: Upload windows release
       uses: alexellis/upload-assets@0.2.2
       env:
           GITHUB_TOKEN: ${{ github.token }}
       with:
-          asset_paths: '["/home/runner/nginx/nginx-with-rtmp-win32.zip"]'
+          asset_paths: '["/home/runner/nginx-with-rtmp-win32.zip"]'
