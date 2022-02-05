@@ -147,6 +147,7 @@ jobs:
       with:
        name: build-linux
        path: /home/runner/
+    - run: ls -R ~
     - name: Upload linux release
       uses: alexellis/upload-assets@0.2.2
       env:
