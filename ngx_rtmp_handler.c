@@ -241,7 +241,9 @@ ngx_rtmp_recv(ngx_event_t *rev)
                     "reusing formerly read data: %d", old_size);
 
             b->pos = b->start;
-            b->last = ngx_movemem(b->pos, old_pos, old_size);
+
+            size = ngx_min((size_t) (b->end - b->start), old_size);
+            b->last = ngx_movemem(b->pos, old_pos, size);
 
             if (s->in_chunk_size_changing) {
                 ngx_rtmp_finalize_set_chunk_size(s);
