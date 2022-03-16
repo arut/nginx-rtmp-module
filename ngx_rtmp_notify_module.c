@@ -1057,23 +1057,41 @@ ngx_rtmp_notify_publish_handle(ngx_rtmp_session_t *s,
     local_name.data = v->name;
     local_name.len = ngx_strlen(v->name);
 
-    ngx_memzero(&target, sizeof(target));
+    u_char *start = name;
+    u_char *next;
 
-    u = &target.url;
-    u->url = local_name;
-    u->url.data = name + 7;
-    u->url.len = rc - 7;
-    u->default_port = 1935;
-    u->uri_part = 1;
-    u->no_resolve = 1; /* want ip here */
+    while (start != NULL) {
+        next = (u_char *) ngx_strchr(start, ',');
 
-    if (ngx_parse_url(s->connection->pool, u) != NGX_OK) {
-        ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
-                      "notify: push failed '%V'", &local_name);
-        return NGX_ERROR;
+        ngx_memzero(&target, sizeof(target));
+        u = &target.url;
+        u->url = local_name;
+
+        if (next) {
+            u->url.data = start + 7;
+            u->url.len = next - start - 7;
+            start = next + 1;
+        } else {
+            u->url.data = start + 7;
+            u->url.len = rc - (start - name) - 7;
+            start = NULL;
+        }
+
+        u->default_port = 1935;
+        u->uri_part = 1;
+        u->no_resolve = 1; /* want ip here */
+
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+              "notify: processing push '%V'", &u->url);
+
+        if (ngx_parse_url(s->connection->pool, u) != NGX_OK) {
+            ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+                          "notify: push failed '%V'", &local_name);
+            return NGX_ERROR;
+        }
+
+        ngx_rtmp_relay_push(s, &local_name, &target);
     }
-
-    ngx_rtmp_relay_push(s, &local_name, &target);
 
 next:
 
