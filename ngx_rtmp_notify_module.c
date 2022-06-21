@@ -1564,7 +1564,7 @@ ngx_rtmp_notify_parse_url(ngx_conf_t *cf, ngx_str_t *url)
     if (ngx_strncasecmp(url->data, (u_char *)"http://", 7) == 0)
     {
         add = 7;
-        port = 80
+        port = 80;
     }
     else if (ngx_strncasecmp(url->data, (u_char *)"https://", 8) == 0)
     {
