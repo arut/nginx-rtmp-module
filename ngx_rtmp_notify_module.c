@@ -1552,6 +1552,7 @@ ngx_rtmp_notify_parse_url(ngx_conf_t *cf, ngx_str_t *url)
 {
     ngx_url_t  *u;
     size_t      add;
+    size_t      port;
 
     add = 0;
 
