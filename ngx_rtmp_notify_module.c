@@ -1555,6 +1555,7 @@ ngx_rtmp_notify_parse_url(ngx_conf_t *cf, ngx_str_t *url)
     size_t      port;
 
     add = 0;
+    port = 80;
 
     u = ngx_pcalloc(cf->pool, sizeof(ngx_url_t));
     if (u == NULL) {
