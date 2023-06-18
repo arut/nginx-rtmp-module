@@ -18,7 +18,7 @@
 
 ### Donation page (Paypal etc)
 
-  http://arut.github.com/nginx-rtmp-module/
+  https://arut.github.io/nginx-rtmp-module/
 
 ### Features
 
