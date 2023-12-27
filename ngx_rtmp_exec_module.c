@@ -778,13 +778,8 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             /* close all descriptors but pipe write end */
 
             maxfd = sysconf(_SC_OPEN_MAX);
-            for (fd = 0; fd < maxfd; ++fd) {
-                if (fd == pipefd[1]) {
-                    continue;
-                }
-
-                close(fd);
-            }
+            close_range(0, pipefd[1] - 1, 0);
+            close_range(pipefd[1] + 1, maxfd - 1, 0);
 
             fd = open("/dev/null", O_RDWR);
 
