@@ -167,6 +167,8 @@ ngx_rtmp_eval(void *ctx, ngx_str_t *in, ngx_rtmp_eval_t **e, ngx_str_t *out,
                         continue;
                 }
 
+                /* fall through */
+
             case ESCAPE:
                 ngx_rtmp_eval_append(&b, &c, 1, log);
                 state = NORMAL;
