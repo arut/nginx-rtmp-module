@@ -84,12 +84,11 @@ static void
 ngx_rtmp_eval_append_var(void *ctx, ngx_buf_t *b, ngx_rtmp_eval_t **e,
     ngx_str_t *name, ngx_log_t *log)
 {
-    ngx_uint_t          k;
     ngx_str_t           v;
     ngx_rtmp_eval_t    *ee;
 
     for (; *e; ++e) {
-        for (k = 0, ee = *e; ee->handler; ++k, ++ee) {
+        for (ee = *e; ee->handler; ++ee) {
             if (ee->name.len == name->len &&
                 ngx_memcmp(ee->name.data, name->data, name->len) == 0)
             {
