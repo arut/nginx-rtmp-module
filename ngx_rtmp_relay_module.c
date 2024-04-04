@@ -1288,7 +1288,7 @@ ngx_rtmp_relay_on_status(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 
     ngx_memzero(&v, sizeof(v));
-    if (h->type == NGX_RTMP_MSG_AMF_META) {
+    if (h->type == NGX_RTMP_MSG_AMF_NOTIFY) {
         ngx_rtmp_receive_amf(s, in, in_elts_meta,
                 sizeof(in_elts_meta) / sizeof(in_elts_meta[0]));
     } else {

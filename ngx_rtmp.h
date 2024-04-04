@@ -126,10 +126,10 @@ typedef struct {
 #define NGX_RTMP_MSG_EDGE               7
 #define NGX_RTMP_MSG_AUDIO              8
 #define NGX_RTMP_MSG_VIDEO              9
-#define NGX_RTMP_MSG_AMF3_META          15
+#define NGX_RTMP_MSG_AMF3_NOTIFY        15
 #define NGX_RTMP_MSG_AMF3_SHARED        16
 #define NGX_RTMP_MSG_AMF3_CMD           17
-#define NGX_RTMP_MSG_AMF_META           18
+#define NGX_RTMP_MSG_AMF_NOTIFY         18
 #define NGX_RTMP_MSG_AMF_SHARED         19
 #define NGX_RTMP_MSG_AMF_CMD            20
 #define NGX_RTMP_MSG_AGGREGATE          22
@@ -300,6 +300,7 @@ typedef struct {
     ngx_hash_t              amf_hash;
     ngx_array_t             amf_arrays;
     ngx_array_t             amf;
+    ngx_rtmp_handler_pt     amf_default;
 } ngx_rtmp_core_main_conf_t;
 
 
@@ -458,7 +459,8 @@ ngx_int_t ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
 ngx_int_t ngx_rtmp_amf_shared_object_handler(ngx_rtmp_session_t *s,
         ngx_rtmp_header_t *h, ngx_chain_t *in);
-
+ngx_int_t ngx_rtmp_amf_notify_handler(ngx_rtmp_session_t *s,
+        ngx_rtmp_header_t *h, ngx_chain_t *in);
 
 /* Shared output buffers */
 
