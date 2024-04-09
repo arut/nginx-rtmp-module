@@ -6,7 +6,31 @@
 #include <ngx_rtmp_codec_module.h>
 
 
-static ngx_int_t
+ngx_int_t
+ngx_rtmp_mp4_field_64(ngx_buf_t *b, uint64_t n)
+{
+    u_char         bytes[8];
+
+    bytes[0] = ((uint64_t)n >> 56) & 0xFF;
+    bytes[1] = ((uint64_t)n >> 48) & 0xFF;
+    bytes[2] = ((uint64_t)n >> 40) & 0xFF;
+    bytes[3] = ((uint64_t)n >> 32) & 0xFF;
+    bytes[4] = ((uint64_t)n >> 24) & 0xFF;
+    bytes[5] = ((uint64_t)n >> 16) & 0xFF;
+    bytes[6] = ((uint64_t)n >> 8) & 0xFF;
+    bytes[7] = (uint64_t)n & 0xFF;
+
+    if (b->last + sizeof(bytes) > b->end) {
+        return NGX_ERROR;
+    }
+
+    b->last = ngx_cpymem(b->last, bytes, sizeof(bytes));
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
 ngx_rtmp_mp4_field_32(ngx_buf_t *b, uint32_t n)
 {
     u_char  bytes[4];
@@ -26,7 +50,7 @@ ngx_rtmp_mp4_field_32(ngx_buf_t *b, uint32_t n)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_mp4_field_24(ngx_buf_t *b, uint32_t n)
 {
     u_char  bytes[3];
@@ -45,7 +69,7 @@ ngx_rtmp_mp4_field_24(ngx_buf_t *b, uint32_t n)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_mp4_field_16(ngx_buf_t *b, uint16_t n)
 {
     u_char  bytes[2];
@@ -63,7 +87,7 @@ ngx_rtmp_mp4_field_16(ngx_buf_t *b, uint16_t n)
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_mp4_field_8(ngx_buf_t *b, uint8_t n)
 {
     u_char  bytes[1];
@@ -116,7 +140,7 @@ ngx_rtmp_mp4_box(ngx_buf_t *b, const char box[4])
 }
 
 
-static u_char *
+u_char *
 ngx_rtmp_mp4_start_box(ngx_buf_t *b, const char box[4])
 {
     u_char  *p;
@@ -135,7 +159,7 @@ ngx_rtmp_mp4_start_box(ngx_buf_t *b, const char box[4])
 }
 
 
-static ngx_int_t
+ngx_int_t
 ngx_rtmp_mp4_update_box_size(ngx_buf_t *b, u_char *p)
 {
     u_char  *curpos;

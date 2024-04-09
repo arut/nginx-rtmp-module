@@ -1105,7 +1105,8 @@ static ngx_int_t
 ngx_rtmp_dash_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t *in)
 {
-    u_char                     htype;
+    u_char                     htype, *pos;
+    ngx_int_t                  rc;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
     ngx_rtmp_dash_app_conf_t  *dacf;
@@ -1141,11 +1142,15 @@ ngx_rtmp_dash_audio(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx->has_audio = 1;
 
-    /* skip RTMP & AAC headers */
-
+    /* skip RTMP & AAC headers, dont modify input buffers */
+    pos = in->buf->pos;
     in->buf->pos += 2;
 
-    return ngx_rtmp_dash_append(s, in, &ctx->audio, 0, h->timestamp, 0);
+    rc = ngx_rtmp_dash_append(s, in, &ctx->audio, 0, h->timestamp, 0);
+
+    in->buf->pos = pos;
+
+    return rc;
 }
 
 
@@ -1153,9 +1158,10 @@ static ngx_int_t
 ngx_rtmp_dash_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     ngx_chain_t *in)
 {
-    u_char                    *p;
+    u_char                    *p, *pos;
     uint8_t                    ftype, htype;
     uint32_t                   delay;
+    ngx_int_t                  rc;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
     ngx_rtmp_dash_app_conf_t  *dacf;
@@ -1198,12 +1204,16 @@ ngx_rtmp_dash_video(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     ctx->has_video = 1;
 
-    /* skip RTMP & H264 headers */
-
+    /* skip RTMP & H264 headers, dont modify input buffers */
+    pos = in->buf->pos;
     in->buf->pos += 5;
 
-    return ngx_rtmp_dash_append(s, in, &ctx->video, ftype == 1, h->timestamp,
+    rc = ngx_rtmp_dash_append(s, in, &ctx->video, ftype == 1, h->timestamp,
                                 delay);
+
+    in->buf->pos = pos;
+
+    return rc;
 }
 
 

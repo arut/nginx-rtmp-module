@@ -186,6 +186,11 @@ ngx_rtmp_codec_disconnect(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ctx->meta = NULL;
     }
 
+    if (ctx->received_meta) {
+        ngx_rtmp_free_shared_chain(cscf, ctx->received_meta);
+        ctx->received_meta = NULL;
+    }
+
     return NGX_OK;
 }
 
@@ -732,7 +737,10 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 {
     ngx_rtmp_codec_app_conf_t      *cacf;
     ngx_rtmp_codec_ctx_t           *ctx;
+    ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_uint_t                      skip;
+
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     static struct {
         double                      width;
@@ -876,6 +884,11 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             ctx->video_codec_id,
             ngx_rtmp_get_audio_codec_name(ctx->audio_codec_id),
             ctx->audio_codec_id);
+
+    if (ctx->received_meta) {
+        ngx_rtmp_free_shared_chain(cscf, ctx->received_meta);
+    }
+    ctx->received_meta = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
 
     switch (cacf->meta) {
         case NGX_RTMP_CODEC_META_ON:
