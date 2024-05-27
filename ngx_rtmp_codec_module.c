@@ -943,7 +943,15 @@ ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf)
     }
     ngx_str_set(&ch->name, "@setDataFrame");
     ch->handler = ngx_rtmp_codec_meta_data;
-
+    
+    // some encoders send setDataFrame instead of @setDataFrame
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "setDataFrame");
+    ch->handler = ngx_rtmp_codec_meta_data;
+    
     ch = ngx_array_push(&cmcf->amf);
     if (ch == NULL) {
         return NGX_ERROR;
