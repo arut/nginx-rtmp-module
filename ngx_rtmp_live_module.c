@@ -929,6 +929,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                     rc = ngx_rtmp_send_message(ss, apkt, 0);
                     if (rc != NGX_OK) {
+			    cs->timestamp = lh.timestamp;
+			    ss->current_time = cs->timestamp;
                         continue;
                     }
                 }
@@ -941,6 +943,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                     rc = ngx_rtmp_send_message(ss, acopkt, 0);
                     if (rc != NGX_OK) {
+			    cs->timestamp = lh.timestamp;
+			    ss->current_time = cs->timestamp;
                         continue;
                     }
 
@@ -967,6 +971,8 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                 rc = ngx_rtmp_send_message(ss, apkt, prio);
                 if (rc != NGX_OK) {
+			cs->timestamp = ch.timestamp;
+			ss->current_time = cs->timestamp;
                     continue;
                 }
 
@@ -994,6 +1000,9 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             ++pctx->ndropped;
 
             cs->dropped += delta;
+
+	    cs->timestamp += delta;
+	    ss->current_time = cs->timestamp;
 
             if (mandatory) {
                 ngx_log_debug0(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
