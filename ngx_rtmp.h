@@ -582,6 +582,9 @@ ngx_int_t ngx_rtmp_send_status(ngx_rtmp_session_t *s, char *code,
 ngx_int_t ngx_rtmp_send_play_status(ngx_rtmp_session_t *s, char *code,
         char* level, ngx_uint_t duration, ngx_uint_t bytes);
 ngx_int_t ngx_rtmp_send_sample_access(ngx_rtmp_session_t *s);
+ngx_int_t ngx_rtmp_send_redirect_status(ngx_rtmp_session_t *s,
+        char *callMethod, char *desc, ngx_str_t to_url);
+ngx_int_t ngx_rtmp_send_close_method(ngx_rtmp_session_t *s, char *methodName);
 
 
 /* Frame types */
