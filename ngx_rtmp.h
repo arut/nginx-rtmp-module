@@ -233,6 +233,9 @@ typedef struct {
     ngx_msec_t              base_time;
     uint32_t                current_time;
 
+    /* ready for publishing? */
+    unsigned                ready_for_publish:1;
+
     /* ping */
     ngx_event_t             ping_evt;
     unsigned                ping_active:1;
