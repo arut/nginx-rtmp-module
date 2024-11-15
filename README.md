@@ -138,7 +138,7 @@ rtmp_auto_push directive.
             application big {
                 live on;
 
-                # On every pusblished stream run this command (ffmpeg)
+                # On every published stream run this command (ffmpeg)
                 # with substitutions: $app/${app}, $name/${name} for application & stream name.
                 #
                 # This ffmpeg call receives stream from this application &
