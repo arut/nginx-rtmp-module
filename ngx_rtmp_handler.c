@@ -570,7 +570,10 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 {
     ngx_chain_t                *l;
     u_char                     *p, *pp;
-    ngx_int_t                   hsize, thsize, nbufs;
+    ngx_int_t                   hsize, thsize;
+#if (NGX_DEBUG)
+    ngx_int_t                   nbufs;
+#endif
     uint32_t                    mlen, timestamp, ext_timestamp;
     static uint8_t              hdrsize[] = { 12, 8, 4, 1 };
     u_char                      th[7];
@@ -591,10 +594,14 @@ ngx_rtmp_prepare_message(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
     /* detect packet size */
     mlen = 0;
+#if (NGX_DEBUG)
     nbufs = 0;
+#endif
     for(l = out; l; l = l->next) {
         mlen += (l->buf->last - l->buf->pos);
+#if (NGX_DEBUG)
         ++nbufs;
+#endif
     }
 
     fmt = 0;
