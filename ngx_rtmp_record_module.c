@@ -11,7 +11,7 @@
 #include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_codec_module.h"
 #include "ngx_rtmp_record_module.h"
-
+#include <stdbool.h>
 
 ngx_rtmp_record_done_pt             ngx_rtmp_record_done;
 
@@ -145,6 +145,13 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       0,
       NULL },
 
+    { ngx_string("record_align_interval"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+      NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_flag_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, align_interval),
+      NULL },
 
       ngx_null_command
 };
@@ -197,6 +204,8 @@ ngx_rtmp_record_create_app_conf(ngx_conf_t *cf)
     racf->lock_file = NGX_CONF_UNSET;
     racf->notify = NGX_CONF_UNSET;
     racf->url = NGX_CONF_UNSET_PTR;
+    racf->align_interval = NGX_CONF_UNSET;
+
 
     if (ngx_array_init(&racf->rec, cf->pool, 1, sizeof(void *)) != NGX_OK) {
         return NULL;
@@ -225,6 +234,7 @@ ngx_rtmp_record_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
                               (ngx_msec_t) NGX_CONF_UNSET);
     ngx_conf_merge_bitmask_value(conf->flags, prev->flags, 0);
     ngx_conf_merge_ptr_value(conf->url, prev->url, NULL);
+    ngx_conf_merge_value(conf->align_interval, prev->align_interval, 0);
 
     if (conf->flags) {
         rracf = ngx_array_push(&conf->rec);
@@ -429,7 +439,6 @@ ngx_rtmp_record_notify_error(ngx_rtmp_session_t *s,
     ngx_rtmp_send_status(s, "NetStream.Record.Failed", "error",
                          rracf->id.data ? (char *) rracf->id.data : "");
 }
-
 
 static ngx_int_t
 ngx_rtmp_record_node_open(ngx_rtmp_session_t *s,
@@ -1015,6 +1024,35 @@ ngx_rtmp_record_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     return NGX_OK;
 }
 
+static ngx_time_t
+ngx_rtmp_record_calc_next_reopen(ngx_rtmp_record_rec_ctx_t *rctx)
+{
+    ngx_time_t next;
+    ngx_rtmp_record_app_conf_t *rracf;
+    bool align;
+    ngx_msec_t interval;
+
+    rracf = rctx->conf;
+
+    interval = rracf->interval;
+    align = rracf->align_interval;
+
+    next = rctx->last;
+    next.msec += interval;
+
+    if (align) {
+	next.msec = (next.msec / interval) * interval;
+	interval /= 1000;
+	if (interval != 0) {
+	    next.sec = (next.sec / interval) * interval;
+	}
+    }
+
+    next.sec  += (next.msec / 1000);
+    next.msec %= 1000;
+
+    return next;
+}
 
 static ngx_int_t
 ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
@@ -1045,10 +1083,7 @@ ngx_rtmp_record_node_av(ngx_rtmp_session_t *s, ngx_rtmp_record_rec_ctx_t *rctx,
 
         if (rracf->interval != (ngx_msec_t) NGX_CONF_UNSET) {
 
-            next = rctx->last;
-            next.msec += rracf->interval;
-            next.sec  += (next.msec / 1000);
-            next.msec %= 1000;
+	    next = ngx_rtmp_record_calc_next_reopen(rctx);
 
             if (ngx_cached_time->sec  > next.sec ||
                (ngx_cached_time->sec == next.sec &&

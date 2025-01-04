@@ -36,6 +36,7 @@ typedef struct {
 
     void                              **rec_conf;
     ngx_array_t                         rec; /* ngx_rtmp_record_app_conf_t * */
+    ngx_flag_t                          align_interval;
 } ngx_rtmp_record_app_conf_t;
 
 
