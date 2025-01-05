@@ -284,6 +284,7 @@ ngx_module_t  ngx_rtmp_exec_module = {
 };
 
 
+#if !(NGX_WIN32)
 static void
 ngx_rtmp_exec_eval_ctx_cstr(void *sctx, ngx_rtmp_eval_t *e, ngx_str_t *ret)
 {
@@ -406,6 +407,7 @@ static ngx_rtmp_eval_t * ngx_rtmp_exec_event_eval[] = {
     ngx_rtmp_exec_event_specific_eval,
     NULL
 };
+#endif
 
 
 static void *

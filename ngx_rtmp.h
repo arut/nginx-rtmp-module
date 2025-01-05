@@ -18,7 +18,7 @@
 #include "ngx_rtmp_bandwidth.h"
 
 
-#if (NGX_WIN32)
+#if (NGX_WIN32) && !defined(__int8)
 typedef __int8              int8_t;
 typedef unsigned __int8     uint8_t;
 #endif
@@ -182,7 +182,7 @@ typedef struct {
 
 /* disable zero-sized array warning by msvc */
 
-#if (NGX_WIN32)
+#if (NGX_WIN32) && (_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable:4200)
 #endif
@@ -271,7 +271,7 @@ typedef struct {
 } ngx_rtmp_session_t;
 
 
-#if (NGX_WIN32)
+#if (NGX_WIN32) && (_MSC_VER)
 #pragma warning(pop)
 #endif
 
