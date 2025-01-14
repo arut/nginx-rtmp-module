@@ -10,6 +10,8 @@
 #include <ngx_rtmp_cmd_module.h>
 #include <ngx_rtmp_codec_module.h>
 #include "ngx_rtmp_mpegts.h"
+#include "ngx_rtmp_amf.h"
+#include "id3v2lib.h"
 
 
 static ngx_rtmp_publish_pt              next_publish;
@@ -70,6 +72,7 @@ typedef struct {
 
     ngx_uint_t                          audio_cc;
     ngx_uint_t                          video_cc;
+    ngx_uint_t                          meta_cc;
     ngx_uint_t                          key_frags;
 
     uint64_t                            aframe_base;
@@ -2429,11 +2432,188 @@ ngx_rtmp_hls_merge_app_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
+char * trim_spaces(char *str) {
+    char *end;
+    /* skip leading whitespace */
+    while (isspace(*str)) {
+        str = str + 1;
+    }
+    /* remove trailing whitespace */
+    end = str + strlen(str) - 1;
+    while (end > str && isspace(*end)) {
+        end = end - 1;
+    }
+
+    *(end+1) = '\0';
+    return str;
+}
+
+
+static ngx_int_t
+ngx_rtmp_hls_meta(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+    ngx_chain_t *in)
+{
+    ngx_rtmp_hls_ctx_t      *ctx;
+    ngx_rtmp_mpegts_frame_t frame;
+    ngx_int_t               rc;
+    ngx_buf_t               out;
+    ngx_uint_t              skip;
+    char                    *token;
+
+    static u_char           buffer[132];
+    ID3v2_tag*              tag;
+    ID3v2_frame_list*       frame_list;    
+
+    static struct {
+        char title[32];
+        char artist[32];
+        char streamTitle[64];
+    } v;
+
+    ngx_memzero(&v, sizeof(v));
+
+    static ngx_rtmp_amf_elt_t       in_inf[] = {
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("StreamTitle"),
+          &v.streamTitle, 64 },
+    };
+    
+    static ngx_rtmp_amf_elt_t       in_elts[] = {
+        { NGX_RTMP_AMF_STRING,
+          ngx_string("first_string"),
+          NULL, 0 },
+
+        { NGX_RTMP_AMF_OBJECT,
+          ngx_string("mix_array"),
+          in_inf, sizeof(in_inf) },
+    };
+
+    skip = !(in->buf->last > in->buf->pos
+            && *in->buf->pos == NGX_RTMP_AMF_STRING);
+
+    if (ngx_rtmp_receive_amf(s, in, in_elts + skip,
+                sizeof(in_elts) / sizeof(in_elts[0]) - skip))
+    {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                "codec: error parsing data frame");
+        return NGX_OK;
+    }
+
+    token = strtok(v.streamTitle, "|"); 
+    if (token != NULL) {   
+        token = trim_spaces(token);
+        snprintf(v.title, sizeof(v.title), "%s", token);
+    } else {
+        return NGX_OK;
+    }
+    
+    token = strtok(NULL, "|");
+    if (token != NULL) {
+      token = trim_spaces(token);    
+      snprintf(v.artist, sizeof(v.artist), "%s", token);
+    }
+    
+    ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+
+    if (ctx == NULL) {
+        return NGX_OK;
+    }
+
+    ngx_memzero(&frame, sizeof(frame));
+    frame.cc = ctx->meta_cc;    
+    frame.dts = (uint64_t) h->timestamp * 90 + 100;
+    frame.pts = frame.dts;    
+    frame.pid = 0x102;
+    frame.sid = 0xbd;
+
+    ngx_rtmp_hls_update_fragment(s, frame.dts, 1, 1);
+    if (!ctx->opened) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "ctx not opened");      
+        return NGX_OK;
+    }
+    
+    tag = new_tag();
+    tag_set_title(v.title, 3, tag);    
+    tag_set_artist(v.artist, 3, tag);    
+
+    tag->tag_header = new_header();
+    memcpy(tag->tag_header->tag, "ID3", 3);
+    tag->tag_header->major_version = '\x04';
+    tag->tag_header->minor_version = '\x00';
+    tag->tag_header->flags = '\x00';
+    tag->tag_header->tag_size = get_tag_size(tag)+1;
+    
+    ngx_memzero(&out, sizeof(out));
+
+    out.start = buffer;
+    out.end = buffer + sizeof(buffer);
+    out.pos = out.start;
+    out.last = out.pos;
+
+    // TODO: maybe move this section inside the id3 library
+    *out.last++ = tag->tag_header->tag[0];
+    *out.last++ = tag->tag_header->tag[1];
+    *out.last++ = tag->tag_header->tag[2];
+    
+    *out.last++ = tag->tag_header->major_version;
+    *out.last++ = tag->tag_header->minor_version;
+    *out.last++ = tag->tag_header->flags;
+    *out.last++ = 0x00; 
+    *out.last++ = 0x00;
+    *out.last++ = 0x00;    
+    *out.last++ = tag->tag_header->tag_size;
+
+    frame_list = tag->frames->start;
+    while(frame_list != NULL)
+    {
+        *out.last++ = frame_list->frame->frame_id[0];
+        *out.last++ = frame_list->frame->frame_id[1];
+        *out.last++ = frame_list->frame->frame_id[2];
+        *out.last++ = frame_list->frame->frame_id[3];
+    
+        // int enc = syncint_encode(frame_list->frame->size);
+        int enc = frame_list->frame->size + 1;        
+        *out.last++ = (enc >> 24) & 0xFF;
+        *out.last++ = (enc >> 16) & 0xFF;
+        *out.last++ = (enc >> 8) & 0xFF;
+        *out.last++ = (enc) & 0xFF;
+
+        //*out.last++ = frame_list->frame->flags[0];
+        //*out.last++ = frame_list->frame->flags[1];
+        *out.last++ = 0x00;
+        *out.last++ = 0x00;        
+
+        int i;
+        for(i=0; i<frame_list->frame->size; i++)
+            *out.last++ = frame_list->frame->data[i];
+
+        *out.last++ = 0x00;            
+        frame_list = frame_list->next;
+    }
+
+    rc = ngx_rtmp_mpegts_write_frame(&ctx->file, &frame, &out);
+
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "hls: ID3 frame write failed");
+    } else {
+        ngx_log_debug1(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "hls: ID3 frame write pts=%uL", frame.pts);
+    }
+
+    ctx->meta_cc = frame.cc;
+    
+    return rc;
+}  
+
+
 static ngx_int_t
 ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
 {
-    ngx_rtmp_core_main_conf_t   *cmcf;
+  ngx_rtmp_core_main_conf_t   *cmcf;
     ngx_rtmp_handler_pt         *h;
+    ngx_rtmp_amf_handler_t      *ch;    
 
     cmcf = ngx_rtmp_conf_get_module_main_conf(cf, ngx_rtmp_core_module);
 
@@ -2443,6 +2623,22 @@ ngx_rtmp_hls_postconfiguration(ngx_conf_t *cf)
     h = ngx_array_push(&cmcf->events[NGX_RTMP_MSG_AUDIO]);
     *h = ngx_rtmp_hls_audio;
 
+    
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "@setDataFrame");
+    ch->handler = ngx_rtmp_hls_meta;
+
+    
+    ch = ngx_array_push(&cmcf->amf);
+    if (ch == NULL) {
+        return NGX_ERROR;
+    }
+    ngx_str_set(&ch->name, "onMetaData");
+    ch->handler = ngx_rtmp_hls_meta;
+    
     next_publish = ngx_rtmp_publish;
     ngx_rtmp_publish = ngx_rtmp_hls_publish;
 
