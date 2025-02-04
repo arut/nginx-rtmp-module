@@ -9,6 +9,7 @@
 #include <ngx_md5.h>
 #include "ngx_rtmp.h"
 #include "ngx_rtmp_cmd_module.h"
+#include "ngx_rtmp_live_module.h"
 #include "ngx_rtmp_netcall_module.h"
 #include "ngx_rtmp_record_module.h"
 #include "ngx_rtmp_relay_module.h"
@@ -627,7 +628,9 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
     ngx_chain_t                    *pl;
     ngx_buf_t                      *b;
     size_t                          cbname_len, name_len, args_len;
+    u_char                         *name;
     ngx_rtmp_notify_ctx_t          *ctx;
+    ngx_rtmp_live_ctx_t            *live_ctx;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_notify_module);
 
@@ -637,7 +640,15 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
     }
 
     cbname_len = ngx_strlen(ds->cbname);
-    name_len = ctx ? ngx_strlen(ctx->name) : 0;
+    name = ctx ? ctx->name : NULL;
+    name_len = name ? ngx_strlen(name) : 0;
+    if (name_len == 0) {
+        ngx_log_debug0(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
+                       "notify: name unavailable, trying to infer from live ctx");
+        live_ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_live_module);
+        name = live_ctx ? live_ctx->stream->name : NULL;
+        name_len = name ? ngx_strlen(name) : 0;
+    }
     args_len = ctx ? ngx_strlen(ctx->args) : 0;
 
     b = ngx_create_temp_buf(pool,
@@ -656,7 +667,7 @@ ngx_rtmp_notify_done_create(ngx_rtmp_session_t *s, void *arg,
 
     if (name_len) {
         b->last = ngx_cpymem(b->last, (u_char*) "&name=", sizeof("&name=") - 1);
-        b->last = (u_char*) ngx_escape_uri(b->last, ctx->name, name_len,
+        b->last = (u_char*) ngx_escape_uri(b->last, name, name_len,
                                            NGX_ESCAPE_ARGS);
     }
 
