@@ -504,6 +504,19 @@ ngx_rtmp_live_join(ngx_rtmp_session_t *s, u_char *name, unsigned publisher)
 
     if (ctx == NULL) {
         ctx = ngx_palloc(s->connection->pool, sizeof(ngx_rtmp_live_ctx_t));
+        
+        if (ctx == NULL) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                          "live: failed to allocate memory for context");
+
+            ngx_rtmp_send_status(s, "NetStream.Play.Failed", "error",
+                                 "Failed to allocate memory");
+
+            ngx_rtmp_finalize_session(s); 
+
+            return;
+        }
+
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_live_module);
     }
 
