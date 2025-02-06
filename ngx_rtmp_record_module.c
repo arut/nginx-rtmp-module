@@ -81,6 +81,13 @@ static ngx_command_t  ngx_rtmp_record_commands[] = {
       NGX_RTMP_APP_CONF_OFFSET,
       offsetof(ngx_rtmp_record_app_conf_t, suffix),
       NULL },
+   { ngx_string("record_prefix"),
+      NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
+                         NGX_RTMP_REC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_RTMP_APP_CONF_OFFSET,
+      offsetof(ngx_rtmp_record_app_conf_t, prefix),
+      NULL },
 
     { ngx_string("record_unique"),
       NGX_RTMP_MAIN_CONF|NGX_RTMP_SRV_CONF|NGX_RTMP_APP_CONF|
@@ -388,9 +395,12 @@ ngx_rtmp_record_make_path(ngx_rtmp_session_t *s,
     p = ngx_cpymem(p, rracf->path.data,
                 ngx_min(rracf->path.len, (size_t)(l - p - 1)));
     *p++ = '/';
-    p = (u_char *)ngx_escape_uri(p, ctx->name, ngx_min(ngx_strlen(ctx->name),
-                (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
-
+    if(rracf->prefix.data){
+	p = ngx_cpymem(p, rracf->prefix.data, ngx_min(rracf->prefix.len, (size_t)(l-p)));
+    }else{
+    	p = (u_char *)ngx_escape_uri(p, ctx->name, ngx_min(ngx_strlen(ctx->name),
+        	        (size_t)(l - p)), NGX_ESCAPE_URI_COMPONENT);
+    }
     /* append timestamp */
     if (rracf->unique) {
         p = ngx_cpymem(p, buf, ngx_min(ngx_sprintf(buf, "-%T",
