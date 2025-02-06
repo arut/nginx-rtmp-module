@@ -30,7 +30,6 @@ static ngx_int_t ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s,
 
 
 #define NGX_RTMP_HLS_BUFSIZE            (1024*1024)
-#define NGX_RTMP_HLS_DIR_ACCESS         0744
 
 
 typedef struct {
@@ -391,20 +390,22 @@ ngx_rtmp_hls_write_variant_playlist(ngx_rtmp_session_t *s)
 {
     static u_char             buffer[1024];
 
-    u_char                   *p, *last;
-    ssize_t                   rc;
-    ngx_fd_t                  fd;
-    ngx_str_t                *arg;
-    ngx_uint_t                n, k;
-    ngx_rtmp_hls_ctx_t       *ctx;
-    ngx_rtmp_hls_variant_t   *var;
-    ngx_rtmp_hls_app_conf_t  *hacf;
+    u_char                    *p, *last;
+    ssize_t                    rc;
+    ngx_fd_t                   fd;
+    ngx_str_t                 *arg;
+    ngx_uint_t                 n, k;
+    ngx_rtmp_hls_ctx_t        *ctx;
+    ngx_rtmp_hls_variant_t    *var;
+    ngx_rtmp_hls_app_conf_t   *hacf;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     fd = ngx_open_file(ctx->var_playlist_bak.data, NGX_FILE_WRONLY,
-                       NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+                       NGX_FILE_TRUNCATE, cscf->file_access);
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -488,6 +489,7 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
     ngx_rtmp_hls_ctx_t             *ctx;
     ssize_t                         n;
     ngx_rtmp_hls_app_conf_t        *hacf;
+    ngx_rtmp_core_srv_conf_t       *cscf;
     ngx_rtmp_hls_frag_t            *f;
     ngx_uint_t                      i, max_frag;
     ngx_str_t                       name_part, key_name_part;
@@ -497,9 +499,10 @@ ngx_rtmp_hls_write_playlist(ngx_rtmp_session_t *s)
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     fd = ngx_open_file(ctx->playlist_bak.data, NGX_FILE_WRONLY,
-                       NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+                       NGX_FILE_TRUNCATE, cscf->file_access);
 
     if (fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -844,12 +847,13 @@ static ngx_int_t
 ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     ngx_int_t discont)
 {
-    uint64_t                  id;
-    ngx_fd_t                  fd;
-    ngx_uint_t                g;
-    ngx_rtmp_hls_ctx_t       *ctx;
-    ngx_rtmp_hls_frag_t      *f;
-    ngx_rtmp_hls_app_conf_t  *hacf;
+    uint64_t                   id;
+    ngx_fd_t                   fd;
+    ngx_uint_t                 g;
+    ngx_rtmp_hls_ctx_t        *ctx;
+    ngx_rtmp_hls_frag_t       *f;
+    ngx_rtmp_hls_app_conf_t   *hacf;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_hls_module);
 
@@ -858,6 +862,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     }
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (ngx_rtmp_hls_ensure_directory(s, &hacf->path) != NGX_OK) {
         return NGX_ERROR;
@@ -893,7 +898,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
             ngx_sprintf(ctx->keyfile.data + ctx->keyfile.len, "%uL.key%Z", id);
 
             fd = ngx_open_file(ctx->keyfile.data, NGX_FILE_WRONLY,
-                               NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+                               NGX_FILE_TRUNCATE, cscf->file_access);
 
             if (fd == NGX_INVALID_FILE) {
                 ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
@@ -944,7 +949,7 @@ ngx_rtmp_hls_open_fragment(ngx_rtmp_session_t *s, uint64_t ts,
     }
 
     if (ngx_rtmp_mpegts_open_file(&ctx->file, ctx->stream.data,
-                                  s->connection->log)
+                                  cscf->file_access, s->connection->log)
         != NGX_OK)
     {
         return NGX_ERROR;
@@ -1169,14 +1174,16 @@ done:
 static ngx_int_t
 ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s, ngx_str_t *path)
 {
-    size_t                    len;
-    ngx_file_info_t           fi;
-    ngx_rtmp_hls_ctx_t       *ctx;
-    ngx_rtmp_hls_app_conf_t  *hacf;
+    size_t                     len;
+    ngx_file_info_t            fi;
+    ngx_rtmp_hls_ctx_t        *ctx;
+    ngx_rtmp_hls_app_conf_t   *hacf;
+    ngx_rtmp_core_srv_conf_t  *cscf;
 
     static u_char  zpath[NGX_MAX_PATH + 1];
 
     hacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_hls_module);
+    cscf = ngx_rtmp_get_module_srv_conf(s, ngx_rtmp_core_module);
 
     if (path->len + 1 > sizeof(zpath)) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, 0, "hls: too long path");
@@ -1195,7 +1202,8 @@ ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s, ngx_str_t *path)
 
         /* ENOENT */
 
-        if (ngx_create_dir(zpath, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
+        if (ngx_create_dir(zpath, ngx_dir_access(cscf->file_access))
+            == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                           "hls: " ngx_create_dir_n " failed on '%V'", path);
             return NGX_ERROR;
@@ -1257,7 +1265,8 @@ ngx_rtmp_hls_ensure_directory(ngx_rtmp_session_t *s, ngx_str_t *path)
 
     /* NGX_ENOENT */
 
-    if (ngx_create_dir(zpath, NGX_RTMP_HLS_DIR_ACCESS) == NGX_FILE_ERROR) {
+    if (ngx_create_dir(zpath, ngx_dir_access(cscf->file_access))
+        == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_ERR, s->connection->log, ngx_errno,
                       "hls: " ngx_create_dir_n " failed on '%s'", zpath);
         return NGX_ERROR;

@@ -350,12 +350,11 @@ ngx_rtmp_mpegts_init_encryption(ngx_rtmp_mpegts_file_t *file,
 
 ngx_int_t
 ngx_rtmp_mpegts_open_file(ngx_rtmp_mpegts_file_t *file, u_char *path,
-    ngx_log_t *log)
+    ngx_uint_t access, ngx_log_t *log)
 {
     file->log = log;
 
-    file->fd = ngx_open_file(path, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE,
-                             NGX_FILE_DEFAULT_ACCESS);
+    file->fd = ngx_open_file(path, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE, access);
 
     if (file->fd == NGX_INVALID_FILE) {
         ngx_log_error(NGX_LOG_ERR, log, ngx_errno,

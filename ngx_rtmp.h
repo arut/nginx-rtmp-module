@@ -329,6 +329,7 @@ typedef struct ngx_rtmp_core_srv_conf_s {
     size_t                  out_queue;
     size_t                  out_cork;
     ngx_msec_t              buflen;
+    ngx_uint_t              file_access;
 
     ngx_rtmp_conf_ctx_t    *ctx;
 } ngx_rtmp_core_srv_conf_t;
