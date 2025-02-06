@@ -421,8 +421,10 @@ ngx_rtmp_amf_message_handler(ngx_rtmp_session_t *s,
 
     /* skip name */
     in = act.link;
-    in->buf->pos += act.offset;
-
+	if (ngx_strcmp(func, "onMetaData") != 0) {
+		in->buf->pos += act.offset;
+	}
+	
     len = ngx_strlen(func);
 
     ch = ngx_hash_find(&cmcf->amf_hash,
