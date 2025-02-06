@@ -616,6 +616,7 @@ static ngx_int_t
 ngx_rtmp_play_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
 {
     ngx_rtmp_play_ctx_t            *ctx;
+    ngx_uint_t                     timestamp;
 
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_play_module);
 
@@ -651,7 +652,14 @@ ngx_rtmp_play_pause(ngx_rtmp_session_t *s, ngx_rtmp_pause_t *v)
             return NGX_ERROR;
         }
 
-        ngx_rtmp_play_do_start(s); /*TODO: v->position? */
+        timestamp = (v->position < 0 ? 0 : (ngx_uint_t)v->position);
+
+        if (ngx_rtmp_play_do_seek(s, timestamp) != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
+        ngx_rtmp_play_do_start(s);
     }
 
 next:
