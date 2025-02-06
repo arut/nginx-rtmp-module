@@ -17,6 +17,7 @@ typedef struct {
     ngx_url_t                       url;
     ngx_str_t                       app;
     ngx_str_t                       name;
+    ngx_str_t                       param;
     ngx_str_t                       tc_url;
     ngx_str_t                       page_url;
     ngx_str_t                       swf_url;
