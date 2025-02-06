@@ -60,16 +60,16 @@ typedef struct {
 } ngx_rtmp_addr_conf_t;
 
 typedef struct {
-    in_addr_t               addr;
     ngx_rtmp_addr_conf_t    conf;
+    in_addr_t               addr;
 } ngx_rtmp_in_addr_t;
 
 
 #if (NGX_HAVE_INET6)
 
 typedef struct {
-    struct in6_addr         addr6;
     ngx_rtmp_addr_conf_t    conf;
+    struct in6_addr         addr6;
 } ngx_rtmp_in6_addr_t;
 
 #endif
