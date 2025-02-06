@@ -15,7 +15,7 @@
 #define NGX_RTMP_CODEC_META_OFF     0
 #define NGX_RTMP_CODEC_META_ON      1
 #define NGX_RTMP_CODEC_META_COPY    2
-
+#define NGX_RTMP_CODEC_ONMETADATA_HEAD   13
 
 static void * ngx_rtmp_codec_create_app_conf(ngx_conf_t *cf);
 static char * ngx_rtmp_codec_merge_app_conf(ngx_conf_t *cf,
@@ -890,6 +890,34 @@ ngx_rtmp_codec_meta_data(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 }
 
 
+static ngx_int_t
+ngx_rtmp_codec_meta_data_by_setdataframe(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    return ngx_rtmp_codec_meta_data(s, h, in);
+}
+
+
+static ngx_int_t
+ngx_rtmp_codec_meta_data_by_onmetadata(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
+        ngx_chain_t *in)
+{
+    ngx_int_t           size = 0;
+
+    if (in) {
+        size = in->buf->pos - in->buf->start;
+
+        if (in->buf->last > in->buf->pos 
+                && size >= NGX_RTMP_CODEC_ONMETADATA_HEAD) 
+        {
+            in->buf->pos -= NGX_RTMP_CODEC_ONMETADATA_HEAD;
+        }
+    }
+
+    return ngx_rtmp_codec_meta_data(s, h, in);
+}
+
+
 static void *
 ngx_rtmp_codec_create_app_conf(ngx_conf_t *cf)
 {
@@ -942,14 +970,14 @@ ngx_rtmp_codec_postconfiguration(ngx_conf_t *cf)
         return NGX_ERROR;
     }
     ngx_str_set(&ch->name, "@setDataFrame");
-    ch->handler = ngx_rtmp_codec_meta_data;
+    ch->handler = ngx_rtmp_codec_meta_data_by_setdataframe;
 
     ch = ngx_array_push(&cmcf->amf);
     if (ch == NULL) {
         return NGX_ERROR;
     }
     ngx_str_set(&ch->name, "onMetaData");
-    ch->handler = ngx_rtmp_codec_meta_data;
+    ch->handler = ngx_rtmp_codec_meta_data_by_onmetadata;
 
 
     return NGX_OK;
