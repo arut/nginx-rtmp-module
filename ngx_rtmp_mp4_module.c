@@ -32,7 +32,7 @@ static ngx_int_t ngx_rtmp_mp4_reset(ngx_rtmp_session_t *s);
 
 /* disable zero-sized array warning by msvc */
 
-#if (NGX_WIN32)
+#if (NGX_WIN32) && (_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable:4200)
 #endif
@@ -115,7 +115,7 @@ typedef struct {
 } ngx_rtmp_mp4_offsets64_t;
 
 
-#if (NGX_WIN32)
+#if (NGX_WIN32) && (_MSC_VER)
 #pragma warning(pop)
 #endif
 

@@ -1,0 +1,161 @@
+name: Build
+on:
+ push:
+  branches: [ master ]
+ pull_request:
+  branches: [ master ]
+ workflow_dispatch:
+ release:
+   types: [published]
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone nginx-rtmp-module
+        uses: actions/checkout@v2.4.0
+        with:
+          path: nginx-rtmp-module
+      - name: Clone OpenSSL
+        uses: actions/checkout@v2.4.0
+        with:
+         repository: openssl/openssl
+         ref: OpenSSL_1_1_1-stable
+         path: openssl
+      - name: Prepare build environment
+        run: |
+          cd ~
+          sudo apt-get install gcc make mercurial git wget
+          hg clone http://hg.nginx.org/nginx
+          mv $GITHUB_WORKSPACE/openssl ~
+          wget https://sourceforge.net/projects/pcre/files/pcre/8.45/pcre-8.45.zip/download -O pcre.zip
+          unzip pcre.zip
+          wget https://www.zlib.net/zlib-1.2.11.tar.gz -O zlib.tgz
+          tar xzf zlib.tgz
+          mv $GITHUB_WORKSPACE/nginx-rtmp-module ~
+          cd nginx
+          rm conf/nginx.conf
+          cp ~/nginx-rtmp-module/support/nginx.conf conf/nginx.conf
+          rm docs/html/index.html
+          cp ~/nginx-rtmp-module/support/index.html docs/html/index.html
+          auto/configure --prefix=. --add-module=../nginx-rtmp-module --with-openssl=../openssl --with-zlib=../zlib-1.2.11 --with-pcre=../pcre-8.45
+      - name: Build nginx
+        run: |
+          cd ~/nginx
+          make -j2
+      - name: Move build files to directory
+        run: |
+          cd ~/nginx
+          mkdir build
+          mkdir build/logs
+          touch build/logs/error.log
+          touch build/logs/access.log
+          mkdir build/sbin
+          cp objs/nginx build/sbin/
+          cp -r conf build/
+          cp -r docs/html build/
+      - name: Create archive
+        run: |
+         cd ~/nginx/build
+         tar -czf nginx-with-rtmp-linux.tar.gz *
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+         name: build-linux
+         path: /home/runner/nginx/build/nginx-with-rtmp-linux.tar.gz
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2.4.0
+        name: Clone nginx-rtmp-module
+        with:
+          path: nginx-rtmp-module
+      - uses: actions/checkout@v2.4.0
+        name: Clone OpenSSL
+        with:
+          repository: openssl/openssl
+          ref: OpenSSL_1_1_1-stable
+          path: openssl
+      - uses: ilammy/msvc-dev-cmd@v1
+        name: Setup msbuild environment
+        with:
+          arch: amd64_x86
+      - uses: ilammy/setup-nasm@v1.2.1
+        name: Install NASM
+      - uses: shogo82148/actions-setup-perl@v1
+        name: Install PERL
+        with:
+          distribution: strawberry
+      - name: Prepare build environment
+        shell: bash
+        run: |
+          cd ~
+          rm /usr/bin/perl.exe /usr/bin/link.exe
+          chocolatey install wget unzip zip
+          hg clone http://hg.nginx.org/nginx
+          mv $GITHUB_WORKSPACE/openssl ~
+          mv $GITHUB_WORKSPACE/nginx-rtmp-module ~
+          wget https://sourceforge.net/projects/pcre/files/pcre/8.45/pcre-8.45.zip/download -O pcre.zip
+          unzip pcre.zip
+          wget https://www.zlib.net/zlib-1.2.11.tar.gz -O zlib.tgz
+          tar xzf zlib.tgz
+          cd nginx
+          rm conf/nginx.conf
+          cp ~/nginx-rtmp-module/support/nginx.conf conf/nginx.conf
+          rm docs/html/index.html
+          cp ~/nginx-rtmp-module/support/index.html docs/html/index.html
+          sed -i 's/-WX/ /' auto/cc/msvc
+          auto/configure --prefix=. --add-module=../nginx-rtmp-module --with-openssl=../openssl --with-zlib=../zlib-1.2.11 --with-pcre=../pcre-8.45 --with-cc=cl
+      - name: Build nginx
+        shell: bash
+        run: |
+          cd ~/nginx
+          nmake
+      - name: Move build files to directory
+        shell: bash
+        run: |
+          cd ~/nginx
+          mkdir build
+          mkdir build/logs
+          touch build/logs/error.log
+          touch build/logs/access.log
+          mkdir build/sbin
+          cp objs/nginx.exe build/sbin/
+          cp -r conf build/
+          cp -r docs/html build/
+      - name: Generate zip artifact
+        shell: bash
+        run: |
+         cd ~/nginx/build
+         zip -r nginx-with-rtmp-win32.zip *
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+         name: build-win32
+         path: C:\Users\runneradmin\nginx\build\nginx-with-rtmp-win32.zip
+  create-release:
+   needs: [build-windows, build-linux]
+   if: ${{ github.event_name == 'release' }}
+   runs-on: ubuntu-latest
+   steps:
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v2.1.0
+      with:
+       name: build-win32
+       path: /home/runner/
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v2.1.0
+      with:
+       name: build-linux
+       path: /home/runner/
+    - name: Upload linux release
+      uses: alexellis/upload-assets@0.2.2
+      env:
+          GITHUB_TOKEN: ${{ github.token }}
+      with:
+          asset_paths: '["/home/runner/nginx-with-rtmp-linux.tar.gz"]'
+    - name: Upload windows release
+      uses: alexellis/upload-assets@0.2.2
+      env:
+          GITHUB_TOKEN: ${{ github.token }}
+      with:
+          asset_paths: '["/home/runner/nginx-with-rtmp-win32.zip"]'
