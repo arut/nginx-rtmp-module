@@ -139,7 +139,7 @@ typedef struct {
 #if !(NGX_WIN32)
 static void ngx_rtmp_exec_respawn(ngx_event_t *ev);
 static ngx_int_t ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal);
-static ngx_int_t ngx_rtmp_exec_run(ngx_rtmp_exec_t *e);
+static void ngx_rtmp_exec_run(ngx_rtmp_exec_t *e);
 #endif
 
 
@@ -690,7 +690,7 @@ ngx_rtmp_exec_kill(ngx_rtmp_exec_t *e, ngx_int_t kill_signal)
 }
 
 
-static ngx_int_t
+static void
 ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
 {
     int                     fd, ret, maxfd, pipefd[2];
@@ -714,13 +714,13 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
         if (e->active) {
             ngx_log_debug1(NGX_LOG_DEBUG_RTMP, e->log, 0,
                            "exec: already active '%V'", &ec->cmd);
-            return NGX_OK;
+            return;
         }
 
         if (pipe(pipefd) == -1) {
             ngx_log_error(NGX_LOG_INFO, e->log, ngx_errno,
                           "exec: pipe failed");
-            return NGX_ERROR;
+            return;
         }
 
         /* make pipe write end survive through exec */
@@ -740,7 +740,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             ngx_log_error(NGX_LOG_INFO, e->log, ngx_errno,
                           "exec: fcntl failed");
 
-            return NGX_ERROR;
+            return;
         }
     }
 
@@ -763,7 +763,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             ngx_log_error(NGX_LOG_INFO, e->log, ngx_errno,
                           "exec: fork failed");
 
-            return NGX_ERROR;
+            return;
 
         case 0:
 
@@ -886,7 +886,7 @@ ngx_rtmp_exec_run(ngx_rtmp_exec_t *e)
             break;
     }
 
-    return NGX_OK;
+    return;
 }
 
 
