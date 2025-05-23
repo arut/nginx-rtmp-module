@@ -733,6 +733,13 @@ ngx_rtmp_play_play(ngx_rtmp_session_t *s, ngx_rtmp_play_t *v)
 
     if (ctx == NULL) {
         ctx = ngx_palloc(s->connection->pool, sizeof(ngx_rtmp_play_ctx_t));
+
+        if (ctx == NULL) {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                          "play: failed to allocate play context");
+            return NGX_ERROR; 
+        }
+        
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_play_module);
     }
 

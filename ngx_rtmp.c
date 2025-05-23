@@ -449,7 +449,9 @@ ngx_rtmp_init_event_handlers(ngx_conf_t *cf, ngx_rtmp_core_main_conf_t *cmcf)
     *eh = ngx_rtmp_aggregate_message_handler;
 
     /* init amf callbacks */
-    ngx_array_init(&cmcf->amf_arrays, cf->pool, 1, sizeof(ngx_hash_key_t));
+    if (ngx_array_init(&cmcf->amf_arrays, cf->pool, 1, sizeof(ngx_hash_key_t)) != NGX_OK) {
+        return NGX_ERROR;
+    }
 
     h = cmcf->amf.elts;
     for(n = 0; n < cmcf->amf.nelts; ++n, ++h) {

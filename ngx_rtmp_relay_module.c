@@ -1292,8 +1292,13 @@ ngx_rtmp_relay_on_status(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
         ngx_rtmp_receive_amf(s, in, in_elts_meta,
                 sizeof(in_elts_meta) / sizeof(in_elts_meta[0]));
     } else {
-        ngx_rtmp_receive_amf(s, in, in_elts,
-                sizeof(in_elts) / sizeof(in_elts[0]));
+        if (ngx_rtmp_receive_amf(s, in, in_elts,
+            sizeof(in_elts) / sizeof(in_elts[0])))
+        {
+            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                 "relay: ngx_rtmp_receive_amf failed");
+            return NGX_OK;
+        }
     }
 
     ngx_log_debug3(NGX_LOG_DEBUG_RTMP, s->connection->log, 0,
