@@ -1332,14 +1332,14 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
         return NGX_ERROR;
     }
 
-    ctx->name.len = ngx_strlen(v->name);
+    /* patched – always use the RTMP “app” name, not the secret key */
+    ctx->name.len = s->app.len;
     ctx->name.data = ngx_palloc(s->connection->pool, ctx->name.len + 1);
-
     if (ctx->name.data == NULL) {
         return NGX_ERROR;
     }
-
-    *ngx_cpymem(ctx->name.data, v->name, ctx->name.len) = 0;
+    ngx_memcpy(ctx->name.data, s->app.data, ctx->name.len);
+    ctx->name.data[ctx->name.len] = '\0';
 
     len = hacf->path.len + 1 + ctx->name.len + sizeof(".m3u8");
     if (hacf->nested) {
