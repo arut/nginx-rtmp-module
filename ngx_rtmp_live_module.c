@@ -803,6 +803,11 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
     }
 */
     rpkt = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
+    if (rpkt == NULL) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "live: failed to append packet buffers");
+        return NGX_OK;
+    }
 
     ngx_rtmp_prepare_message(s, &ch, &lh, rpkt);
 
@@ -903,55 +908,78 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
             }
 
             dummy_audio = 0;
-            if (lacf->wait_video && h->type == NGX_RTMP_MSG_VIDEO &&
-                !pctx->cs[1].active)
+            if (lacf->wait_video
+                && h->type == NGX_RTMP_MSG_VIDEO
+                && !pctx->cs[1].active)
             {
                 dummy_audio = 1;
+        
                 if (aapkt == NULL) {
+        
                     aapkt = ngx_rtmp_alloc_shared_buf(cscf);
-                    ngx_rtmp_prepare_message(s, &clh, NULL, aapkt);
+                    if (aapkt == NULL) {
+                        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                                      "relay: failed to alloc dummy audio buffer");
+                        dummy_audio = 0;
+                    }
+                    else {
+                        ngx_rtmp_prepare_message(s, &clh, NULL, aapkt);
+                    }
                 }
             }
-
+        
             if (header || coheader) {
-
-                /* send absolute codec header */
-
+        
                 ngx_log_debug2(NGX_LOG_DEBUG_RTMP, ss->connection->log, 0,
                                "live: abs %s header timestamp=%uD",
                                type_s, lh.timestamp);
-
+        
                 if (header) {
                     if (apkt == NULL) {
                         apkt = ngx_rtmp_append_shared_bufs(cscf, NULL, header);
-                        ngx_rtmp_prepare_message(s, &lh, NULL, apkt);
+                        if (apkt == NULL) {
+                            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                                          "relay: failed to append header buffers");
+                        }
+                        else {
+                            ngx_rtmp_prepare_message(s, &lh, NULL, apkt);
+                        }
                     }
-
-                    rc = ngx_rtmp_send_message(ss, apkt, 0);
-                    if (rc != NGX_OK) {
-                        continue;
+        
+                    if (apkt) {
+                        rc = ngx_rtmp_send_message(ss, apkt, 0);
+                        if (rc != NGX_OK) {
+                            continue;
+                        }
                     }
                 }
-
+        
                 if (coheader) {
                     if (acopkt == NULL) {
                         acopkt = ngx_rtmp_append_shared_bufs(cscf, NULL, coheader);
-                        ngx_rtmp_prepare_message(s, &clh, NULL, acopkt);
+                        if (acopkt == NULL) {
+                            ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                                          "relay: failed to append coheader buffers");
+                        }
+                        else {
+                            ngx_rtmp_prepare_message(s, &clh, NULL, acopkt);
+                        }
                     }
-
-                    rc = ngx_rtmp_send_message(ss, acopkt, 0);
-                    if (rc != NGX_OK) {
-                        continue;
+        
+                    if (acopkt) {
+                        rc = ngx_rtmp_send_message(ss, acopkt, 0);
+                        if (rc != NGX_OK) {
+                            continue;
+                        }
                     }
-
-                } else if (dummy_audio) {
+        
+                } else if (dummy_audio && aapkt) {
                     ngx_rtmp_send_message(ss, aapkt, 0);
                 }
-
-                cs->timestamp = lh.timestamp;
-                cs->active = 1;
+        
+                cs->timestamp  = lh.timestamp;
+                cs->active     = 1;
                 ss->current_time = cs->timestamp;
-
             } else {
 
                 /* send absolute packet */
@@ -962,7 +990,14 @@ ngx_rtmp_live_av(ngx_rtmp_session_t *s, ngx_rtmp_header_t *h,
 
                 if (apkt == NULL) {
                     apkt = ngx_rtmp_append_shared_bufs(cscf, NULL, in);
-                    ngx_rtmp_prepare_message(s, &ch, NULL, apkt);
+                    if (apkt == NULL) {
+                        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                                      "relay: failed to append header buffers");
+                    }
+
+                    else {
+                        ngx_rtmp_prepare_message(s, &ch, NULL, apkt);
+                    }
                 }
 
                 rc = ngx_rtmp_send_message(ss, apkt, prio);
