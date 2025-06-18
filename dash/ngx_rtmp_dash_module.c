@@ -222,6 +222,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     struct tm                  tm;
     ngx_str_t                  noname, *name;
     ngx_uint_t                 i;
+    ngx_uint_t                 depth_hour, depth_min, depth_msec;
     ngx_rtmp_dash_ctx_t       *ctx;
     ngx_rtmp_codec_ctx_t      *codec_ctx;
     ngx_rtmp_dash_frag_t      *f;
@@ -230,6 +231,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     static u_char              buffer[NGX_RTMP_DASH_BUFSIZE];
     static u_char              start_time[sizeof("1970-09-28T12:00:00Z")];
     static u_char              pub_time[sizeof("1970-09-28T12:00:00Z")];
+    static u_char              buffer_depth[sizeof("PT1234H00M00.00S")];
 
     dacf = ngx_rtmp_get_module_app_conf(s, ngx_rtmp_dash_module);
     ctx = ngx_rtmp_get_module_ctx(s, ngx_rtmp_dash_module);
@@ -261,7 +263,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
     "    publishTime=\"%s\"\n"                                                 \
     "    minimumUpdatePeriod=\"PT%uiS\"\n"                                     \
     "    minBufferTime=\"PT%uiS\"\n"                                           \
-    "    timeShiftBufferDepth=\"PT%uiS\"\n"                                    \
+    "    timeShiftBufferDepth=\"%s\"\n"                                    \
     "    profiles=\"urn:hbbtv:dash:profile:isoff-live:2012,"                   \
                    "urn:mpeg:dash:profile:isoff-live:2011\"\n"                 \
     "    xmlns:xsi=\"http://www.w3.org/2011/XMLSchema-instance\"\n"            \
@@ -350,6 +352,21 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                 tm.tm_mday, tm.tm_hour,
                 tm.tm_min, tm.tm_sec);
 
+    depth_msec = (ngx_uint_t) (
+                 ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->timestamp +
+                 ngx_rtmp_dash_get_frag(s, ctx->nfrags - 1)->duration -
+                 ngx_rtmp_dash_get_frag(s, 0)->timestamp);
+
+    depth_hour = (ngx_uint_t) (depth_msec / 3600 / 1000);
+    depth_msec -= depth_hour * 3600000;
+    depth_min = (ngx_uint_t) (depth_msec / 60 / 1000);
+    depth_msec -= depth_min * 60000;
+
+    ngx_sprintf(buffer_depth, "PT%dH%02dM%02d.%02dS",
+                 depth_hour, depth_min,
+                 (ngx_uint_t) (depth_msec / 1000),
+                 depth_msec % 1000);
+
     last = buffer + sizeof(buffer);
 
     p = ngx_slprintf(buffer, last, NGX_RTMP_DASH_MANIFEST_HEADER,
@@ -357,6 +374,7 @@ ngx_rtmp_dash_write_playlist(ngx_rtmp_session_t *s)
                      pub_time,
                      (ngx_uint_t) (dacf->fraglen / 1000),
                      (ngx_uint_t) (dacf->fraglen / 1000),
+                     buffer_depth,
                      (ngx_uint_t) (dacf->fraglen / 250 + 1));
 
     /*
