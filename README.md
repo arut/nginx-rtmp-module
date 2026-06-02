@@ -76,6 +76,17 @@ For building debug version of nginx add `--with-debug`
 
 [Read more about debug log](https://github.com/arut/nginx-rtmp-module/wiki/Debug-log)
 
+### Windows local setup
+
+On Windows, the module can be built and tested using WSL (Windows Subsystem for Linux). Native Windows builds are possible but require a compatible Nginx source tree and build tools.
+
+Recommended steps:
+
+* Install WSL: `wsl.exe --install`
+* Install a Linux distribution: `wsl.exe --install <Distro>`
+* Install build tools inside WSL: `sudo apt update && sudo apt install build-essential libpcre3 libpcre3-dev zlib1g zlib1g-dev libssl-dev`
+* Configure and build Nginx from Linux source with this module: `./configure --add-module=/path/to/nginx-rtmp-module && make && sudo make install`
+
 ### Windows limitations
 
 Windows support is limited. These features are not supported
