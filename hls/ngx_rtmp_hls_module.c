@@ -1300,6 +1300,10 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     if (ctx == NULL) {
 
         ctx = ngx_pcalloc(s->connection->pool, sizeof(ngx_rtmp_hls_ctx_t));
+        if (ctx == NULL) {
+            return NGX_ERROR;
+        }
+
         ngx_rtmp_set_ctx(s, ctx, ngx_rtmp_hls_module);
 
     } else {
@@ -1347,6 +1351,10 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     }
 
     ctx->playlist.data = ngx_palloc(s->connection->pool, len);
+    if (ctx->playlist.data == NULL) {
+        return NGX_ERROR;
+    }
+
     p = ngx_cpymem(ctx->playlist.data, hacf->path.data, hacf->path.len);
 
     if (p[-1] != '/') {
@@ -1365,6 +1373,9 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
     ctx->stream.data = ngx_palloc(s->connection->pool,
                                   ctx->stream.len + NGX_INT64_LEN +
                                   sizeof(".ts"));
+    if (ctx->stream.data == NULL) {
+        return NGX_ERROR;
+    }
 
     ngx_memcpy(ctx->stream.data, ctx->playlist.data, ctx->stream.len - 1);
     ctx->stream.data[ctx->stream.len - 1] = (hacf->nested ? '/' : '-');
@@ -1388,6 +1399,9 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
                                         - 1;
                 ctx->var_playlist.data = ngx_palloc(s->connection->pool,
                                                     ctx->var_playlist.len + 1);
+                if (ctx->var_playlist.data == NULL) {
+                    return NGX_ERROR;
+                }
 
                 pp = ngx_cpymem(ctx->var_playlist.data, ctx->playlist.data,
                                len - var->suffix.len);
@@ -1398,6 +1412,9 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
                                             sizeof(".bak") - 1;
                 ctx->var_playlist_bak.data = ngx_palloc(s->connection->pool,
                                                  ctx->var_playlist_bak.len + 1);
+                if (ctx->var_playlist_bak.data == NULL) {
+                    return NGX_ERROR;
+                }
 
                 pp = ngx_cpymem(ctx->var_playlist_bak.data,
                                 ctx->var_playlist.data,
@@ -1427,6 +1444,10 @@ ngx_rtmp_hls_publish(ngx_rtmp_session_t *s, ngx_rtmp_publish_t *v)
 
     ctx->playlist_bak.data = ngx_palloc(s->connection->pool,
                                         ctx->playlist.len + sizeof(".bak"));
+    if (ctx->playlist_bak.data == NULL) {
+        return NGX_ERROR;
+    }
+
     p = ngx_cpymem(ctx->playlist_bak.data, ctx->playlist.data,
                    ctx->playlist.len);
     p = ngx_cpymem(p, ".bak", sizeof(".bak") - 1);
