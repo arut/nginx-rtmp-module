@@ -50,6 +50,10 @@ typedef ngx_chain_t * (*ngx_rtmp_amf_alloc_pt)(void *arg);
 
 
 typedef struct {
+    ngx_uint_t                          object_depth;
+    ngx_uint_t                          array_depth;
+    ngx_uint_t                          variant_depth;
+
     ngx_chain_t                        *link, *first;
     size_t                              offset;
     ngx_rtmp_amf_alloc_pt               alloc;
